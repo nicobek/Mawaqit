@@ -97,17 +97,18 @@ HTTP: httpx.AsyncClient = None  # type: ignore
 
 # ───────────────────────── constants ─────────────────────────
 
-LANGS = ["en", "ru", "uz", "tg", "ar"]
+LANGS = ["en", "ru", "uz", "uzc", "tg", "ar"]  # uzc = Uzbek in Cyrillic
 LANG_BUTTONS = {
     "en": "🇬🇧 English",
     "ru": "🇷🇺 Русский",
     "uz": "🇺🇿 Oʻzbekcha",
+    "uzc": "🇺🇿 Ўзбекча",
     "tg": "🇹🇯 Тоҷикӣ",
     "ar": "🇸🇦 العربية",
 }
 LANG_PICK_TEXT = (
     "🌐 <b>Choose your language</b>\n"
-    "Выберите язык · Tilni tanlang\n"
+    "Выберите язык · Tilni tanlang · Тилни танланг\n"
     "Забонро интихоб кунед · اختر لغتك"
 )
 
@@ -835,6 +836,88 @@ EXTRA5 = {
 for _l, _d in EXTRA5.items():
     T[_l].update(_d)
 
+# ───────────────────────── Uzbek in Cyrillic ─────────────────────────
+# The Cyrillic Uzbek texts are produced from the Latin ones by the official spelling rules,
+# so both stay in sync. Words that the rules can't get right are listed in CYR_WORDS.
+
+_APOS = "'ʻʼ’‘`"
+_CYR_1 = {"a": "а", "b": "б", "c": "ц", "d": "д", "e": "е", "f": "ф", "g": "г", "h": "ҳ", "i": "и", "j": "ж", "k": "к",
+          "l": "л", "m": "м", "n": "н", "o": "о", "p": "п", "q": "қ", "r": "р", "s": "с", "t": "т", "u": "у", "v": "в",
+          "w": "в", "x": "х", "y": "й", "z": "з"}
+_CYR_VOW = set("aeiouAEIOU")
+CYR_WORDS = {  # Latin word (lower case) → Cyrillic
+    "sentabr": "сентябр", "oktabr": "октябр", "iyun": "июн", "iyul": "июл", "yanvar": "январ",
+    "mawaqit": "Mawaqit", "telegram": "Telegram", "mawaqittimebot": "MawaqitTimeBot",
+    "fevral": "феврал", "dekabr": "декабр", "noyabr": "ноябр", "avgust": "август",
+}
+_CYR_KEEP = re.compile(r"(\{[^}]*\}|<b>N</b>|<[^>]+>|https?://\S+|@\w+|&\w+;)")
+_CYR_WORD = re.compile(r"[A-Za-z" + _APOS + r"]+")
+
+
+def _cyr_word(w):
+    low = w.lower().strip(_APOS)
+    for k, v in CYR_WORDS.items():  # "Mawaqit'dagi" → "Mawaqit’даги"
+        if low.startswith(k) and len(low) > len(k) and low[len(k)] in _APOS:
+            return v + "’" + _cyr_word(w[len(k) + 1:])
+    if low in CYR_WORDS:
+        out = CYR_WORDS[low]
+        if w[:1].isupper() and out[:1].islower():
+            out = out[:1].upper() + out[1:]
+        return out
+    res, i, n = [], 0, len(w)
+    while i < n:
+        c, lc = w[i], w[i].lower()
+        nxt = w[i + 1].lower() if i + 1 < n else ""
+        up = c.isupper()
+        if c in _APOS:  # tutuq belgisi
+            res.append("ъ" if res and res[-1] not in "ъ" and i > 0 else "")
+            i += 1
+            continue
+        if lc in "og" and nxt and nxt in _APOS:
+            ch = "ў" if lc == "o" else "ғ"
+            i += 2
+        elif lc == "s" and nxt == "h":
+            ch, i = "ш", i + 2
+        elif lc == "c" and nxt == "h":
+            ch, i = "ч", i + 2
+        elif lc == "y" and nxt in ("o", "u", "a", "e") and not (nxt == "o" and i + 2 < n and w[i + 2] in _APOS):
+            ch, i = {"o": "ё", "u": "ю", "a": "я", "e": "е"}[nxt], i + 2
+        elif lc == "e":
+            ch = "э" if i == 0 or w[i - 1] in _CYR_VOW else "е"
+            i += 1
+        elif lc in _CYR_1:
+            ch = _CYR_1[lc]
+            i += 1
+        else:
+            ch, i = c, i + 1
+        if up:
+            # SH, CH, YO… in an all-caps word stay all caps
+            ch = ch.upper()
+        res.append(ch)
+    out = "".join(res)
+    if len(w) > 1 and w.isupper():
+        return out.upper()
+    if w[:1].isupper():
+        return out[:1].upper() + out[1:].lower() if not any(x.isupper() for x in w[1:]) else out
+    return out
+
+
+def to_cyr(text):
+    """Latin Uzbek → Cyrillic Uzbek. Placeholders, HTML tags, links and @names are left alone."""
+    if not isinstance(text, str):
+        if isinstance(text, list):
+            return [to_cyr(x) for x in text]
+        if isinstance(text, dict):
+            return {k: to_cyr(v) for k, v in text.items()}
+        return text
+    parts = _CYR_KEEP.split(text)
+    return "".join(p if i % 2 else _CYR_WORD.sub(lambda m: _cyr_word(m.group(0)), p) for i, p in enumerate(parts))
+
+
+T["uzc"] = to_cyr(T["uz"])
+PN["uzc"] = to_cyr(PN["uz"])
+HM["uzc"] = to_cyr(HM["uz"])
+
 GROUP_WELCOME = ("🕌 <b>Assalamu alaikum!</b>\n\n"
                  "I'll post prayer times and reminders here. Group admins, please set me up 👇\n\n" + LANG_PICK_TEXT)
 
@@ -1060,20 +1143,25 @@ def place_name(addr):
 
 
 async def geocode(query, lang):
-    data = await nominatim("search", {"q": query, "limit": 1, "accept-language": lang})
+    data = await nominatim("search", {"q": query, "limit": 1, "accept-language": "uz" if lang == "uzc" else lang})
     if not data:
         return None
     d = data[0]
     addr = d.get("address", {})
     name = place_name(addr) or d.get("display_name", query).split(",")[0]
+    if lang == "uzc":
+        name = to_cyr(name)
     return name, float(d["lat"]), float(d["lon"]), addr.get("country_code", "")
 
 
 async def reverse_geocode(lat, lon, lang):
     try:
-        d = await nominatim("reverse", {"lat": lat, "lon": lon, "zoom": 10, "accept-language": lang})
+        d = await nominatim("reverse", {"lat": lat, "lon": lon, "zoom": 10, "accept-language": "uz" if lang == "uzc" else lang})
         addr = d.get("address", {})
-        return place_name(addr) or f"{lat:.2f}, {lon:.2f}", addr.get("country_code", "")
+        name = place_name(addr)
+        if name and lang == "uzc":
+            name = to_cyr(name)
+        return name or f"{lat:.2f}, {lon:.2f}", addr.get("country_code", "")
     except Exception:  # noqa: BLE001
         log.exception("reverse geocode failed")
         return f"{lat:.2f}, {lon:.2f}", ""
@@ -1173,8 +1261,8 @@ async def can_manage(update: Update, ctx):
 
 def screen_lang(back=False):
     rows = [[btn(LANG_BUTTONS["en"], "lang:en"), btn(LANG_BUTTONS["ru"], "lang:ru")],
-            [btn(LANG_BUTTONS["uz"], "lang:uz"), btn(LANG_BUTTONS["tg"], "lang:tg")],
-            [btn(LANG_BUTTONS["ar"], "lang:ar")]]
+            [btn(LANG_BUTTONS["uz"], "lang:uz"), btn(LANG_BUTTONS["uzc"], "lang:uzc")],
+            [btn(LANG_BUTTONS["tg"], "lang:tg"), btn(LANG_BUTTONS["ar"], "lang:ar")]]
     if back:
         rows.append([btn("⬅️", "s:settings")])
     return LANG_PICK_TEXT, kb(*rows)
@@ -2717,8 +2805,8 @@ async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
             return await ask_bc_text(update, ctx)
         if what == "lang":
             rows = [[btn(LANG_BUTTONS["en"], "a:bcl:en"), btn(LANG_BUTTONS["ru"], "a:bcl:ru")],
-                    [btn(LANG_BUTTONS["uz"], "a:bcl:uz"), btn(LANG_BUTTONS["tg"], "a:bcl:tg")],
-                    [btn(LANG_BUTTONS["ar"], "a:bcl:ar")], [btn("⬅️ Назад", "a:bc")]]
+                    [btn(LANG_BUTTONS["uz"], "a:bcl:uz"), btn(LANG_BUTTONS["uzc"], "a:bcl:uzc")],
+                    [btn(LANG_BUTTONS["tg"], "a:bcl:tg"), btn(LANG_BUTTONS["ar"], "a:bcl:ar")], [btn("⬅️ Назад", "a:bc")]]
             return await render(update, "🌐 <b>Выберите язык получателей</b>", kb(*rows))
         if what == "country":
             ctx.user_data["admin_state"] = "bc_country"
@@ -4530,6 +4618,8 @@ async def setup_profile(bot):
         log.exception("could not set menu button")
     log.info("menu button: %s", "mini app" if WEBAPP_URL else "commands")
     for lang in LANGS:
+        if lang not in BOT_ABOUT:  # Telegram has one "uz": the profile stays in Latin
+            continue
         for code in ([None, lang] if lang == "en" else [lang]):
             try:
                 await bot.set_my_short_description(BOT_ABOUT[lang], language_code=code)

@@ -1154,9 +1154,9 @@ const L_ = new Proxy({}, {get: (_, k) => window.L[k]});  // Leaflet
 /* ───────── 99 NAMES ───────── */
 function renderNames(filter = "") {
   $("nTitle").textContent = tr("m_names"); $("nSearch").placeholder = tr("n_search");
-  const col = {en: 2, ru: 3, uz: 4, tg: 5}[LANG], f = filter.trim().toLowerCase();
-  $("nList").innerHTML = NAMES.map((n, i) => ({n, i})).filter(({n}) => !f || n.some(x => String(x).toLowerCase().includes(f))).map(({n, i}) =>
-    `<div class="nm"><div class="no">${i + 1}</div><div class="ar">${n[0]}</div><div class="tr">${esc(n[1])}</div>${col ? `<div class="mn">${esc(n[col])}</div>` : ""}</div>`).join("");
+  const col = {en: 2, ru: 3, uz: 4, uzc: 4, tg: 5}[LANG], f = filter.trim().toLowerCase();
+  $("nList").innerHTML = NAMES.map((n, i) => ({n, i})).filter(({n}) => !f || n.concat(LANG === "uzc" ? [cy(n[4])] : []).some(x => String(x).toLowerCase().includes(f))).map(({n, i}) =>
+    `<div class="nm"><div class="no">${i + 1}</div><div class="ar">${n[0]}</div><div class="tr">${esc(n[1])}</div>${col ? `<div class="mn">${esc(cy(n[col]))}</div>` : ""}</div>`).join("");
 }
 
 
@@ -1206,9 +1206,9 @@ const LX2 = {
 for (const l in LX2) Object.assign(LX[l], LX2[l]);
 
 const SRC = {bukhari:["Bukhari","Бухари","Buxoriy","Бухорӣ","البخاري"],muslim:["Muslim","Муслим","Muslim","Муслим","مسلم"],abudawud:["Abu Dawud","Абу Дауд","Abu Dovud","Абудовуд","أبو داود"],tirmidhi:["at-Tirmidhi","ат-Тирмизи","Termiziy","Тирмизӣ","الترمذي"],nasai:["an-Nasa'i","ан-Насаи","Nasoiy","Насоӣ","النسائي"],hakim:["al-Hakim","аль-Хаким","Hokim","Ҳоким","الحاكم"],quran:["Qur'an","Коран","Qur'on","Қуръон","القرآن"]};
-const LI = () => ({en:0, ru:1, uz:2, tg:3, ar:4})[LANG] ?? 0;
-const srcText = list => list.map(s => { const [k, ref] = s.split(" "); return (SRC[k] ? SRC[k][LI()] : k) + (ref ? " " + ref : ""); }).join(", ");
-const mean = o => o ? (o[LANG] || o.en || "") : "";
+const LI = () => ({en:0, ru:1, uz:2, uzc:2, tg:3, ar:4})[LANG] ?? 0;
+const srcText = list => list.map(s => { const [k, ref] = s.split(" "); return (SRC[k] ? cy(SRC[k][LI()]) : k) + (ref ? " " + ref : ""); }).join(", ");
+const mean = o => o ? (o[LANG] || (LANG === "uzc" && o.uz && cy(o.uz)) || o.en || "") : "";
 
 /* id, when (m = morning, e = evening, b = both), count, arabic, transliteration, meaning, sources */
 const AZKAR = [
@@ -1312,7 +1312,7 @@ function renderSettings() {
   $("stCityChange").textContent = tr("pl_change"); renderThemePicker();
   $("stLangL").textContent = tr("st_lang"); $("stMadhabL").textContent = tr("st_madhab");
   $("stLeadL").textContent = tr("st_lead"); $("stAutoL").textContent = tr("st_auto"); $("stQuietL").textContent = tr("st_quiet");
-  chips($("stLang"), [["en", "🇬🇧 English"], ["ru", "🇷🇺 Русский"], ["uz", "🇺🇿 Oʻzbekcha"], ["tg", "🇹🇯 Тоҷикӣ"], ["ar", "🇸🇦 العربية"]], LANG, v => saveSetting({lang: v}));
+  chips($("stLang"), [["en", "🇬🇧 English"], ["ru", "🇷🇺 Русский"], ["uz", "🇺🇿 Oʻzbekcha"], ["uzc", "🇺🇿 Ўзбекча"], ["tg", "🇹🇯 Тоҷикӣ"], ["ar", "🇸🇦 العربية"]], LANG, v => saveSetting({lang: v}));
   chips($("stMadhab"), [["std", tr("st_std")], ["hanafi", tr("st_hanafi")]], p.madhab, v => saveSetting({madhab: v}));
   sw($("stRemind"), tr("st_remind"), p.remind, v => saveSetting({remind: v}));
   chips($("stLead"), (p.lead_options || [5, 10, 15, 30, 0]).map(n => [n, n ? tr("st_min", {n}) : tr("st_lead_off")]), p.lead, v => saveSetting({lead: +v}));
@@ -1362,7 +1362,7 @@ function tapZikr(id) {
 /* ───────── DUAS ───────── */
 function renderDuas() {
   $("duTitle").textContent = tr("m_duas"); $("duNote").textContent = tr("du_note");
-  $("duList").innerHTML = DUAS.map(d => `<div class="du"><div class="tt">${esc(d.t[LI()])}</div><div class="ar">${esc(d.ar)}</div>${LANG !== "ar" ? `<div class="tl">${esc(d.tl)}</div><div class="mn">${esc(mean(d.m))}</div>` : ""}<div class="ft"><span>📚 ${esc(srcText(d.s))}</span></div></div>`).join("");
+  $("duList").innerHTML = DUAS.map(d => `<div class="du"><div class="tt">${esc(cy(d.t[LI()]))}</div><div class="ar">${esc(d.ar)}</div>${LANG !== "ar" ? `<div class="tl">${esc(d.tl)}</div><div class="mn">${esc(mean(d.m))}</div>` : ""}<div class="ft"><span>📚 ${esc(srcText(d.s))}</span></div></div>`).join("");
 }
 
 /* ───────── QADA ───────── */
@@ -1661,6 +1661,47 @@ const LX6 = {
   ps_text:"🕌 مواقيت الصلاة · {city}"}
 };
 for (const l in LX6) Object.assign(LX[l], LX6[l]);
+
+/* ═══════════ Uzbek in Cyrillic: made from the Latin texts by the spelling rules (same as the bot) ═══════════ */
+const CYR_APOS = "'ʻʼ’‘`";
+const CYR_1 = {a:"а",b:"б",c:"ц",d:"д",e:"е",f:"ф",g:"г",h:"ҳ",i:"и",j:"ж",k:"к",l:"л",m:"м",n:"н",o:"о",p:"п",q:"қ",r:"р",s:"с",t:"т",u:"у",v:"в",w:"в",x:"х",y:"й",z:"з"};
+const CYR_WORDS = {sentabr:"сентябр",oktabr:"октябр",iyun:"июн",iyul:"июл",yanvar:"январ",mawaqit:"Mawaqit",telegram:"Telegram",mawaqittimebot:"MawaqitTimeBot",fevral:"феврал",dekabr:"декабр",noyabr:"ноябр",avgust:"август"};
+const CYR_KEEP = /(\{[^}]*\}|<b>N<\/b>|<[^>]+>|https?:\/\/\S+|@\w+|&\w+;)/;
+const CYR_WORD = new RegExp("[A-Za-z" + CYR_APOS + "]+", "g");
+const isUp = c => c !== c.toLowerCase() && c === c.toUpperCase();
+function cyrWord(w) {
+  const strip = s => s.replace(new RegExp("^[" + CYR_APOS + "]+|[" + CYR_APOS + "]+$", "g"), "");
+  const low = strip(w.toLowerCase());
+  for (const k in CYR_WORDS) if (low.startsWith(k) && low.length > k.length && CYR_APOS.includes(low[k.length])) return CYR_WORDS[k] + "’" + cyrWord(w.slice(k.length + 1));
+  if (low in CYR_WORDS) { let o = CYR_WORDS[low]; if (isUp(w[0]) && o[0] === o[0].toLowerCase()) o = o[0].toUpperCase() + o.slice(1); return o; }
+  const res = []; let i = 0; const n = w.length;
+  while (i < n) {
+    const c = w[i], lc = c.toLowerCase(), nx = i + 1 < n ? w[i + 1].toLowerCase() : "", up = isUp(c);
+    let ch;
+    if (CYR_APOS.includes(c)) { res.push(res.length && i > 0 && res[res.length - 1] !== "ъ" ? "ъ" : ""); i++; continue; }
+    if ((lc === "o" || lc === "g") && nx && CYR_APOS.includes(nx)) { ch = lc === "o" ? "ў" : "ғ"; i += 2; }
+    else if (lc === "s" && nx === "h") { ch = "ш"; i += 2; }
+    else if (lc === "c" && nx === "h") { ch = "ч"; i += 2; }
+    else if (lc === "y" && "oaue".includes(nx) && nx && !(nx === "o" && i + 2 < n && CYR_APOS.includes(w[i + 2]))) { ch = {o: "ё", u: "ю", a: "я", e: "е"}[nx]; i += 2; }
+    else if (lc === "e") { ch = (i === 0 || "aeiouAEIOU".includes(w[i - 1])) ? "э" : "е"; i++; }
+    else if (lc in CYR_1) { ch = CYR_1[lc]; i++; }
+    else { ch = c; i++; }
+    res.push(up ? ch.toUpperCase() : ch);
+  }
+  const out = res.join("");
+  const letters = w.replace(new RegExp("[" + CYR_APOS + "]", "g"), "");
+  if (letters.length > 1 && letters === letters.toUpperCase()) return out.toUpperCase();
+  if (isUp(w[0])) return [...w.slice(1)].some(isUp) ? out : out[0].toUpperCase() + out.slice(1).toLowerCase();
+  return out;
+}
+function toCyr(x) {
+  if (Array.isArray(x)) return x.map(toCyr);
+  if (x && typeof x === "object") { const o = {}; for (const k in x) o[k] = toCyr(x[k]); return o; }
+  if (typeof x !== "string") return x;
+  return x.split(CYR_KEEP).map((p, i) => i % 2 ? p : p.replace(CYR_WORD, cyrWord)).join("");
+}
+const cy = s => LANG === "uzc" ? toCyr(s) : s;
+LX.uzc = toCyr(LX.uz);
 
 /* glass: lighter version for slow phones */
 function detectLite() {
@@ -2215,7 +2256,7 @@ function adBc() {
     <div class="card"><b>🔘 Кнопка-ссылка (необязательно)</b>
       <input class="search" id="bcBtnT" placeholder="Текст кнопки" value="${esc(b.btnT || "")}" style="margin-top:8px"><input class="search" id="bcBtnU" placeholder="https://…" value="${esc(b.btnU || "")}" inputmode="url"></div>
     <div class="card"><b>👥 Кому</b><div class="chips" id="bcKind" style="margin-top:8px">${[["all", "Всем пользователям"], ["lang", "По языку"], ["country", "По стране"], ["everything", "+ группы и каналы"]].map(([k, l]) => `<button class="chip ${k === b.kind ? "on" : ""}" data-k="${k}">${l}</button>`).join("")}</div>
-      ${b.kind === "lang" ? `<div class="chips" id="bcLang" style="margin-top:8px">${["en", "ru", "uz", "tg", "ar"].map(l => `<button class="chip ${l === b.value ? "on" : ""}" data-l2="${l}">${LANG_LABEL[l]}</button>`).join("")}</div>` : ""}
+      ${b.kind === "lang" ? `<div class="chips" id="bcLang" style="margin-top:8px">${["en", "ru", "uz", "uzc", "tg", "ar"].map(l => `<button class="chip ${l === b.value ? "on" : ""}" data-l2="${l}">${LANG_LABEL[l]}</button>`).join("")}</div>` : ""}
       ${b.kind === "country" ? `<input class="search" id="bcCountry" maxlength="2" placeholder="Код страны: uz, ru, tj…" value="${esc(b.kind === "country" ? (b.value.length === 2 ? b.value : "") : "")}" style="margin-top:8px">` : ""}
       <div class="sub" id="bcCount" style="margin-top:8px">…</div></div>
     <div class="lbl">👁 Предпросмотр</div><div class="bubble" id="bcPrev"></div>
@@ -2230,7 +2271,7 @@ function adBc() {
   $("bcSend").onclick = bcSend;
   bcPreview(); bcCount();
 }
-const LANG_LABEL = {en: "🇬🇧 English", ru: "🇷🇺 Русский", uz: "🇺🇿 Oʻzbekcha", tg: "🇹🇯 Тоҷикӣ", ar: "🇸🇦 العربية"};
+const LANG_LABEL = {en: "🇬🇧 English", ru: "🇷🇺 Русский", uz: "🇺🇿 Oʻzbekcha", uzc: "🇺🇿 Ўзбекча", tg: "🇹🇯 Тоҷикӣ", ar: "🇸🇦 العربية"};
 function fmtRich(s) { return esc(s).replace(/\*\*(.+?)\*\*/gs, "<b>$1</b>").replace(/__(.+?)__/gs, "<i>$1</i>").replace(/\n/g, "<br>"); }
 function bcPreview() {
   const b = AD.bc;
@@ -2297,7 +2338,7 @@ async function adSys() {
 /* ───────── boot ───────── */
 function applyLang() {
   T = LX[LANG] || LX.en;
-  document.documentElement.lang = LANG;
+  document.documentElement.lang = LANG === "uzc" ? "uz-Cyrl" : LANG;
   document.documentElement.dir = LANG === "ar" ? "rtl" : "ltr";
   document.querySelectorAll("[data-l]").forEach(e => e.textContent = tr(e.dataset.l));
 }
