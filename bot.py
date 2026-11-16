@@ -6047,8 +6047,14 @@ async def provider_models(p, key=None):
     r.raise_for_status()
     have = [m.get("id") for m in r.json().get("data", [])]
     model = next((m for m in v["prefer"] if m in have), None)
-    if not model and p == "openrouter":
-        model = next((m for m in have if m and m.endswith(":free")), None)
+    if not model and p == "openrouter":  # free models change often: take the strongest family that is there
+        free = [m for m in have if m and m.endswith(":free")]
+        for fam in ("gpt-oss-120b", "deepseek-chat", "deepseek-v3", "llama-3.3-70b", "qwen3-235b", "llama-4-maverick",
+                    "gemma-3-27b", "mistral-small", "gpt-oss-20b"):
+            model = next((m for m in free if fam in m), None)
+            if model:
+                break
+        model = model or (free[0] if free else None)
     model = model or v["prefer"][0]
     if not key:
         AI["pmodel"][p] = model
