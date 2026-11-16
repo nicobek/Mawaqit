@@ -616,6 +616,21 @@ EXTRA2 = {
 for _l, _d in EXTRA2.items():
     T[_l].update(_d)
 
+EXTRA3 = {
+    "en": {"btn_auto": "🔄 Auto-update: {v}", "auto_title": "🔄 <b>Auto-update of the prayer times card</b>\n\nThe last card in the chat updates itself: countdown, current prayer and the new day's times.",
+           "auto_off": "Off", "auto_1": "Every minute", "auto_n": "Every {n} min", "updated_at": "🔄 Updated at {time}"},
+    "ru": {"btn_auto": "🔄 Автообновление: {v}", "auto_title": "🔄 <b>Автообновление карточки времени</b>\n\nПоследняя карточка в чате обновляется сама: отсчёт, текущий намаз и время на новый день.",
+           "auto_off": "Выкл", "auto_1": "Каждую минуту", "auto_n": "Каждые {n} мин", "updated_at": "🔄 Обновлено в {time}"},
+    "uz": {"btn_auto": "🔄 Avtoyangilash: {v}", "auto_title": "🔄 <b>Namoz vaqtlari kartasini avtoyangilash</b>\n\nChatdagi oxirgi karta o'zi yangilanadi: qolgan vaqt, joriy namoz va yangi kun vaqtlari.",
+           "auto_off": "O'chiq", "auto_1": "Har daqiqada", "auto_n": "Har {n} daqiqada", "updated_at": "🔄 {time} da yangilandi"},
+    "tg": {"btn_auto": "🔄 Навсозии худкор: {v}", "auto_title": "🔄 <b>Навсозии худкори корти вақти намоз</b>\n\nКорти охирин дар чат худаш нав мешавад: вақти боқимонда, намози ҷорӣ ва вақтҳои рӯзи нав.",
+           "auto_off": "Хомӯш", "auto_1": "Ҳар дақиқа", "auto_n": "Ҳар {n} дақиқа", "updated_at": "🔄 Соати {time} нав шуд"},
+    "ar": {"btn_auto": "🔄 التحديث التلقائي: {v}", "auto_title": "🔄 <b>التحديث التلقائي لبطاقة المواقيت</b>\n\nآخر بطاقة في المحادثة تتحدث تلقائياً: العد التنازلي والصلاة الحالية ومواقيت اليوم الجديد.",
+           "auto_off": "متوقف", "auto_1": "كل دقيقة", "auto_n": "كل {n} دقيقة", "updated_at": "🔄 تم التحديث {time}"},
+}
+for _l, _d in EXTRA3.items():
+    T[_l].update(_d)
+
 GROUP_WELCOME = ("🕌 <b>Assalamu alaikum!</b>\n\n"
                  "I'll post prayer times and reminders here. Group admins, please set me up 👇\n\n" + LANG_PICK_TEXT)
 
@@ -681,6 +696,16 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS owner_id  BIGINT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS members   INT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS daily     TEXT NOT NULL DEFAULT 'off';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS at_time   BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS auto_mode INT NOT NULL DEFAULT 5;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS username  TEXT;
+CREATE TABLE IF NOT EXISTS times_cards (
+    chat_id   BIGINT PRIMARY KEY,
+    msg_id    BIGINT NOT NULL,
+    data_id   BIGINT NOT NULL,
+    sent_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    edited_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS daily_stats (
     stat_day   DATE NOT NULL,
     stat_key   TEXT NOT NULL,
@@ -1040,6 +1065,7 @@ def screen_settings(u):
         [btn(t(lang, "btn_lang"), "s:lang"), btn(t(lang, "btn_madhab"), "s:madhab")],
         [btn(t(lang, "btn_lead"), "s:lead")],
         [btn(t(lang, "btn_at_on" if u["at_time"] else "btn_at_off"), "s:attime")],
+        [btn(t(lang, "btn_auto", v=auto_label(lang, u["auto_mode"])), "s:auto")],
         [btn(t(lang, "btn_quiet"), "s:quiet")],
         [btn(t(lang, "btn_ram_on" if u["ramadan"] else "btn_ram_off"), "s:ramadan")],
     ]
@@ -1129,6 +1155,96 @@ async def ask_remind(update, u):
     )
 
 
+
+# ───────────────────────── live prayer-times card ─────────────────────────
+# Opening "prayer times" sends a separate card. The menu stays where it is, the previous card is
+# deleted, and the newest card keeps itself up to date (countdown, current prayer, new day).
+
+AUTO_OPTIONS = [0, 1, 5, 15]
+
+
+def auto_label(lang, n):
+    return t(lang, "auto_off") if not n else (t(lang, "auto_1") if n == 1 else t(lang, "auto_n", n=n))
+
+
+def card_markup(u):
+    lang = u["lang"]
+    return kb([qibla_btn(u), btn("🔄", "tc:refresh")], [btn(t(lang, "btn_menu"), "m:new")])
+
+
+async def card_text(u):
+    text, _ = await screen_times(u, onboarding=True)
+    if u["auto_mode"]:
+        now = datetime.now(ZoneInfo(u["tz"]))
+        text += "\n<i>" + t(u["lang"], "updated_at", time=now.strftime("%H:%M")) + "</i>"
+    return text
+
+
+async def remember_card(chat_id, msg_id, data_id, bot=None):
+    """Make this message the chat's live card; delete the previous one."""
+    old = await POOL.fetchval("SELECT msg_id FROM times_cards WHERE chat_id = $1", chat_id)
+    await POOL.execute(
+        "INSERT INTO times_cards (chat_id, msg_id, data_id, sent_at, edited_at) VALUES ($1, $2, $3, now(), now()) "
+        "ON CONFLICT (chat_id) DO UPDATE SET msg_id = EXCLUDED.msg_id, data_id = EXCLUDED.data_id, "
+        "sent_at = now(), edited_at = now()", chat_id, msg_id, data_id)
+    if bot and old and old != msg_id:
+        try:
+            await bot.delete_message(chat_id, old)
+        except Exception:  # noqa: BLE001  (older than 48 h or already gone)
+            pass
+
+
+async def send_times_card(update, ctx, u):
+    chat = update.effective_chat
+    try:
+        text = await card_text(u)
+    except Exception:  # noqa: BLE001
+        log.exception("times failed")
+        return await chat.send_message(t(u["lang"], "error"))
+    m = await chat.send_message(text, parse_mode=ParseMode.HTML, reply_markup=card_markup(u))
+    await remember_card(chat.id, m.message_id, u["user_id"], ctx.bot)
+
+
+async def refresh_cards(context: ContextTypes.DEFAULT_TYPE):
+    try:
+        rows = await POOL.fetch(
+            "SELECT c.chat_id AS card_chat, c.msg_id AS card_msg, u.* FROM times_cards c "
+            "JOIN users u ON u.user_id = c.data_id "
+            "WHERE u.auto_mode > 0 AND u.tz IS NOT NULL AND u.lang IS NOT NULL AND u.city IS NOT NULL "
+            "AND NOT u.banned AND c.sent_at > now() - interval '14 days' "
+            "AND c.edited_at <= now() - make_interval(mins => u.auto_mode) + interval '10 seconds'")
+    except Exception:  # noqa: BLE001
+        log.exception("refresh_cards: db error")
+        return
+    for r in rows:
+        u = dict(r)
+        chat_id, msg_id = u.pop("card_chat"), u.pop("card_msg")
+        drop = False
+        try:
+            await context.bot.edit_message_text(await card_text(u), chat_id=chat_id, message_id=msg_id,
+                                                parse_mode=ParseMode.HTML, reply_markup=card_markup(u))
+        except RetryAfter as e:
+            log.warning("card refresh slowed down by Telegram for %ss", e.retry_after)
+            return
+        except BadRequest as e:
+            drop = "not modified" not in str(e).lower()
+        except Forbidden:
+            drop = True
+        except Exception:  # noqa: BLE001
+            log.exception("card refresh failed for %s", chat_id)
+        if drop:
+            await POOL.execute("DELETE FROM times_cards WHERE chat_id = $1 AND msg_id = $2", chat_id, msg_id)
+        else:
+            await POOL.execute("UPDATE times_cards SET edited_at = now() WHERE chat_id = $1", chat_id)
+        await asyncio.sleep(0.04)
+
+
+def screen_auto(u):
+    lang = u["lang"]
+    opts = [btn(("✅ " if u["auto_mode"] == n else "") + auto_label(lang, n), f"set:auto:{n}") for n in AUTO_OPTIONS]
+    return t(lang, "auto_title"), kb(opts[:2], opts[2:], [btn(t(lang, "btn_back"), "s:settings")])
+
+
 # ───────────────────────── flow ─────────────────────────
 
 async def resume(update, ctx, u):
@@ -1151,7 +1267,7 @@ async def resume(update, ctx, u):
     await render(update, text, markup)
 
 
-async def apply_location(update, ctx, u, name, lat, lon, cc):
+async def apply_location(update, ctx, u, name, lat, lon, cc, drop_ids=()):
     tid, lang = u["user_id"], u["lang"]
     school = 1 if u["madhab"] == "hanafi" else 0
     try:
@@ -1164,11 +1280,17 @@ async def apply_location(update, ctx, u, name, lat, lon, cc):
     u = await get_user(tid)
     await cleanup_loc_kb(update, ctx)
     await cleanup_city_prompt(update, ctx)
+    for mid in drop_ids:  # the user's own message with the city / location
+        await drop_message(update, mid)
     onboarding = not u["onboarded"]
-    text, markup = await screen_times(u, onboarding)
-    await render(update, text, markup)
     if onboarding:
-        await ask_remind(update, u)
+        shown = await render(update, await card_text(u), None)
+        if shown is not None:
+            await remember_card(update.effective_chat.id, shown.message_id, tid, ctx.bot)
+        return await ask_remind(update, u)
+    shown = await render(update, await card_text(u), card_markup(u))
+    if shown is not None:
+        await remember_card(update.effective_chat.id, shown.message_id, tid, ctx.bot)
 
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -1211,7 +1333,7 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not res:
         return await msg.reply_text(t(lang, "city_not_found"), parse_mode=ParseMode.HTML)
     name, lat, lon, cc = res
-    ctx.chat_data["pending_city"] = (u["user_id"], name, lat, lon, cc)
+    ctx.chat_data["pending_city"] = (u["user_id"], name, lat, lon, cc, msg.message_id)
     place = f"{esc(name)} {flag(cc)}" if cc else esc(name)
     await msg.reply_text(
         t(lang, "city_confirm", place=place),
@@ -1227,7 +1349,7 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ctx.chat_data.pop("pending_city", None)
     loc = update.message.location
     name, cc = await reverse_geocode(loc.latitude, loc.longitude, u["lang"])
-    await apply_location(update, ctx, u, name, loc.latitude, loc.longitude, cc)
+    await apply_location(update, ctx, u, name, loc.latitude, loc.longitude, cc, drop_ids=(update.message.message_id,))
 
 
 async def channel_button(update: Update, ctx, parts):
@@ -1284,7 +1406,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     u = await target_for(update, ctx)
-    public = act == "m" and len(parts) > 1 and parts[1] in ("home", "times", "qibla")
+    public = act == "tc" or (act == "m" and len(parts) > 1 and parts[1] in ("home", "times", "qibla", "new"))
     if chat.type != "private" and not public and not await can_manage(update, ctx):
         return await q.answer(t(u["lang"] or "en", "only_admins"), show_alert=True)
     await q.answer()
@@ -1315,8 +1437,10 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         pending = ctx.chat_data.pop("pending_city", None)
         if not u["madhab"]:
             return await resume(update, ctx, u)
+        if pending:
+            await drop_message(update, pending[-1])  # the user's "Tashkent" message
         if parts[1] == "yes" and pending and pending[0] == tid:
-            _, name, lat, lon, cc = pending
+            _, name, lat, lon, cc, _ = pending
             return await apply_location(update, ctx, u, name, lat, lon, cc)
         return await show_city_prompt(update, ctx, u)  # "type again" (or an old, expired button)
 
@@ -1332,14 +1456,23 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not (u["madhab"] and u["city"] and u["tz"]):
         return await resume(update, ctx, u)
 
+    if act == "tc":  # refresh this card now
+        try:
+            text = await card_text(u)
+            await render(update, text, card_markup(u))
+            await POOL.execute("UPDATE times_cards SET edited_at = now() WHERE chat_id = $1 AND msg_id = $2",
+                               update.effective_chat.id, q.message.message_id)
+        except Exception:  # noqa: BLE001
+            log.exception("card refresh failed")
+        return
+
     if act == "m":
         sub = parts[1]
         if sub == "times":
-            try:
-                text, markup = await screen_times(u)
-            except Exception:  # noqa: BLE001
-                log.exception("times failed")
-                text, markup = t(lang, "error"), screen_menu(u)[1]
+            return await send_times_card(update, ctx, u)
+        if sub == "new":
+            text, markup = screen_menu(u)
+            return await update.effective_chat.send_message(text, parse_mode=ParseMode.HTML, reply_markup=markup)
         elif sub == "qibla":
             return await send_qibla_image(update, u)
         elif sub == "toggle":
@@ -1369,6 +1502,8 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             text, markup = screen_quiet(u)
         elif sub == "daily" and not is_private(u):
             text, markup = screen_daily(u)
+        elif sub == "auto":
+            text, markup = screen_auto(u)
         elif sub == "attime":
             await save(tid, at_time=not u["at_time"])
             text, markup = screen_settings(await get_user(tid))
@@ -1383,6 +1518,16 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         what = parts[1]
         if what == "lead" and parts[2].isdigit() and int(parts[2]) in LEAD_OPTIONS:
             await save(tid, lead_min=int(parts[2]))
+        elif what == "auto" and parts[2].isdigit() and int(parts[2]) in AUTO_OPTIONS:
+            await save(tid, auto_mode=int(parts[2]))
+            card = await POOL.fetchrow("SELECT chat_id, msg_id FROM times_cards WHERE data_id = $1", tid)
+            if card:  # show the change on the card right away
+                try:
+                    await ctx.bot.edit_message_text(await card_text(await get_user(tid)), chat_id=card["chat_id"],
+                                                    message_id=card["msg_id"], parse_mode=ParseMode.HTML,
+                                                    reply_markup=card_markup(await get_user(tid)))
+                except Exception:  # noqa: BLE001
+                    pass
         elif what == "daily" and parts[2] in ("off", "fajr", "sunrise"):
             await save(tid, daily=parts[2])
         elif what == "quiet":
@@ -1702,7 +1847,7 @@ async def tick(context: ContextTypes.DEFAULT_TYPE):
 # One admin (ADMIN_ID). The admin UI is in Russian and fully button-driven.
 
 ADMIN_BACK = [btn("⬅️ Назад", "a:home")]
-CSV_COLUMNS = ("user_id", "chat_type", "title", "owner_id", "members", "lang", "madhab", "city", "country", "tz", "remind", "lead_min", "at_time", "quiet_start",
+CSV_COLUMNS = ("user_id", "full_name", "username", "chat_type", "title", "owner_id", "members", "lang", "madhab", "city", "country", "tz", "remind", "lead_min", "at_time", "quiet_start",
                "quiet_end", "ramadan", "onboarded", "banned", "blocked", "created_at", "last_seen")
 MADHAB_RU = {"std": "Шафиитский / Маликитский / Ханбалитский", "hanafi": "Ханафитский"}
 
@@ -1747,9 +1892,18 @@ async def gate(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if not user:
         return
+    chat = update.effective_chat
     try:
-        row = await POOL.fetchrow(
-            "UPDATE users SET last_seen = now(), blocked = FALSE WHERE user_id = $1 RETURNING banned", user.id)
+        if chat and chat.type == "private":
+            row = await POOL.fetchrow(
+                "INSERT INTO users (user_id, last_seen, full_name, username) VALUES ($1, now(), $2, $3) "
+                "ON CONFLICT (user_id) DO UPDATE SET last_seen = now(), blocked = FALSE, "
+                "full_name = EXCLUDED.full_name, username = EXCLUDED.username RETURNING banned",
+                user.id, user.full_name, user.username)
+        else:
+            row = await POOL.fetchrow(
+                "UPDATE users SET last_seen = now(), full_name = $2, username = $3 WHERE user_id = $1 RETURNING banned",
+                user.id, user.full_name, user.username)
     except Exception:  # noqa: BLE001
         log.exception("gate failed")
         return
@@ -1774,7 +1928,8 @@ async def screen_admin_home():
             f"Выберите раздел 👇")
     markup = kb(
         [btn("📈 Статистика", "a:stats"), btn("🌍 География", "a:geo")],
-        [btn("📣 Рассылка", "a:bc"), btn("🔎 Пользователь", "a:user")],
+        [btn("👥 Пользователи", "a:users:0"), btn("📢 Группы и каналы", "a:chats:0")],
+        [btn("📣 Рассылка", "a:bc"), btn("🔎 Поиск", "a:user")],
         [btn("✉️ Тест напоминания", "a:test"), btn("🚫 Баны", "a:bans")],
         [btn("📤 Экспорт CSV", "a:export"), btn("🩺 Здоровье", "a:health")],
         [btn("🏠 В меню бота", "m:home")],
@@ -1828,10 +1983,35 @@ def top_lines(rows, label):
     return "\n".join(f"{label(r)}  {bar(r['c'], mx)} <b>{r['c']}</b>" for r in rows)
 
 
+def km_between(a1, o1, a2, o2):
+    r = math.radians
+    h = math.sin(r(a2 - a1) / 2) ** 2 + math.cos(r(a1)) * math.cos(r(a2)) * math.sin(r(o2 - o1) / 2) ** 2
+    return 12742 * math.asin(math.sqrt(h))
+
+
+async def city_clusters(radius_km=30, top=10):
+    """One city = every point within ~30 km, whatever language its name was saved in."""
+    rows = await POOL.fetch("SELECT city, lat, lon, lang FROM users WHERE lat IS NOT NULL AND city IS NOT NULL")
+    groups = []
+    for r in rows:
+        for g in groups:
+            if km_between(g["lat"], g["lon"], r["lat"], r["lon"]) <= radius_km:
+                g["c"] += 1
+                g["names"][r["city"]] = g["names"].get(r["city"], 0) + 1
+                if r["lang"] == "ru":
+                    g["ru"] = r["city"]
+                break
+        else:
+            groups.append({"lat": r["lat"], "lon": r["lon"], "c": 1, "names": {r["city"]: 1},
+                           "ru": r["city"] if r["lang"] == "ru" else None})
+    for g in groups:
+        g["name"] = g["ru"] or max(g["names"], key=g["names"].get)
+    groups.sort(key=lambda g: -g["c"])
+    return groups[:top]
+
+
 async def screen_admin_geo():
-    cities = await POOL.fetch(
-        "SELECT min(city) AS name, count(*) AS c FROM users WHERE lat IS NOT NULL "
-        "GROUP BY round(lat::numeric, 1), round(lon::numeric, 1) ORDER BY c DESC LIMIT 10")
+    cities = await city_clusters()
     countries = await POOL.fetch(
         "SELECT lower(country) AS cc, count(*) AS c FROM users WHERE coalesce(country, '') <> '' "
         "GROUP BY lower(country) ORDER BY c DESC LIMIT 10")
@@ -1847,34 +2027,126 @@ async def screen_admin_geo():
     return text, kb([btn("🔄 Обновить", "a:geo")], ADMIN_BACK)
 
 
-async def user_card(uid):
+PAGE = 8
+
+
+def back_cb(token):
+    """Where the "back" button of a profile leads: users list, search, chats list or the admin home."""
+    if token and token[0] in "usc" and token[1:].isdigit():
+        return {"u": "a:users:", "s": "a:usearch:", "c": "a:chats:"}[token[0]] + token[1:]
+    return "a:home"
+
+
+def short(s, n):
+    s = str(s or "")
+    return s if len(s) <= n else s[: n - 1] + "…"
+
+
+def person_label(r):
+    name = r["full_name"] or (f"@{r['username']}" if r["username"] else str(r["user_id"]))
+    bits = [("🚫 " if r["banned"] else "") + short(name, 22)]
+    if r["username"] and r["full_name"]:
+        bits.append("@" + short(r["username"], 16))
+    if r["city"]:
+        bits.append(short(r["city"].split(",")[0], 14))
+    return " · ".join(bits)
+
+
+async def user_card(uid, back=None):
     r = await POOL.fetchrow("SELECT * FROM users WHERE user_id = $1", uid)
     if not r:
         return None
     u = dict(r)
     lead = (f"за {u['lead_min']} мин" if u["lead_min"] else "без заранее") + (" + в момент азана" if u["at_time"] else "")
     quiet = "выкл" if u["quiet_start"] is None else f"{u['quiet_start']:02d}:00–{u['quiet_end']:02d}:00"
-    kind_ru = {"private": "👤 Пользователь", "group": "👥 Группа", "channel": "📢 Канал"}.get(u["chat_type"], "👤")
-    extra = "" if u["chat_type"] == "private" else (
-        f"🏷 {esc(u['title'] or '—')} · 👤 участников: {u['members'] or '—'}\n"
-        f"🙋 Добавил: <code>{u['owner_id'] or '—'}</code> · 📅 Ежедневно: {u['daily']}\n")
-    text = (f"<b>{kind_ru}</b> <code>{u['user_id']}</code>\n\n{extra}"
-            f"🌐 Язык: {LANG_BUTTONS.get(u['lang'], '—')}\n"
-            f"🕌 Мазхаб: {MADHAB_RU.get(u['madhab'], '—')}\n"
-            f"📍 Город: {esc(u['city'] or '—')} {flag(u['country']) if u['country'] else ''}\n"
-            f"🕒 Часовой пояс: {esc(u['tz'] or '—')}\n"
-            f"🔔 Напоминания: {'вкл, ' + lead if u['remind'] else 'выкл'}\n"
-            f"🔕 Тихие часы: {quiet}\n"
-            f"🌙 Режим Рамадана: {yn(u['ramadan'])}\n"
-            f"✅ Настройка завершена: {yn(u['onboarded'])}\n"
-            f"🚫 Бан: {yn(u['banned'])} · 🧱 Заблокировал бота: {yn(u['blocked'])}\n"
-            f"📅 Регистрация: {fdt(u['created_at'])} UTC\n"
-            f"👁 Последний визит: {fdt(u['last_seen'])} UTC")
+    where = f"{esc(u['city'] or '—')} {flag(u['country']) if u['country'] else ''}"
+    common = (f"🌐 {LANG_BUTTONS.get(u['lang'], '—')} · 🕌 {MADHAB_RU.get(u['madhab'], '—')}\n"
+              f"📍 {where}\n"
+              f"🔔 {'вкл: ' + lead if u['remind'] else 'выкл'} · 🔕 {quiet}\n"
+              f"🔄 Автообновление: {auto_label('ru', u['auto_mode'])} · 🌙 Рамадан: {yn(u['ramadan'])}\n")
     rows = []
-    if not is_admin(uid):
-        rows.append([btn("✅ Разбанить", f"a:unban:{uid}") if u["banned"] else btn("🚫 Забанить", f"a:ban:{uid}")])
-    rows.append(ADMIN_BACK)
+    if u["chat_type"] == "private":
+        name = esc(u["full_name"] or "Без имени")
+        owned = await POOL.fetchrow(
+            "SELECT count(*) FILTER (WHERE chat_type = 'group') AS g, count(*) FILTER (WHERE chat_type = 'channel') AS c "
+            "FROM users WHERE owner_id = $1 AND NOT blocked", uid)
+        status = ("🚫 В бане" if u["banned"] else "") + (" · " if u["banned"] and u["blocked"] else "") + \
+                 ("🧱 Заблокировал бота" if u["blocked"] else "")
+        text = (f"👤 <b><a href=\"tg://user?id={uid}\">{name}</a></b>\n"
+                f"🔗 {('@' + esc(u['username'])) if u['username'] else 'нет username'} · 🆔 <code>{uid}</code>\n\n"
+                f"{common}"
+                f"📢 Каналов: {owned['c']} · 👥 Групп: {owned['g']}\n\n"
+                f"📅 С нами с {fdt(u['created_at'])} UTC\n"
+                f"👁 Был(а): {fdt(u['last_seen'])} UTC\n"
+                f"{('⚠️ ' + status) if status else '✅ Активен'}")
+        if not is_admin(uid):
+            rows.append([btn("✉️ Написать", f"sup:reply:{uid}"),
+                         btn("✅ Разбанить", f"a:unban:{uid}:{back or ''}") if u["banned"]
+                         else btn("🚫 Забанить", f"a:ban:{uid}:{back or ''}")])
+        if u["username"]:
+            rows.append([InlineKeyboardButton("💬 Открыть в Telegram", url=f"https://t.me/{u['username']}")])
+    else:
+        kind_ru = "👥 Группа" if u["chat_type"] == "group" else "📢 Канал"
+        owner = await POOL.fetchrow("SELECT full_name, username FROM users WHERE user_id = $1", u["owner_id"]) \
+            if u["owner_id"] else None
+        who = (esc(owner["full_name"] or "") + (f" @{esc(owner['username'])}" if owner and owner["username"] else "")) \
+            if owner else "—"
+        text = (f"<b>{kind_ru}: {esc(u['title'] or '—')}</b>\n🆔 <code>{uid}</code> · 👤 участников: {u['members'] or '—'}\n"
+                f"🙋 Добавил: {who} (<code>{u['owner_id'] or '—'}</code>)\n"
+                f"📅 Ежедневное расписание: {u['daily']}\n\n{common}\n"
+                f"📅 Добавлен {fdt(u['created_at'])} UTC\n"
+                f"{'🧱 Бот удалён из чата' if u['blocked'] else '✅ Бот в чате'}")
+        if u["owner_id"]:
+            rows.append([btn("👤 Кто добавил", f"a:card:{u['owner_id']}:{back or ''}")])
+    rows.append([btn("⬅️ Назад", back_cb(back))])
     return text, kb(*rows)
+
+
+def search_where(query):
+    q = query.strip()
+    if q.lstrip("-").isdigit():
+        return "user_id = $1", [int(q)]
+    if q.startswith("@"):
+        return "username ILIKE $1", [q[1:] + "%"]
+    return "(full_name ILIKE $1 OR username ILIKE $1 OR city ILIKE $1 OR title ILIKE $1)", [f"%{q}%"]
+
+
+async def screen_people(page, kind="users", query=None):
+    """kind: users | search | chats"""
+    if kind == "chats":
+        where, args, title = "chat_type <> 'private'", [], "📢 <b>Группы и каналы</b>"
+    elif kind == "search":
+        w, args = search_where(query or "")
+        where, title = w, f"🔎 <b>Поиск:</b> «{esc(query)}»"
+    else:
+        where, args, title = "chat_type = 'private'", [], "👥 <b>Пользователи</b>"
+    total = await POOL.fetchval(f"SELECT count(*) FROM users WHERE {where}", *args)
+    pages = max(1, math.ceil(total / PAGE))
+    page = max(0, min(page, pages - 1))
+    rows = await POOL.fetch(
+        f"SELECT user_id, full_name, username, city, banned, chat_type, title, members FROM users WHERE {where} "
+        f"ORDER BY last_seen DESC NULLS LAST, created_at DESC LIMIT {PAGE} OFFSET {page * PAGE}", *args)
+    token = {"users": "u", "search": "s", "chats": "c"}[kind] + str(page)
+    buttons = []
+    for r in rows:
+        if r["chat_type"] == "private":
+            label = "👤 " + person_label(r)
+        else:
+            label = ("👥 " if r["chat_type"] == "group" else "📢 ") + short(r["title"] or r["user_id"], 28) + \
+                    (f" · {r['members']} уч." if r["members"] else "")
+        buttons.append([btn(label, f"a:card:{r['user_id']}:{token}")])
+    cb = {"users": "a:users:", "search": "a:usearch:", "chats": "a:chats:"}[kind]
+    nav = []
+    if page > 0:
+        nav.append(btn("◀️", f"{cb}{page - 1}"))
+    nav.append(btn(f"{page + 1} / {pages}", f"{cb}{page}"))
+    if page < pages - 1:
+        nav.append(btn("▶️", f"{cb}{page + 1}"))
+    buttons.append(nav)
+    buttons.append([btn("🔎 Поиск", "a:user"), btn("⬅️ Назад", "a:home")])
+    text = f"{title}\nНайдено: <b>{total}</b>" + ("" if rows else "\n\nНичего не найдено.") + \
+        ("\n\nНовые и активные — сверху. Нажмите, чтобы открыть профиль 👇" if rows else "")
+    return text, kb(*buttons)
 
 
 async def screen_admin_bans():
@@ -2032,14 +2304,23 @@ async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
         return await render(update, text, markup)
 
     if sub == "card" and len(parts) > 2 and parts[2].lstrip("-").isdigit():
-        card = await user_card(int(parts[2]))
-        if card:
-            return await update.effective_chat.send_message(card[0], parse_mode=ParseMode.HTML, reply_markup=card[1])
-        return await update.effective_chat.send_message("🤷 Такого пользователя нет в базе.")
+        back = parts[3] if len(parts) > 3 else None
+        card = await user_card(int(parts[2]), back)
+        if not card:
+            return await update.effective_chat.send_message("🤷 Такого пользователя нет в базе.")
+        if back:  # opened from a list: show in place
+            return await render(update, card[0], card[1])
+        return await update.effective_chat.send_message(card[0], parse_mode=ParseMode.HTML, reply_markup=card[1])
+
+    if sub in ("users", "usearch", "chats"):
+        page = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0
+        kind = {"users": "users", "usearch": "search", "chats": "chats"}[sub]
+        text, markup = await screen_people(page, kind, ctx.user_data.get("user_q"))
+        return await render(update, text, markup)
 
     if sub == "user":
         ctx.user_data["admin_state"] = "search"
-        return await render(update, "🔎 <b>Поиск пользователя</b>\n\nОтправьте Telegram ID пользователя (число).",
+        return await render(update, "🔎 <b>Поиск</b>\n\nОтправьте имя, @username, Telegram ID, город или название группы.",
                             kb(ADMIN_BACK))
 
     if sub in ("ban", "unban") and len(parts) > 2 and parts[2].lstrip("-").isdigit():
@@ -2047,7 +2328,7 @@ async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
         if is_admin(target):
             return await render(update, "😅 Себя забанить нельзя.", kb(ADMIN_BACK))
         await POOL.execute("UPDATE users SET banned = $2 WHERE user_id = $1", target, sub == "ban")
-        card = await user_card(target)
+        card = await user_card(target, parts[3] if len(parts) > 3 else None)
         if card:
             return await render(update, card[0], card[1])
         return await render(update, "Пользователь не найден.", kb(ADMIN_BACK))
@@ -2127,16 +2408,11 @@ async def admin_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.message
 
     if state == "search":
-        raw = msg.text.strip()
-        if not raw.lstrip("-").isdigit():
-            await msg.reply_text("❗ Нужен числовой Telegram ID. Попробуйте ещё раз.", reply_markup=kb(ADMIN_BACK))
-            return True
+        raw = msg.text.strip()[:64]
         ctx.user_data.pop("admin_state", None)
-        card = await user_card(int(raw))
-        if not card:
-            await msg.reply_text("🤷 Такого пользователя нет в базе.", reply_markup=kb(ADMIN_BACK))
-        else:
-            await msg.reply_text(card[0], parse_mode=ParseMode.HTML, reply_markup=card[1])
+        ctx.user_data["user_q"] = raw
+        text, markup = await screen_people(0, "search", raw)
+        await msg.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
         return True
 
     if state == "bc_country":
@@ -2535,6 +2811,7 @@ def main():
                                    on_text), group=1)
     app.add_error_handler(on_error)
     app.job_queue.run_repeating(tick, interval=30, first=10)
+    app.job_queue.run_repeating(refresh_cards, interval=60, first=40)
     app.run_polling(drop_pending_updates=True)
 
 
