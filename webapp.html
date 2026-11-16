@@ -593,7 +593,7 @@ html.lite #sky .b{animation:none;filter:blur(60px)}
 
   <section class="view" id="v-admin">
     <h1>🛠 Админка</h1>
-    <div class="seg adseg" id="adSeg"><button data-ad="dash">📊 Обзор</button><button data-ad="users">👥 Люди</button><button data-ad="chats">📢 Чаты</button><button data-ad="bc">📣 Рассылка</button><button data-ad="sys">🩺 Система</button></div>
+    <div class="seg adseg" id="adSeg"><button data-ad="dash">📊 Обзор</button><button data-ad="users">👥 Люди</button><button data-ad="chats">📢 Чаты</button><button data-ad="bc">📣 Рассылка</button><button data-ad="sys">🩺 Система</button><button data-ad="adm" hidden>👮 Админы</button></div>
     <div id="adBody" style="margin-top:10px"></div>
   </section>
 
@@ -2136,9 +2136,34 @@ const shortD = d => d.slice(8, 10) + "." + d.slice(5, 7);
 async function apiAdmin(path, body) {
   return body === undefined ? api(path) : apiPost(path, body);
 }
+const AD_NEED = {dash: "stats", users: "users", chats: "users", bc: "bc", sys: ["health", "export"], adm: "main"};
+const canAd = p => { const a = (DATA && DATA.admin) || {perms: [], main: false}; return [].concat(p).some(x => x === "main" ? a.main : a.perms.includes(x)); };
 function renderAdmin() {
-  document.querySelectorAll("#adSeg button").forEach(b => b.classList.toggle("on", b.dataset.ad === AD_TAB));
-  ({dash: adDash, users: () => adPeople("users"), chats: () => adPeople("chats"), bc: adBc, sys: adSys})[AD_TAB]();
+  const tabs = [...document.querySelectorAll("#adSeg button")];
+  tabs.forEach(b => b.hidden = !canAd(AD_NEED[b.dataset.ad]));
+  if (!canAd(AD_NEED[AD_TAB])) { const first = tabs.find(b => !b.hidden); if (!first) return adBody(`<div class="muted" style="padding:24px 4px">🔒 Нет доступных разделов. Попросите главного админа включить права.</div>`); AD_TAB = first.dataset.ad; }
+  tabs.forEach(b => b.classList.toggle("on", b.dataset.ad === AD_TAB));
+  ({dash: adDash, users: () => adPeople("users"), chats: () => adPeople("chats"), bc: adBc, sys: adSys, adm: adAdmins})[AD_TAB]();
+}
+
+/* ── admins and their rights (main admin only) ── */
+async function adAdmins(data) {
+  if (!data) { adLoading(); try { data = await apiAdmin("/api/admin/admins"); } catch (e) { return adBody(`<div class="muted">Не удалось загрузить</div>`); } }
+  const labels = Object.fromEntries(data.perms.map(p => [p.key, p.label]));
+  adBody(`<div class="card"><b>➕ Добавить админа</b><div class="sub" style="margin:4px 0 8px">Telegram ID или @username. Человек должен хотя бы раз запустить бота.</div>
+      <input class="search" id="admQ" placeholder="123456789 или @username" autocomplete="off"><button class="btn" id="admAdd">Добавить</button></div>`
+    + data.items.map(a => `<div class="card"><div class="row between"><div style="min-width:0"><b>${a.permanent ? "👑" : "🛠"} ${esc(a.name)}</b>
+        <div class="sub">${a.username ? "@" + esc(a.username) + " · " : ""}<span dir="ltr">${a.id}</span>${a.permanent ? (a.main ? " · главный" : " · постоянный") : ""}</div></div>
+        ${a.permanent ? `<span class="badge g">все права</span>` : `<button class="chip" data-admdel="${a.id}">🗑</button>`}</div>
+      ${a.permanent ? "" : `<div class="chips" style="margin-top:10px">${data.perms.map(p => `<button class="chip ${a.perms.includes(p.key) ? "on" : ""}" data-admp="${a.id}:${p.key}">${esc(p.label)}</button>`).join("")}</div>
+        <div class="row" style="margin-top:10px;gap:8px"><button class="chip" data-admall="${a.id}">✅ Все права</button><button class="chip" data-admnone="${a.id}">⬜ Снять все</button></div>`}</div>`).join(""));
+  const post = async body => { try { const r = await apiAdmin("/api/admin/admins", body); if (r.ok === false) return toast(r.error === "not_found" ? "Нет в базе: пусть сначала запустит бота" : "Ошибка"); haptic(); adAdmins(r); } catch (e) { toast("Ошибка"); } };
+  const find = id => data.items.find(x => String(x.id) === String(id));
+  $("admAdd").onclick = () => { const q = $("admQ").value.trim(); if (q) post({op: "add", query: q}); };
+  document.querySelectorAll("[data-admp]").forEach(b => b.onclick = () => { const [id, k] = b.dataset.admp.split(":"); const a = find(id); const set = new Set(a.perms); set.has(k) ? set.delete(k) : set.add(k); post({op: "perms", id: +id, perms: [...set]}); });
+  document.querySelectorAll("[data-admall]").forEach(b => b.onclick = () => post({op: "perms", id: +b.dataset.admall, perms: data.perms.map(p => p.key)}));
+  document.querySelectorAll("[data-admnone]").forEach(b => b.onclick = () => post({op: "perms", id: +b.dataset.admnone, perms: []}));
+  document.querySelectorAll("[data-admdel]").forEach(b => b.onclick = () => confirmBox("Удалить из админов?", () => post({op: "del", id: +b.dataset.admdel})));
 }
 const adBody = html => { $("adBody").innerHTML = html; };
 const adLoading = () => adBody(`<div class="muted" style="padding:24px 4px">Загрузка…</div>`);
@@ -2225,9 +2250,9 @@ async function openAdmUser(id) {
       <div class="sub">${p.username ? "@" + esc(p.username) + " · " : ""}ID <span dir="ltr">${p.id}</span></div><div style="margin-top:8px">${badges}</div></div>
     <div class="card kv">${rows.map(([k, v]) => `<div><span class="sub">${k}</span><b>${esc(v)}</b></div>`).join("")}</div>
     ${!priv && p.owner ? `<button class="btn ghost" data-person="${p.owner.id}">🙋 Добавил: ${esc(p.owner.name || p.owner.username || p.owner.id)}</button>` : ""}
-    ${priv && !p.is_admin ? `<div class="card"><b>✉️ Написать</b><textarea class="search" id="auMsg" rows="3" placeholder="Сообщение придёт от бота. **жирный**, __курсив__" style="margin-top:8px"></textarea>
-      <button class="btn" id="auSend">Отправить</button></div>
-      <button class="btn ghost" id="auBan" style="margin-top:10px">${p.banned ? "✅ Разбанить" : "🚫 Забанить"}</button>` : ""}
+    ${priv && !p.is_admin && canAd("support") ? `<div class="card"><b>✉️ Написать</b><textarea class="search" id="auMsg" rows="3" placeholder="Сообщение придёт от бота. **жирный**, __курсив__" style="margin-top:8px"></textarea>
+      <button class="btn" id="auSend">Отправить</button></div>` : ""}
+    ${priv && !p.is_admin && canAd("bans") ? `<button class="btn ghost" id="auBan" style="margin-top:10px">${p.banned ? "✅ Разбанить" : "🚫 Забанить"}</button>` : ""}
     ${p.username ? `<button class="btn ghost" id="auOpen" style="margin-top:10px">💬 Открыть в Telegram</button>` : ""}`;
   if ($("auSend")) $("auSend").onclick = async () => {
     const text = $("auMsg").value.trim(); if (!text) return;
@@ -2323,6 +2348,9 @@ function bcSend() {
 /* ── system ── */
 async function adSys() {
   adLoading();
+  const exportBtn = `<button class="btn" id="adExport">📤 Экспорт пользователей (CSV) в чат</button>`;
+  const bindExport = () => { if ($("adExport")) $("adExport").onclick = async () => { haptic(); try { const r = await apiAdmin("/api/admin/export", {}); toast(`Файл отправлен в чат ✓ (${r.rows})`); } catch (e) { toast("Не удалось"); } }; };
+  if (!canAd("health")) { adBody(exportBtn); return bindExport(); }
   let h; try { h = await apiAdmin("/api/admin/health"); } catch (e) { return adBody(`<div class="muted">Не удалось загрузить</div>`); }
   const up = h.uptime, d = Math.floor(up / 86400), hh = Math.floor(up % 86400 / 3600), mm = Math.floor(up % 3600 / 60);
   const tiles = [["🗄", "База данных", `✅ ${h.db_ms} мс`], ["🕌", "Сервис времён", h.api.ok ? `✅ ${h.api.ms} мс` : `❌ ${h.api.error}`], ["⏱", "Работает", `${d} д ${hh} ч ${mm} мин`],
@@ -2330,9 +2358,9 @@ async function adSys() {
   adBody(`<div class="adgrid">${tiles.map(([i, l, v]) => `<div class="card"><div class="sub">${i} ${l}</div><b>${esc(v)}</b></div>`).join("")}</div>
     <div class="card"><b>🛠 Админы</b><div class="sub" style="margin-top:6px" dir="ltr">${h.admins.join(", ")}</div></div>
     <div class="card"><b>🧾 Последние ошибки</b>${h.errors.length ? h.errors.map(e => `<div class="err"><span class="sub">${esc(e.at)}</span> ${esc(e.msg)}</div>`).join("") : `<div class="sub" style="margin-top:6px">Ошибок нет 🎉</div>`}</div>
-    <button class="btn" id="adExport">📤 Экспорт пользователей (CSV) в чат</button>
+    ${canAd("export") ? exportBtn : ""}
     <button class="btn ghost" data-adref="1" style="margin-top:10px">🔄 Обновить</button>`);
-  $("adExport").onclick = async () => { haptic(); try { const r = await apiAdmin("/api/admin/export", {}); toast(`Файл отправлен в чат ✓ (${r.rows})`); } catch (e) { toast("Не удалось"); } };
+  bindExport();
 }
 
 /* ───────── boot ───────── */

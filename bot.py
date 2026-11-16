@@ -836,6 +836,14 @@ EXTRA5 = {
 for _l, _d in EXTRA5.items():
     T[_l].update(_d)
 
+EXTRA6 = {"en": {"admin_msg_header": "📩 <b>Message from the administrator:</b>"},
+          "ru": {"admin_msg_header": "📩 <b>Сообщение от администратора:</b>"},
+          "uz": {"admin_msg_header": "📩 <b>Administrator xabari:</b>"},
+          "tg": {"admin_msg_header": "📩 <b>Паёми маъмур:</b>"},
+          "ar": {"admin_msg_header": "📩 <b>رسالة من المشرف:</b>"}}
+for _l, _d in EXTRA6.items():
+    T[_l].update(_d)
+
 # ───────────────────────── Uzbek in Cyrillic ─────────────────────────
 # The Cyrillic Uzbek texts are produced from the Latin ones by the official spelling rules,
 # so both stay in sync. Words that the rules can't get right are listed in CYR_WORDS.
@@ -994,6 +1002,19 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by BIGINT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS azan TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_screen_msg BIGINT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS rem_msgs BIGINT[];
+CREATE TABLE IF NOT EXISTS admins (
+    user_id  BIGINT PRIMARY KEY,
+    perms    TEXT[] NOT NULL DEFAULT '{}',
+    added_by BIGINT,
+    added_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS msg_cleanup (
+    chat_id BIGINT NOT NULL,
+    msg_id  BIGINT NOT NULL,
+    at      TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (chat_id, msg_id)
+);
+CREATE INDEX IF NOT EXISTS msg_cleanup_at ON msg_cleanup (at);
 CREATE INDEX IF NOT EXISTS users_referred_by ON users (referred_by);
 CREATE TABLE IF NOT EXISTS nv_months (
     slug       TEXT NOT NULL,
@@ -2077,8 +2098,11 @@ async def support_button(update: Update, ctx, parts):
     if not is_admin(uid) or update.effective_chat.type != "private":
         return
     if sub == "reply" and len(parts) > 2 and parts[2].lstrip("-").isdigit():
+        if not has_perm(uid, "support"):
+            return await update.effective_chat.send_message("🔒 У вас нет права «Поддержка».")
         target = int(parts[2])
         ctx.user_data["reply_to"] = target
+        ctx.user_data["reply_kind"] = "w" if len(parts) > 3 and parts[3] == "w" else "r"
         ctx.user_data.pop("rep_last_mg", None)
         await update.effective_chat.send_message(
             f"↩️ <b>Ответ пользователю</b> <code>{target}</code>\n\n"
@@ -2134,7 +2158,7 @@ async def user_support(update: Update, ctx):
                       f"🆔 ID: <code>{user.id}</code>\n"
                       f"{where}🌐 {LANG_BUTTONS.get(lang, lang)}")
         delivered = 0
-        for admin in sorted(ADMINS):  # every admin gets it; any of them can reply
+        for admin in sorted(a for a in ADMINS if has_perm(a, "support")):  # any of them can reply
             try:
                 if first:
                     await ctx.bot.send_message(admin, header, parse_mode=ParseMode.HTML)
@@ -2167,7 +2191,8 @@ async def admin_reply(update: Update, ctx):
     ctx.user_data["rep_last_mg"] = mg
     try:
         if first:
-            await ctx.bot.send_message(target, t(tlang, "support_reply_header"), parse_mode=ParseMode.HTML)
+            head = "admin_msg_header" if ctx.user_data.get("reply_kind") == "w" else "support_reply_header"
+            await ctx.bot.send_message(target, t(tlang, head), parse_mode=ParseMode.HTML)
         await msg.copy(target)
     except Forbidden:
         await POOL.execute("UPDATE users SET blocked = TRUE WHERE user_id = $1", target)
@@ -2204,6 +2229,7 @@ async def send_reminder(bot, u, text, markup=None):
             await bump("reminders_sent")
             if is_private(u):
                 await swap_reminders(bot, u["user_id"], m.message_id)
+                await schedule_delete(u["user_id"], m.message_id)
             break
         except Forbidden:  # blocked / removed from the chat (cleared automatically when they come back)
             await POOL.execute("UPDATE users SET blocked = TRUE WHERE user_id = $1", u["user_id"])
@@ -2397,7 +2423,7 @@ async def gate(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── screens ──
 
-async def screen_admin_home():
+async def screen_admin_home(uid=None):
     r = await POOL.fetchrow(
         "SELECT count(*) AS total, count(*) FILTER (WHERE remind AND NOT blocked AND NOT banned) AS rem "
         "FROM users WHERE chat_type = 'private'")
@@ -2405,16 +2431,19 @@ async def screen_admin_home():
             f"👥 Пользователей: <b>{r['total']}</b>\n"
             f"🔔 С напоминаниями: <b>{r['rem']}</b>\n\n"
             f"Выберите раздел 👇")
-    markup = kb(
-        [btn("📈 Статистика", "a:stats"), btn("🌍 География", "a:geo")],
-        [btn("👥 Пользователи", "a:users:0"), btn("📢 Группы и каналы", "a:chats:0")],
-        [btn("📣 Рассылка", "a:bc"), btn("🔎 Поиск", "a:user")],
-        [btn("✉️ Тест напоминания", "a:test"), btn("🚫 Баны", "a:bans")],
-        [btn("📤 Экспорт CSV", "a:export"), btn("🩺 Здоровье", "a:health")],
-        [btn("🔊 Азаны", "a:azan")],
-        [btn("🏠 В меню бота", "m:home")],
-    )
-    return text, markup
+    can = (lambda p: True) if uid is None else (lambda p: has_perm(uid, p))
+    items = [("stats", btn("📈 Статистика", "a:stats")), ("stats", btn("🌍 География", "a:geo")),
+             ("users", btn("👥 Пользователи", "a:users:0")), ("users", btn("📢 Группы и каналы", "a:chats:0")),
+             ("bc", btn("📣 Рассылка", "a:bc")), ("users", btn("🔎 Поиск", "a:user")),
+             ("health", btn("✉️ Тест напоминания", "a:test")), ("bans", btn("🚫 Баны", "a:bans")),
+             ("export", btn("📤 Экспорт CSV", "a:export")), ("health", btn("🩺 Здоровье", "a:health")),
+             ("azan", btn("🔊 Азаны", "a:azan"))]
+    shown = [b for p, b in items if can(p)]
+    rows = [shown[i:i + 2] for i in range(0, len(shown), 2)]
+    if uid is not None and is_main(uid):
+        rows.append([btn("👮 Админы", "a:adm")])
+    rows.append([btn("🏠 В меню бота", "m:home")])
+    return text, kb(*rows)
 
 
 async def today_counters():
@@ -2560,11 +2589,13 @@ async def user_card(uid, back=None):
                 f"👁 Был(а): {fdt(u['last_seen'])} UTC\n"
                 f"{('⚠️ ' + status) if status else '✅ Активен'}")
         if not is_admin(uid):
-            rows.append([btn("✉️ Написать", f"sup:reply:{uid}"),
+            rows.append([btn("✉️ Написать", f"sup:reply:{uid}:w"),
                          btn("✅ Разбанить", f"a:unban:{uid}:{back or ''}") if u["banned"]
                          else btn("🚫 Забанить", f"a:ban:{uid}:{back or ''}")])
         if u["username"]:
             rows.append([InlineKeyboardButton("💬 Открыть в Telegram", url=f"https://t.me/{u['username']}")])
+        if not is_admin(uid) and ADMIN_ID:
+            rows.append([btn("👮 Сделать админом", f"a:adm:mk:{uid}")])
     else:
         kind_ru = "👥 Группа" if u["chat_type"] == "group" else "📢 Канал"
         owner = await POOL.fetchrow("SELECT full_name, username FROM users WHERE user_id = $1", u["owner_id"]) \
@@ -2769,14 +2800,25 @@ async def run_broadcast(app, chat_id, text, bc):
 
 # ── router ──
 
+ADMIN_PERM_OF = {"stats": "stats", "geo": "stats", "health": "health", "test": "health", "bans": "bans", "ban": "bans",
+                 "unban": "bans", "azan": "azan", "card": "users", "users": "users", "usearch": "users", "chats": "users",
+                 "user": "users", "export": "export", "bc": "bc", "bcl": "bc", "adm": "main"}
+
+
 async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
     ctx.user_data.pop("admin_state", None)
     sub = parts[1] if len(parts) > 1 else "home"
     uid = update.effective_user.id
 
+    need = ADMIN_PERM_OF.get(sub)
+    if need == "main" and not is_main(uid) or need not in (None, "main") and not has_perm(uid, need):
+        text, markup = await screen_admin_home(uid)
+        return await render(update, "🔒 <b>Нет доступа к этому разделу.</b>\n\n" + text, markup)
+    if sub == "adm":
+        return await admin_admins(update, ctx, parts)
     if sub == "home":
         ctx.user_data.pop("bc", None)
-        text, markup = await screen_admin_home()
+        text, markup = await screen_admin_home(uid)
         return await render(update, text, markup)
     if sub == "stats":
         text, markup = await screen_admin_stats()
@@ -2892,7 +2934,7 @@ async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
         ctx.user_data["bc"] = {"kind": "lang", "value": parts[2], "text": None}
         return await ask_bc_text(update, ctx)
 
-    text, markup = await screen_admin_home()
+    text, markup = await screen_admin_home(uid)
     await render(update, text, markup)
 
 
@@ -2900,6 +2942,9 @@ async def admin_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Handles the admin's typed answers. Returns True if the message was consumed."""
     state = ctx.user_data.get("admin_state")
     msg = update.message
+
+    if state == "adm_add" and is_main(update.effective_user.id):
+        return await admin_add_from_message(update, ctx)
 
     if state == "search":
         raw = msg.text.strip()[:64]
@@ -2946,7 +2991,7 @@ async def cmd_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return  # silently ignore for everyone else
     ctx.user_data.pop("admin_state", None)
-    text, markup = await screen_admin_home()
+    text, markup = await screen_admin_home(update.effective_user.id)
     await render(update, text, markup)
 
 
@@ -3180,6 +3225,7 @@ async def api_me(request):
     return web.json_response({
         "ok": True, "need_setup": False, "bot": BOT_USERNAME, "profile": profile_json(u, lang),
         "share_url": share_url(u["user_id"], now.date().isoformat()), "is_admin": is_admin(u["user_id"]),
+        "admin": {"perms": admin_perms(u["user_id"]), "main": is_main(u["user_id"])} if is_admin(u["user_id"]) else None,
         "ref": {"count": await POOL.fetchval("SELECT count(*) FROM users WHERE referred_by = $1", u["user_id"]),
                 "link": ref_link(u["user_id"])},
         "dev": DEV_CONTACT,
@@ -3252,6 +3298,7 @@ async def start_web(application=None):
                     web.post("/api/admin/message", api_admin_message), web.get("/api/admin/bc_count", api_admin_bc_count),
                     web.post("/api/admin/broadcast", api_admin_broadcast), web.get("/api/admin/health", api_admin_health),
                     web.post("/api/admin/export", api_admin_export),
+                    web.get("/api/admin/admins", api_admin_admins), web.post("/api/admin/admins", api_admin_admins),
                     web.get("/api/tracker", api_tracker), web.post("/api/tracker", api_tracker_set),
                     web.post("/api/tracker_bulk", api_tracker_bulk), web.get("/api/community", api_community),
                     web.get("/api/challenges", api_challenges), web.post("/api/challenges", api_challenge_new),
@@ -3577,10 +3624,12 @@ async def api_reverse(request):
 # ───────────────────────── mini app: admin panel ─────────────────────────
 # Every call checks the signed Telegram data and that the caller is one of ADMINS.
 
-async def admin_auth(request):
+async def admin_auth(request, perm=None):
     tg_user = check_init_data(request.headers.get("X-Init-Data", ""))
     if not tg_user or not is_admin(int(tg_user["id"])):
         raise web.HTTPForbidden(text="admins only")
+    if perm and not has_perm(int(tg_user["id"]), perm):
+        raise web.HTTPForbidden(text="no right: " + perm)
     return int(tg_user["id"])
 
 
@@ -3592,7 +3641,7 @@ def series(rows, days=30):
 
 
 async def api_admin_summary(request):
-    await admin_auth(request)
+    await admin_auth(request, "stats")
     r = await POOL.fetchrow("""
         SELECT count(*) AS total,
                count(*) FILTER (WHERE onboarded) AS setup,
@@ -3640,7 +3689,7 @@ def person_json(r):
 
 
 async def api_admin_people(request):
-    await admin_auth(request)
+    await admin_auth(request, "users")
     kind = request.query.get("kind", "users")
     flt = request.query.get("filter", "all")
     q = (request.query.get("q") or "").strip()[:64]
@@ -3661,7 +3710,7 @@ async def api_admin_people(request):
 
 
 async def api_admin_person(request):
-    await admin_auth(request)
+    await admin_auth(request, "users")
     try:
         uid = int(request.query["id"])
     except (KeyError, ValueError):
@@ -3689,7 +3738,7 @@ async def api_admin_person(request):
 
 
 async def api_admin_ban(request):
-    await admin_auth(request)
+    await admin_auth(request, "bans")
     body = await read_json(request)
     try:
         uid, ban = int(body["id"]), bool(body["ban"])
@@ -3710,7 +3759,7 @@ def admin_markup_text(text):
 
 
 async def api_admin_message(request):
-    await admin_auth(request)
+    await admin_auth(request, "support")
     body = await read_json(request)
     try:
         uid, text = int(body["id"]), str(body["text"]).strip()[:3500]
@@ -3721,7 +3770,7 @@ async def api_admin_message(request):
     u = await get_user(uid)
     lang = (u or {}).get("lang") or "en"
     try:
-        await request.app["bot"].send_message(uid, t(lang, "support_reply_header") + "\n\n" + admin_markup_text(text),
+        await request.app["bot"].send_message(uid, t(lang, "admin_msg_header") + "\n\n" + admin_markup_text(text),
                                               parse_mode=ParseMode.HTML)
     except Forbidden:
         await POOL.execute("UPDATE users SET blocked = TRUE WHERE user_id = $1", uid)
@@ -3745,7 +3794,7 @@ def bc_from_body(body):
 
 
 async def api_admin_bc_count(request):
-    await admin_auth(request)
+    await admin_auth(request, "bc")
     bc = bc_from_body(dict(request.query))
     where, args = bc_where(bc)
     return web.json_response({"ok": True, "count": await POOL.fetchval(f"SELECT count(*) FROM users WHERE {where}", *args),
@@ -3753,7 +3802,7 @@ async def api_admin_bc_count(request):
 
 
 async def api_admin_broadcast(request):
-    admin = await admin_auth(request)
+    admin = await admin_auth(request, "bc")
     body = await read_json(request)
     bc = bc_from_body(body)
     text = admin_markup_text(str(body.get("text") or "").strip()[:3500])
@@ -3788,7 +3837,7 @@ async def api_admin_broadcast(request):
 
 
 async def api_admin_health(request):
-    await admin_auth(request)
+    await admin_auth(request, "health")
     t0 = _time.perf_counter()
     await POOL.fetchval("SELECT 1")
     db_ms = round((_time.perf_counter() - t0) * 1000)
@@ -3810,7 +3859,7 @@ async def api_admin_health(request):
 
 
 async def api_admin_export(request):
-    admin = await admin_auth(request)
+    admin = await admin_auth(request, "export")
     rows = await POOL.fetch(f"SELECT {', '.join(CSV_COLUMNS)} FROM users ORDER BY created_at")
     buf = io.StringIO()
     w = csv.writer(buf)
@@ -4090,7 +4139,7 @@ async def periodic(context: ContextTypes.DEFAULT_TYPE):
     except Exception:  # noqa: BLE001
         log.exception("summaries failed")
     try:
-        for admin in sorted(ADMINS):
+        for admin in sorted(a for a in ADMINS if has_perm(a, "summary")):
             a = await get_user(admin)
             tz = (a or {}).get("tz") or "Asia/Tashkent"
             now = datetime.now(ZoneInfo(tz))
@@ -4236,6 +4285,7 @@ async def send_azan(bot, u):
         m = await send_azan_file(bot, u["user_id"], a, disable_notification=True)
         await POOL.execute("UPDATE users SET rem_msgs = array_append(rem_msgs, $2::bigint) WHERE user_id = $1",
                            u["user_id"], m.message_id)
+        await schedule_delete(u["user_id"], m.message_id)
     except Exception:  # noqa: BLE001
         log.exception("adhan send failed for %s", u["user_id"])
 
@@ -4627,6 +4677,241 @@ async def local_times(u, d, calc):
         out[k] = day[k]
     return out
 
+
+# ───────────────────────── admins and their rights ─────────────────────────
+# ADMIN_ID is the main admin; ADMIN_ID and ADMIN_IDS are permanent and have every right.
+# Only the main admin adds/removes other admins and picks their rights (stored in the "admins" table).
+
+PERMANENT_ADMINS = set(ADMINS)
+DB_ADMINS = {}  # user_id -> set of rights
+PERMS = [("stats", "📈 Статистика и география"), ("users", "👥 Пользователи и поиск"), ("support", "💬 Поддержка"),
+         ("bans", "🚫 Баны"), ("bc", "📣 Рассылки"), ("export", "📤 Экспорт CSV"), ("azan", "🔊 Азаны"),
+         ("health", "🩺 Здоровье и тест"), ("summary", "📬 Ежедневная сводка")]
+PERM_KEYS = [k for k, _ in PERMS]
+DEFAULT_PERMS = ["stats", "support"]
+
+
+def is_main(uid):
+    return bool(ADMIN_ID) and uid == ADMIN_ID
+
+
+def has_perm(uid, perm):
+    if uid in PERMANENT_ADMINS:
+        return True
+    return perm in DB_ADMINS.get(uid, ())
+
+
+def admin_perms(uid):
+    return PERM_KEYS if uid in PERMANENT_ADMINS else [k for k in PERM_KEYS if k in DB_ADMINS.get(uid, ())]
+
+
+async def load_admins():
+    rows = await POOL.fetch("SELECT user_id, perms FROM admins")
+    DB_ADMINS.clear()
+    DB_ADMINS.update({r["user_id"]: set(r["perms"] or []) for r in rows if r["user_id"] not in PERMANENT_ADMINS})
+    ADMINS.clear()
+    ADMINS.update(PERMANENT_ADMINS | set(DB_ADMINS))
+
+
+async def add_admin(bot, target, by):
+    await POOL.execute("INSERT INTO admins (user_id, perms, added_by) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+                       target, DEFAULT_PERMS, by)
+    await load_admins()
+    try:
+        await bot.send_message(target, "🛠 <b>Вас назначили администратором бота Mawaqit</b>\n\n"
+                                        "Админка открывается кнопкой ниже или командой /admin.",
+                               parse_mode=ParseMode.HTML, reply_markup=kb([btn("🛠 Открыть админку", "a:home")]))
+    except Exception:  # noqa: BLE001
+        pass
+
+
+async def remove_admin(bot, target):
+    await POOL.execute("DELETE FROM admins WHERE user_id = $1", target)
+    await load_admins()
+    try:
+        await bot.send_message(target, "ℹ️ Вы больше не администратор бота Mawaqit.")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+async def set_perms(target, perms):
+    await POOL.execute("UPDATE admins SET perms = $2 WHERE user_id = $1", target, [p for p in PERM_KEYS if p in perms])
+    await load_admins()
+
+
+async def admin_name(uid):
+    u = await get_user(uid)
+    if not u:
+        return str(uid)
+    return (u["full_name"] or "—") + (f" @{u['username']}" if u["username"] else "")
+
+
+async def screen_admins():
+    lines = ["👮 <b>Админы</b>", ""]
+    for uid in sorted(PERMANENT_ADMINS):
+        lines.append(f"👑 {esc(await admin_name(uid))} · <code>{uid}</code> — {'главный' if is_main(uid) else 'постоянный'}, все права")
+    rows = []
+    for uid in sorted(DB_ADMINS):
+        n = len(DB_ADMINS[uid])
+        rows.append([btn(f"🛠 {await admin_name(uid)} · {n}/{len(PERMS)}", f"a:adm:u:{uid}")])
+    if not DB_ADMINS:
+        lines += ["", "Других админов пока нет."]
+    lines += ["", "Нажмите на админа, чтобы изменить права или удалить."]
+    rows.append([btn("➕ Добавить админа", "a:adm:add")])
+    rows.append(ADMIN_BACK)
+    return "\n".join(lines), kb(*rows)
+
+
+async def screen_admin_perms(target):
+    have = DB_ADMINS.get(target, set())
+    row = await POOL.fetchrow("SELECT added_at, added_by FROM admins WHERE user_id = $1", target)
+    text = (f"🛠 <b>{esc(await admin_name(target))}</b>\n🆔 <code>{target}</code>\n"
+            + (f"Добавлен {fdt(row['added_at'])} UTC\n" if row else "")
+            + "\nВключите права галочками 👇")
+    btns = [btn(("✅ " if k in have else "⬜ ") + label, f"a:adm:t:{target}:{k}") for k, label in PERMS]
+    rows = [btns[i:i + 2] for i in range(0, len(btns), 2)]
+    rows.append([btn("✅ Все права", f"a:adm:all:{target}"), btn("⬜ Снять все", f"a:adm:none:{target}")])
+    rows.append([btn("🗑 Удалить из админов", f"a:adm:del:{target}")])
+    rows.append([btn("⬅️ К списку админов", "a:adm")])
+    return text, kb(*rows)
+
+
+async def admin_admins(update, ctx, parts):
+    """a:adm[:op:…] — only the main admin gets here."""
+    op = parts[2] if len(parts) > 2 else ""
+    target = int(parts[3]) if len(parts) > 3 and parts[3].lstrip("-").isdigit() else None
+    if op == "add":
+        ctx.user_data["admin_state"] = "adm_add"
+        return await render(update, "➕ <b>Новый админ</b>\n\nОтправьте Telegram ID или @username человека, "
+                                    "или перешлите сюда любое его сообщение.\n\n"
+                                    "<i>Человек должен хотя бы раз запустить бота.</i>", kb([btn("⬅️ Назад", "a:adm")]))
+    if op == "mk" and target:
+        if target in ADMINS:
+            text, markup = await screen_admin_perms(target) if target in DB_ADMINS else await screen_admins()
+            return await render(update, text, markup)
+        await add_admin(ctx.bot, target, update.effective_user.id)
+        text, markup = await screen_admin_perms(target)
+        return await render(update, "✅ Добавлен. " + text, markup)
+    if target and target in DB_ADMINS:
+        if op == "t" and len(parts) > 4 and parts[4] in PERM_KEYS:
+            await set_perms(target, DB_ADMINS[target] ^ {parts[4]})
+        elif op == "all":
+            await set_perms(target, PERM_KEYS)
+        elif op == "none":
+            await set_perms(target, [])
+        elif op == "del":
+            return await render(update, f"🗑 Удалить <b>{esc(await admin_name(target))}</b> из админов?",
+                                kb([btn("✅ Да, удалить", f"a:adm:delok:{target}"), btn("❌ Отмена", f"a:adm:u:{target}")]))
+        elif op == "delok":
+            await remove_admin(ctx.bot, target)
+            text, markup = await screen_admins()
+            return await render(update, "🗑 Удалён.\n\n" + text, markup)
+        text, markup = await screen_admin_perms(target)
+        return await render(update, text, markup)
+    text, markup = await screen_admins()
+    return await render(update, text, markup)
+
+
+async def admin_add_from_message(update, ctx):
+    """State adm_add: ID, @username or a forwarded message."""
+    msg = update.message
+    target = None
+    origin = getattr(msg, "forward_origin", None)
+    if origin is not None:
+        user = getattr(origin, "sender_user", None)
+        if not user:
+            await msg.reply_text("🙈 У этого человека скрыт аккаунт при пересылке. Отправьте его ID или @username.")
+            return True
+        target = user.id
+    else:
+        raw = (msg.text or "").strip()
+        if raw.lstrip("-").isdigit():
+            target = int(raw)
+        elif raw:
+            target = await POOL.fetchval("SELECT user_id FROM users WHERE lower(username) = lower($1) AND chat_type = 'private'",
+                                         raw.lstrip("@").split("/")[-1])
+    u = await get_user(target) if target else None
+    if not u or u["chat_type"] != "private":
+        await msg.reply_text("🤷 Такого человека нет в базе. Он должен сначала запустить бота. Попробуйте ещё раз.",
+                             reply_markup=kb([btn("⬅️ Назад", "a:adm")]))
+        return True
+    ctx.user_data.pop("admin_state", None)
+    if target in ADMINS:
+        text, markup = await screen_admins()
+        await msg.reply_text("ℹ️ Он уже админ.\n\n" + text, parse_mode=ParseMode.HTML, reply_markup=markup)
+        return True
+    await add_admin(ctx.bot, target, update.effective_user.id)
+    text, markup = await screen_admin_perms(target)
+    await msg.reply_text("✅ Добавлен. " + text, parse_mode=ParseMode.HTML, reply_markup=markup)
+    return True
+
+
+# mini app: admins management (main admin only)
+
+async def api_admin_admins(request):
+    uid = await admin_auth(request)
+    if not is_main(uid):
+        raise web.HTTPForbidden(text="main admin only")
+    if request.method == "POST":
+        body = await read_json(request)
+        op = body.get("op")
+        if op == "add":
+            q = str(body.get("query") or "").strip()
+            target = int(q) if q.lstrip("-").isdigit() else await POOL.fetchval(
+                "SELECT user_id FROM users WHERE lower(username) = lower($1) AND chat_type = 'private'", q.lstrip("@"))
+            u = await get_user(target) if target else None
+            if not u or u["chat_type"] != "private":
+                return web.json_response({"ok": False, "error": "not_found"})
+            if target not in ADMINS:
+                await add_admin(request.app["bot"], target, uid)
+        else:
+            try:
+                target = int(body.get("id"))
+            except (TypeError, ValueError):
+                raise web.HTTPBadRequest(text="bad id")
+            if target not in DB_ADMINS:
+                raise web.HTTPBadRequest(text="not an editable admin")
+            if op == "del":
+                await remove_admin(request.app["bot"], target)
+            elif op == "perms" and isinstance(body.get("perms"), list):
+                await set_perms(target, set(body["perms"]))
+            else:
+                raise web.HTTPBadRequest(text="bad op")
+    items = []
+    for a in sorted(PERMANENT_ADMINS) + sorted(DB_ADMINS):
+        u = await get_user(a)
+        items.append({"id": a, "name": (u or {}).get("full_name") or str(a), "username": (u or {}).get("username"),
+                      "permanent": a in PERMANENT_ADMINS, "main": is_main(a), "perms": admin_perms(a)})
+    return web.json_response({"ok": True, "items": items, "perms": [{"key": k, "label": l} for k, l in PERMS]})
+
+
+# ───────────────────────── tidy chat: reminders disappear after an hour ─────────────────────────
+
+REMINDER_TTL_MIN = 60
+
+
+async def schedule_delete(chat_id, msg_id, minutes=REMINDER_TTL_MIN):
+    try:
+        await POOL.execute("INSERT INTO msg_cleanup (chat_id, msg_id, at) VALUES ($1, $2, now() + make_interval(mins => $3)) "
+                           "ON CONFLICT DO NOTHING", chat_id, msg_id, minutes)
+    except Exception:  # noqa: BLE001
+        log.exception("could not schedule deletion")
+
+
+async def cleanup_job(context: ContextTypes.DEFAULT_TYPE):
+    try:
+        rows = await POOL.fetch("DELETE FROM msg_cleanup WHERE (chat_id, msg_id) IN "
+                                "(SELECT chat_id, msg_id FROM msg_cleanup WHERE at <= now() LIMIT 200) RETURNING chat_id, msg_id")
+    except Exception:  # noqa: BLE001
+        log.exception("cleanup: db error")
+        return
+    for r in rows:
+        try:
+            await context.bot.delete_message(r["chat_id"], r["msg_id"])
+        except Exception:  # noqa: BLE001  (already deleted by the user or by the next reminder)
+            pass
+        await asyncio.sleep(0.03)
+
 # ───────────────────────── app ─────────────────────────
 
 
@@ -4702,6 +4987,7 @@ async def post_init(app: Application):
         await conn.execute(SCHEMA)
     HTTP = httpx.AsyncClient(timeout=15)
     await load_azans()
+    await load_admins()
     global BOT_USERNAME
     BOT_USERNAME = app.bot.username
     asyncio.get_running_loop().create_task(setup_profile(app.bot))  # in background, never blocks startup
@@ -4747,6 +5033,7 @@ def main():
     app.job_queue.run_repeating(tick, interval=30, first=10)
     app.job_queue.run_repeating(refresh_cards, interval=60, first=40)
     app.job_queue.run_repeating(periodic, interval=600, first=90)
+    app.job_queue.run_repeating(cleanup_job, interval=60, first=30)
     app.add_handler(InlineQueryHandler(on_inline), group=1)
     app.run_polling(drop_pending_updates=True)
 
