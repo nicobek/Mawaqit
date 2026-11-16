@@ -1432,7 +1432,7 @@ def place_name(addr):
     return city or country
 
 
-async def relocalize_city(uid, lang):
+async def relocalize_city(uid, lang, force_country=False):
     """After a language change: the city and country names in the new language (by the saved coordinates)."""
     u = await get_user(uid)
     if not u or u["lat"] is None or u["lon"] is None:
@@ -1441,8 +1441,8 @@ async def relocalize_city(uid, lang):
         name, cc = await reverse_geocode(u["lat"], u["lon"], lang)
     except Exception:  # noqa: BLE001
         return
-    if name and not re.match(r"^-?\d+\.\d+, -?\d+\.\d+$", name):
-        await save(uid, city=name, **({"country": cc} if cc and not u["country"] else {}))
+    if name and not COORDS_RE.match(name):
+        await save(uid, city=name, **({"country": cc} if cc and (force_country or not u["country"]) else {}))
 
 
 async def geocode(query, lang):
@@ -1457,17 +1457,38 @@ async def geocode(query, lang):
     return name, float(d["lat"]), float(d["lon"]), addr.get("country_code", "")
 
 
+COORDS_RE = re.compile(r"^-?\d+\.\d+, -?\d+\.\d+$")
+
+
 async def reverse_geocode(lat, lon, lang):
+    """City and country for a point: OpenStreetMap's Nominatim (2 tries), then Photon (also OpenStreetMap).
+    Only if both fail, the coordinates are returned (and fixed later in the background)."""
+    al = "uz" if lang == "uzc" else lang
+    fix = (lambda x: to_cyr(x)) if lang == "uzc" else (lambda x: x)
+    for attempt in range(2):
+        try:
+            d = await nominatim("reverse", {"lat": lat, "lon": lon, "zoom": 10, "accept-language": al})
+            addr = d.get("address", {})
+            name = place_name(addr)
+            if name:
+                return fix(name), addr.get("country_code", "")
+            break
+        except Exception as e:  # noqa: BLE001
+            log.warning("reverse geocode (nominatim, try %d) failed: %r", attempt + 1, e)
     try:
-        d = await nominatim("reverse", {"lat": lat, "lon": lon, "zoom": 10, "accept-language": "uz" if lang == "uzc" else lang})
-        addr = d.get("address", {})
-        name = place_name(addr)
-        if name and lang == "uzc":
-            name = to_cyr(name)
-        return name or f"{lat:.2f}, {lon:.2f}", addr.get("country_code", "")
-    except Exception:  # noqa: BLE001
-        log.exception("reverse geocode failed")
-        return f"{lat:.2f}, {lon:.2f}", ""
+        r = await HTTP.get("https://photon.komoot.io/reverse", timeout=12,
+                           params={"lat": lat, "lon": lon, "limit": 1, **({"lang": al} if al in ("en", "de", "fr") else {})},
+                           headers={"User-Agent": f"PrayerTimesTelegramBot/1.0 ({CONTACT})"})
+        r.raise_for_status()
+        f = (r.json().get("features") or [{}])[0].get("properties") or {}
+        city = f.get("city") or f.get("town") or f.get("village") or f.get("county") or f.get("state") or f.get("name")
+        country = f.get("country")
+        name = f"{city}, {country}" if city and country and city != country else (city or country)
+        if name:
+            return fix(name), (f.get("countrycode") or "").lower()
+    except Exception as e:  # noqa: BLE001
+        log.warning("reverse geocode (photon) failed: %r", e)
+    return f"{lat:.2f}, {lon:.2f}", ""
 
 
 def qibla_bearing(lat, lon):
@@ -1733,6 +1754,8 @@ def screen_menu(u):
             rows.insert(1, [webapp_btn(t(lang, "btn_app"), "today")])
         if ai_allowed_now(u["user_id"]):
             rows.append([InlineKeyboardButton(t(lang, "ai_btn"), callback_data="ai:start", style="primary")])
+        if BOT_USERNAME:
+            rows.append([add_group_btn(lang)])
         if is_admin(u["user_id"]):
             rows.append([btn("🛠 Админка", "a:home")])
     return t(lang, "menu_title", city=esc(u["city"])), kb(*rows)
@@ -2015,6 +2038,8 @@ async def apply_location(update, ctx, u, name, lat, lon, cc, drop_ids=()):
         log.exception("timings failed")
         await update.effective_chat.send_message(t(lang, "error"))
         return
+    if COORDS_RE.match(name or "") and data.get("tz") and "/" in data["tz"]:
+        name = data["tz"].split("/")[-1].replace("_", " ")  # e.g. "Tashkent"; the real name is filled in later
     await save(tid, city=name, lat=lat, lon=lon, country=cc, tz=data["tz"], awaiting_city=False)
     u = await get_user(tid)
     await cleanup_loc_kb(update, ctx)
@@ -4790,6 +4815,13 @@ async def periodic(context: ContextTypes.DEFAULT_TYPE):
                 await asyncio.sleep(0.05)
     except Exception:  # noqa: BLE001
         log.exception("weekly reports failed")
+    try:  # places saved while the geocoder was down: get the real city name and country
+        rows = await POOL.fetch("SELECT user_id, lang, tz, city FROM users WHERE lat IS NOT NULL AND lang IS NOT NULL "
+                                "AND (country IS NULL OR country = '' OR city ~ '^-?[0-9]+[.][0-9]+, -?[0-9]+[.][0-9]+$') LIMIT 5")
+        for r in rows:
+            await relocalize_city(r["user_id"], r["lang"], force_country=True)
+    except Exception:  # noqa: BLE001
+        log.exception("place fix failed")
     try:
         await POOL.execute("DELETE FROM ai_log WHERE at < now() - interval '90 days'")
     except Exception:  # noqa: BLE001
