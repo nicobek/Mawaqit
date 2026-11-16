@@ -318,9 +318,75 @@ nav button .i{font-size:21px;line-height:1.1;filter:grayscale(.6);opacity:.8}
 nav button.on{color:var(--gold)}
 nav button.on .i{filter:none;opacity:1}
 [dir=rtl] .calnav button{transform:scaleX(-1)}
+
+/* ═════════ Liquid Glass ═════════ */
+:root{--sky1:#0b1a3a;--sky2:#1c1446;--sky3:#3b2f7a;--stars:0;
+  --glass-a:58%;--glass:color-mix(in srgb,var(--card) var(--glass-a),transparent);
+  --glass-edge:rgba(255,255,255,.14);--glass-hi:rgba(255,255,255,.10);--glass-shadow:0 10px 30px rgba(0,0,0,.22)}
+html.light{--glass-a:62%;--glass-edge:rgba(255,255,255,.7);--glass-hi:rgba(255,255,255,.45);--glass-shadow:0 10px 30px rgba(40,60,100,.12)}
+html[data-sky=dawn]{--sky1:#2b2f6b;--sky2:#c26a7a;--sky3:#f0a868;--stars:.25}
+html[data-sky=morning]{--sky1:#4a90d9;--sky2:#7fbde8;--sky3:#f2c46b;--stars:0}
+html[data-sky=day]{--sky1:#2f7fd6;--sky2:#5aa5e6;--sky3:#7cc0f2;--stars:0}
+html[data-sky=afternoon]{--sky1:#4f86c6;--sky2:#e8c27a;--sky3:#f4a340;--stars:0}
+html[data-sky=sunset]{--sky1:#3a2a6a;--sky2:#e2665a;--sky3:#f6a04d;--stars:.15}
+html[data-sky=dusk]{--sky1:#1d2350;--sky2:#6a3b7a;--sky3:#c0587a;--stars:.6}
+html[data-sky=night]{--sky1:#0b1a3a;--sky2:#1c1446;--sky3:#3b2f7a;--stars:1}
+html[data-sky=off]{--sky1:var(--gold);--sky2:var(--green);--sky3:var(--gold);--stars:0}
+#sky{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none;background:var(--bg)}
+#sky .g{position:absolute;inset:0;background:linear-gradient(180deg,color-mix(in srgb,var(--sky1) 52%,var(--bg)) 0%,color-mix(in srgb,var(--sky2) 42%,var(--bg)) 45%,var(--bg) 85%);transition:background 2s}
+html.light #sky .g{background:linear-gradient(180deg,color-mix(in srgb,var(--sky1) 42%,var(--bg)) 0%,color-mix(in srgb,var(--sky2) 30%,var(--bg)) 45%,var(--bg) 85%)}
+html[data-sky=off] #sky .g{background:var(--bg)}
+#sky .b{position:absolute;border-radius:50%;filter:blur(50px);opacity:.42;will-change:transform}
+#sky .b1{width:70vw;height:70vw;max-width:420px;max-height:420px;left:-18vw;top:-10vh;background:var(--sky3);animation:fl1 22s ease-in-out infinite alternate}
+#sky .b2{width:60vw;height:60vw;max-width:380px;max-height:380px;right:-20vw;top:18vh;background:var(--sky2);animation:fl2 26s ease-in-out infinite alternate}
+#sky .b3{width:55vw;height:55vw;max-width:340px;max-height:340px;left:10vw;bottom:-12vh;background:var(--gold);opacity:.22;animation:fl3 30s ease-in-out infinite alternate}
+html.light #sky .b{opacity:.35}
+#sky .st{position:absolute;inset:0 0 40% 0;opacity:var(--stars);transition:opacity 2s;
+  background-image:radial-gradient(1.5px 1.5px at 12% 18%,#fff,transparent),radial-gradient(1px 1px at 28% 8%,#fff,transparent),radial-gradient(1.5px 1.5px at 44% 26%,#fff,transparent),radial-gradient(1px 1px at 63% 12%,#fff,transparent),radial-gradient(1.5px 1.5px at 78% 30%,#fff,transparent),radial-gradient(1px 1px at 90% 6%,#fff,transparent),radial-gradient(1px 1px at 6% 40%,#fff,transparent),radial-gradient(1.5px 1.5px at 54% 44%,#fff,transparent),radial-gradient(1px 1px at 36% 52%,#fff,transparent),radial-gradient(1px 1px at 86% 50%,#fff,transparent);animation:tw 6s ease-in-out infinite alternate}
+@keyframes fl1{to{transform:translate(14vw,8vh) scale(1.1)}}
+@keyframes fl2{to{transform:translate(-12vw,10vh) scale(.92)}}
+@keyframes fl3{to{transform:translate(10vw,-8vh) scale(1.08)}}
+@keyframes tw{to{filter:brightness(.6)}}
+html,body{background:transparent}
+html{background:var(--bg)}
+.card,.menu .item,.btn.ghost,.calnav button,.search,.seg,.names .nm,.zk,.ach,.sheet .box{
+  background:linear-gradient(135deg,var(--glass-hi),transparent 42%),var(--glass)!important;
+  -webkit-backdrop-filter:blur(20px) saturate(170%);backdrop-filter:blur(20px) saturate(170%);
+  border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-edge),var(--glass-shadow)}
+.zk.done{border-color:var(--green)!important}
+.chip{background:color-mix(in srgb,var(--card) 40%,transparent);border-color:var(--glass-edge)}
+.btn{box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 8px 22px color-mix(in srgb,var(--gold) 35%,transparent)}
+.btn,.chip,.menu .item,nav button,.calnav button,.times .t,.sw,.c,.pm{transition:transform .15s ease}
+.btn:active,.chip:active,.menu .item:active,nav button:active,.calnav button:active,.times .t:active{transform:scale(.96)}
+nav{left:12px;right:12px;bottom:calc(8px + var(--safe-bottom));padding:6px;border-radius:26px;border:1px solid var(--glass-edge);
+  background:linear-gradient(135deg,var(--glass-hi),transparent 50%),color-mix(in srgb,var(--card) 55%,transparent);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);
+  box-shadow:inset 0 1px 0 var(--glass-edge),0 12px 34px rgba(0,0,0,.28);max-width:560px;margin:0 auto}
+nav button.on{background:color-mix(in srgb,var(--gold) 16%,transparent);border-radius:18px}
+.app{padding-bottom:calc(var(--nav-h) + var(--safe-bottom) + 32px)}
+.toast{bottom:calc(var(--nav-h) + var(--safe-bottom) + 28px)}
+.times .t{cursor:pointer;border-radius:12px}
+/* lite: same look without live blur (slow phones, reduced transparency) */
+html.lite .card,html.lite .menu .item,html.lite .btn.ghost,html.lite .calnav button,html.lite .search,html.lite .seg,html.lite .names .nm,html.lite .zk,html.lite .ach,html.lite nav,html.lite .sheet .box{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+html.lite{--glass-a:90%}
+html.lite #sky .b{animation:none;filter:blur(60px)}
+@media (prefers-reduced-motion:reduce){#sky .b,#sky .st{animation:none}}
+@media (prefers-reduced-transparency:reduce){html{--glass-a:94%}}
+/* extra times, sheet, invite */
+.xt{display:flex;flex-direction:column;gap:8px}
+.xt .r{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px}
+.xt .r b{font-variant-numeric:tabular-nums}
+.sheet{position:fixed;inset:0;z-index:30;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.35);animation:fade .2s ease}
+.sheet .box{width:100%;max-width:560px;margin:0 10px calc(10px + var(--safe-bottom));border-radius:26px;padding:18px 16px 14px}
+.sheet .hd{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.sheet .hd .ic{width:48px;height:48px;border-radius:15px;display:grid;place-items:center;font-size:24px;background:var(--gold-soft)}
+.sheet .hd b{font-size:19px}
+.sheet .btn{margin-top:8px}
+.inv .big{font-size:56px;font-weight:900;color:var(--gold);line-height:1;margin:6px 0}
 </style>
 </head>
 <body>
+<div id="sky"><div class="g"></div><div class="st"></div><div class="b b1"></div><div class="b b2"></div><div class="b b3"></div></div>
 <div class="app" id="app">
   <div class="state" id="boot"><div class="big">🕌</div><div class="muted" id="bootText">…</div></div>
 
@@ -333,6 +399,7 @@ nav button.on .i{filter:none;opacity:1}
       <div class="ring-in"><div class="label" id="untilLbl"></div><div class="name" id="nextName"></div><div class="left" id="left">--:--:--</div><div class="at" id="nextAt"></div></div>
     </div>
     <div class="card times" id="times"></div>
+    <div class="card xt" id="xt" hidden></div>
     <button class="card comm" id="comm" data-sub="tracker" hidden></button>
     <div class="share" id="shareRow"></div>
   </section>
@@ -396,6 +463,14 @@ nav button.on .i{filter:none;opacity:1}
     <button class="btn ghost" data-sub="challenges" id="trChBtn" style="margin-top:14px"></button>
   </section>
 
+  <section class="view" id="v-invite">
+    <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
+    <h1 id="invTitle"></h1>
+    <div class="card center inv"><div class="big" id="invCount">0</div><div class="sub" id="invCountL" style="font-weight:600"></div><div class="sub" id="invText" style="margin-top:6px"></div></div>
+    <button class="btn" id="invShare"></button>
+    <button class="btn ghost" id="invCopy" style="margin-top:10px"></button>
+  </section>
+
   <section class="view" id="v-challenges">
     <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
     <h1 id="chTitle"></h1><div class="sub" id="chSub"></div>
@@ -450,6 +525,9 @@ nav button.on .i{filter:none;opacity:1}
     <div class="card"><div class="lbl" id="stQuietL"></div><div class="chips" id="stQuiet"></div></div>
     <div class="card"><div class="sw" id="stRam"></div></div>
     <div class="card"><div class="sw" id="stWk"></div></div>
+    <div class="card" id="stAzanCard" hidden><div class="lbl" id="stAzanL"></div><div class="sub" id="stAzanH" style="margin:2px 0 8px"></div><div class="chips" id="stAzan"></div></div>
+    <div class="card"><div class="sw" id="stSky"></div></div>
+    <button class="btn ghost" id="stDev" style="margin-top:4px"></button>
   </section>
 
   <section class="view" id="v-azkar">
@@ -526,6 +604,7 @@ nav button.on .i{filter:none;opacity:1}
   </section>
 </div>
 
+<div class="sheet" id="sheet" hidden><div class="box" id="sheetBox"></div></div>
 <nav id="nav" hidden>
   <button data-tab="today"><span class="i">🕌</span><span data-l="t_today"></span></button>
   <button data-tab="qibla"><span class="i">🧭</span><span data-l="t_qibla"></span></button>
@@ -791,9 +870,9 @@ function openSub(name) {
   SUB = name; show(name);
   try { tg?.BackButton?.show(); } catch (e) {}
   ({tracker: renderTracker, ramadan: renderRamadan, mosques: openMosques, names: renderNames, settings: renderSettings,
-    azkar: renderAzkar, duas: renderDuas, challenges: renderChallenges, qada: renderQada, dates: renderDates, cities: renderCities})[name]?.();
+    azkar: renderAzkar, duas: renderDuas, challenges: renderChallenges, invite: renderInvite, qada: renderQada, dates: renderDates, cities: renderCities})[name]?.();
 }
-function back() { if (SUB === "place") return returnFromPlace(); if (SUB === "admuser") return go("admin"); if (SUB === "challenges" && CH_FROM === "tracker") { CH_FROM = null; return openSub("tracker"); } if (SUB) go("more"); }
+function back() { if (!$("sheet").hidden) return closeSheet(); if (SUB === "place") return returnFromPlace(); if (SUB === "admuser") return go("admin"); if (SUB === "challenges" && CH_FROM === "tracker") { CH_FROM = null; return openSub("tracker"); } if (SUB) go("more"); }
 
 /* ───────── TODAY ───────── */
 function eventsAround() {
@@ -810,11 +889,12 @@ function renderToday() {
   $("dates").textContent = `${d} ${T.gm[m - 1]} ${y}`;
   $("hijriPill").textContent = `🗓 ${DATA.today.hday} ${T.hm[DATA.today.hmonth - 1]} ${DATA.today.hyear}`;
   $("times").innerHTML = PRAYERS.map(k => `<div class="t" data-k="${k}"><div class="ico">${ICONS[k]}</div><div class="nm">${esc(T.pn[k])}</div><div class="tm">${t[k]}</div></div>`).join("");
-  tick(); renderShare(); loadCommunity();
+  tick(); renderShare(); loadCommunity(); renderExtra(); updateSky(true);
 }
 function tick() {
   if (!DATA || DATA.need_setup) return;
   if (todayISO() !== DATA.today.date) { load(true); return; }  // new day in the city
+  updateSky();
   const now = Date.now(), ev = eventsAround();
   let i = ev.findIndex(e => e.at > now); if (i < 1) i = 1;
   const prev = ev[i - 1], next = ev[i];
@@ -947,10 +1027,12 @@ function renderMore() {
   $("moreTitle").textContent = T.t_more;
   const items = [["tracker", "✅", "m_tracker", "m_tracker_d"], ["challenges", "🤝", "m_ch", "m_ch_d"], ["azkar", "🌅", "m_azkar", "m_azkar_d"], ["duas", "🤲", "m_duas", "m_duas_d"],
     ["qada", "🔁", "m_qada", "m_qada_d"], ["dates", "📆", "m_dates", "m_dates_d"], ["ramadan", "🌙", "m_ramadan", "m_ramadan_d"],
-    ["cities", "✈️", "m_cities", "m_cities_d"], ["mosques", "🕌", "m_mosques", "m_mosques_d"], ["names", "📖", "m_names", "m_names_d"], ["settings", "⚙️", "m_settings", "m_settings_d"]];
+    ["cities", "✈️", "m_cities", "m_cities_d"], ["mosques", "🕌", "m_mosques", "m_mosques_d"], ["names", "📖", "m_names", "m_names_d"], ["invite", "🤲", "m_invite", "m_invite_d"], ["settings", "⚙️", "m_settings", "m_settings_d"]];
   let h = items.map(([id, ic, t1, t2]) => `<button class="item" data-sub="${id}"><div class="ico">${ic}</div><div><div class="tt">${tr(t1)}</div><div class="ds">${tr(t2)}</div></div><div class="ch">›</div></button>`).join("");
+  h += `<button class="item" id="devBtn"><div class="ico">👨‍💻</div><div><div class="tt">${tr("m_dev")}</div><div class="ds">${tr("m_dev_d")}</div></div><div class="ch">›</div></button>`;
   if (ver("8.0") && tg.addToHomeScreen) h += `<button class="item" id="homeBtn"><div class="ico">📲</div><div><div class="tt">${tr("m_home")}</div><div class="ds" id="homeDs">${tr("m_home_d")}</div></div></button>`;
   $("moreMenu").innerHTML = h;
+  $("devBtn").onclick = openDev;
   const hb = $("homeBtn");
   if (hb) {
     hb.onclick = () => { try { tg.addToHomeScreen(); } catch (e) {} };
@@ -1239,6 +1321,14 @@ function renderSettings() {
   chips($("stQuiet"), (p.quiet_options || ["off"]).map(q => [q, q === "off" ? tr("st_quiet_off") : q.split("-").map(h => pad(h) + ":00").join("–")]), p.quiet, v => saveSetting({quiet: v}));
   sw($("stRam"), tr("st_ram"), p.ramadan, v => saveSetting({ramadan: v}));
   sw($("stWk"), tr("st_wk"), p.weekly !== false, v => saveSetting({weekly: v}));
+  const az = p.azan_options || [];
+  $("stAzanCard").hidden = !az.length;
+  if (az.length) {
+    $("stAzanL").textContent = tr("st_azan"); $("stAzanH").textContent = tr("st_azan_h");
+    chips($("stAzan"), [["off", tr("st_azan_off")]].concat(az.map(([id, n]) => [id, "🔊 " + n])), p.azan || "off", v => saveSetting({azan: v}));
+  }
+  sw($("stSky"), tr("st_sky"), SKY_ON, v => { SKY_ON = v; store.set("app_sky", v ? "1" : "0"); updateSky(true); renderSettings(); });
+  $("stDev").textContent = "👨‍💻 " + tr("m_dev");
 }
 /* ───────── AZKAR ───────── */
 let AZ_MODE = null, AZ = {};
@@ -1388,7 +1478,7 @@ function renderShare() {
   if (story) $("shStory").onclick = () => {
     haptic();
     const opts = {text: `🕌 ${DATA.profile.city}`};
-    if (DATA.bot) opts.widget_link = {url: `https://t.me/${DATA.bot}`, name: "@" + DATA.bot};
+    if (DATA.bot) opts.widget_link = {url: (DATA.ref && DATA.ref.link) || `https://t.me/${DATA.bot}`, name: "@" + DATA.bot};
     try { tg.shareToStory(DATA.share_url, opts); } catch (e) { try { tg.shareToStory(DATA.share_url); } catch (e2) { toast(tr("sh_err")); } }
   };
 }
@@ -1531,6 +1621,162 @@ const LX5 = {
   cm_line:"<b>{n}</b> شخصاً أدّوا الصلوات الخمس اليوم في مواقيت",cm_marked:"<b>{n}</b> شخصاً يسجّلون صلواتهم اليوم",cm_first:"سجّل صلواتك — كن الأول اليوم 🤍",st_azr:"🌅 تذكير الأذكار (صباحاً ومساءً)",st_wk:"📈 التقرير الأسبوعي (أيام الاثنين)"}
 };
 for (const l in LX5) Object.assign(LX[l], LX5[l]);
+
+/* ═══════════ stage 5: glass, living sky, extra times, prayer sheet, invitations ═══════════ */
+const LX6 = {
+ en:{st_sky:"🌌 Living sky (changes with prayer times)",st_azan:"🔊 Adhan at prayer time",st_azan_h:"Arrives silently right after the reminder",st_azan_off:"Off",
+  m_dev:"Contact the developer",m_dev_d:"Ideas, bugs, suggestions",m_invite:"Sadaqah jariyah",m_invite_d:"Invite friends to prayer",
+  inv_title:"🤲 Sadaqah jariyah",inv_count:"people joined through you",inv_text:"Share your link — everyone who starts praying on time thanks to you is a sadaqah jariyah for you 🤍",
+  inv_btn:"📨 Invite friends",inv_copy:"🔗 Copy link",inv_copied:"Link copied ✓",inv_msg:"I use Mawaqit — prayer times and reminders for any city. Join me 🤍",
+  x_duha:"☀️ Duha",x_third:"🌙 Last third of the night",x_from:"from {t}",x_ram:"🌙 Until Ramadan",x_days:"{n} d.",x_ram_now:"🌙 Ramadan · day {d}",
+  ps_share:"📤 Share prayer times",ps_card:"🖼 Send today's card to my chat",ps_mark:"✅ Mark in tracker",ps_marked:"✅ Marked in tracker",ps_close:"Close",ps_at:"at {t}",
+  ps_text:"🕌 Prayer times · {city}"},
+ ru:{st_sky:"🌌 Живое небо (меняется по времени намаза)",st_azan:"🔊 Азан в момент намаза",st_azan_h:"Приходит тихо сразу после напоминания",st_azan_off:"Выкл",
+  m_dev:"Связаться с разработчиком",m_dev_d:"Идеи, ошибки, предложения",m_invite:"Садака джария",m_invite_d:"Приглашайте друзей к намазу",
+  inv_title:"🤲 Садака джария",inv_count:"человек присоединились через вас",inv_text:"Поделитесь своей ссылкой — каждый, кто благодаря вам начнёт молиться вовремя, станет для вас садака джария 🤍",
+  inv_btn:"📨 Пригласить друзей",inv_copy:"🔗 Скопировать ссылку",inv_copied:"Ссылка скопирована ✓",inv_msg:"Я пользуюсь Mawaqit — время намаза и напоминания для любого города. Присоединяйся 🤍",
+  x_duha:"☀️ Духа",x_third:"🌙 Последняя треть ночи",x_from:"с {t}",x_ram:"🌙 До Рамадана",x_days:"{n} дн.",x_ram_now:"🌙 Рамадан · день {d}",
+  ps_share:"📤 Поделиться временем намаза",ps_card:"🖼 Отправить открытку дня в чат",ps_mark:"✅ Отметить в трекере",ps_marked:"✅ Отмечено в трекере",ps_close:"Закрыть",ps_at:"в {t}",
+  ps_text:"🕌 Время намаза · {city}"},
+ uz:{st_sky:"🌌 Jonli osmon (namoz vaqtiga qarab o'zgaradi)",st_azan:"🔊 Namoz vaqtida azon",st_azan_h:"Eslatmadan so'ng ovozsiz keladi",st_azan_off:"O'chiq",
+  m_dev:"Dasturchi bilan bog'lanish",m_dev_d:"G'oyalar, xatolar, takliflar",m_invite:"Sadaqai joriya",m_invite_d:"Do'stlarni namozga taklif qiling",
+  inv_title:"🤲 Sadaqai joriya",inv_count:"kishi siz orqali qo'shildi",inv_text:"Havolangizni ulashing — siz sababli namozni vaqtida o'qiy boshlagan har bir kishi siz uchun sadaqai joriya bo'ladi 🤍",
+  inv_btn:"📨 Do'stlarni taklif qilish",inv_copy:"🔗 Havolani nusxalash",inv_copied:"Havola nusxalandi ✓",inv_msg:"Men Mawaqit'dan foydalanaman — istalgan shahar uchun namoz vaqtlari va eslatmalar. Qo'shiling 🤍",
+  x_duha:"☀️ Zuho",x_third:"🌙 Tunning oxirgi uchdan biri",x_from:"{t} dan",x_ram:"🌙 Ramazongacha",x_days:"{n} kun",x_ram_now:"🌙 Ramazon · {d}-kun",
+  ps_share:"📤 Namoz vaqtlarini ulashish",ps_card:"🖼 Kun kartochkasini chatga yuborish",ps_mark:"✅ Kundalikda belgilash",ps_marked:"✅ Kundalikda belgilandi",ps_close:"Yopish",ps_at:"soat {t}",
+  ps_text:"🕌 Namoz vaqtlari · {city}"},
+ tg:{st_sky:"🌌 Осмони зинда (аз рӯи вақти намоз тағйир меёбад)",st_azan:"🔊 Азон дар вақти намоз",st_azan_h:"Баъди ёдоварӣ бесадо меояд",st_azan_off:"Хомӯш",
+  m_dev:"Тамос бо барномасоз",m_dev_d:"Ғояҳо, хатоҳо, пешниҳодҳо",m_invite:"Садақаи ҷория",m_invite_d:"Дӯстонро ба намоз даъват кунед",
+  inv_title:"🤲 Садақаи ҷория",inv_count:"нафар тавассути шумо ҳамроҳ шуданд",inv_text:"Пайванди худро мубодила кунед — ҳар касе, ки ба шарофати шумо намозро сари вақт мехонад, барои шумо садақаи ҷория мешавад 🤍",
+  inv_btn:"📨 Даъвати дӯстон",inv_copy:"🔗 Нусхаи пайванд",inv_copied:"Пайванд нусха шуд ✓",inv_msg:"Ман Mawaqit-ро истифода мебарам — вақти намоз ва ёдовариҳо барои ҳар шаҳр. Ҳамроҳ шав 🤍",
+  x_duha:"☀️ Зуҳо",x_third:"🌙 Сеяки охири шаб",x_from:"аз {t}",x_ram:"🌙 То Рамазон",x_days:"{n} рӯз",x_ram_now:"🌙 Рамазон · рӯзи {d}",
+  ps_share:"📤 Мубодилаи вақти намоз",ps_card:"🖼 Фиристодани корти рӯз ба чат",ps_mark:"✅ Қайд дар рӯйхат",ps_marked:"✅ Дар рӯйхат қайд шуд",ps_close:"Пӯшидан",ps_at:"соати {t}",
+  ps_text:"🕌 Вақти намоз · {city}"},
+ ar:{st_sky:"🌌 السماء الحيّة (تتغير مع مواقيت الصلاة)",st_azan:"🔊 الأذان عند دخول الوقت",st_azan_h:"يصل بصمت بعد التذكير مباشرة",st_azan_off:"متوقف",
+  m_dev:"تواصل مع المطوّر",m_dev_d:"أفكار، أخطاء، اقتراحات",m_invite:"صدقة جارية",m_invite_d:"ادعُ أصدقاءك إلى الصلاة",
+  inv_title:"🤲 صدقة جارية",inv_count:"شخصاً انضموا عن طريقك",inv_text:"شارك رابطك — كل من يبدأ الصلاة في وقتها بسببك يكون لك صدقة جارية 🤍",
+  inv_btn:"📨 دعوة الأصدقاء",inv_copy:"🔗 نسخ الرابط",inv_copied:"تم نسخ الرابط ✓",inv_msg:"أستخدم مواقيت — مواقيت الصلاة والتذكيرات لأي مدينة. انضم إليّ 🤍",
+  x_duha:"☀️ الضحى",x_third:"🌙 الثلث الأخير من الليل",x_from:"من {t}",x_ram:"🌙 حتى رمضان",x_days:"{n} يوماً",x_ram_now:"🌙 رمضان · اليوم {d}",
+  ps_share:"📤 مشاركة مواقيت الصلاة",ps_card:"🖼 إرسال بطاقة اليوم إلى المحادثة",ps_mark:"✅ تسجيل في المتابعة",ps_marked:"✅ سُجّلت في المتابعة",ps_close:"إغلاق",ps_at:"الساعة {t}",
+  ps_text:"🕌 مواقيت الصلاة · {city}"}
+};
+for (const l in LX6) Object.assign(LX[l], LX6[l]);
+
+/* glass: lighter version for slow phones */
+function detectLite() {
+  const ua = navigator.userAgent || "";
+  const m = ua.match(/Telegram-Android\/[^\s]+ \([^)]*;\s*(LOW|AVERAGE|HIGH)\)/i);
+  const slow = (m && m[1].toUpperCase() !== "HIGH") || (/Android/i.test(ua) && ((navigator.deviceMemory || 8) <= 3 || (navigator.hardwareConcurrency || 8) <= 4));
+  document.documentElement.classList.toggle("lite", !!slow || !CSS.supports("backdrop-filter", "blur(2px)") && !CSS.supports("-webkit-backdrop-filter", "blur(2px)"));
+  const light = () => {
+    const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+    const c = document.createElement("canvas").getContext("2d"); c.fillStyle = bg || "#000";
+    const hex = c.fillStyle; if (!/^#/.test(hex)) return false;
+    const n = parseInt(hex.slice(1), 16); return ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000 > 150;
+  };
+  const upd = () => document.documentElement.classList.toggle("light", light());
+  upd(); try { tg.onEvent("themeChanged", upd); } catch (e) {}
+  const mo = new MutationObserver(upd); mo.observe(document.documentElement, {attributes: true, attributeFilter: ["data-theme"]});
+}
+
+/* living sky: the background follows the prayer times of the user's city */
+let SKY_ON = true, SKY_CUR = null;
+function skyPhase() {
+  if (!DATA || !DATA.today) return "night";
+  const iso = DATA.today.date, t = DATA.today.t, now = Date.now(), at = k => wall(iso, t[k]);
+  if (now < at("Fajr")) return "night";
+  if (now < at("Sunrise")) return "dawn";
+  if (now < at("Sunrise") + 2.5 * 3600e3 && now < at("Dhuhr")) return "morning";
+  if (now < at("Asr")) return "day";
+  if (now < at("Maghrib") - 40 * 60e3) return "afternoon";
+  if (now < at("Maghrib") + 25 * 60e3) return "sunset";
+  if (now < at("Isha")) return "dusk";
+  return "night";
+}
+function updateSky(force) {
+  const ph = SKY_ON ? skyPhase() : "off";
+  if (ph === SKY_CUR && !force) return;
+  SKY_CUR = ph; document.documentElement.setAttribute("data-sky", ph);
+}
+
+/* extra times on the Today screen */
+const hhmm = ms => new Intl.DateTimeFormat("en-GB", {timeZone: TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23"}).format(new Date(ms));
+let RAM_START = undefined;
+async function renderExtra() {
+  const el = $("xt"); if (!el || !DATA) return;
+  const iso = DATA.today.date, t = DATA.today.t;
+  const duha = wall(iso, t.Sunrise) + 20 * 60e3;
+  const mg = wall(iso, t.Maghrib), fj = wall(addDays(iso, 1), DATA.tomorrow.t.Fajr);
+  const third = mg + (fj - mg) * 2 / 3;
+  const rows = [[tr("x_duha"), tr("x_from", {t: hhmm(duha)})], [tr("x_third"), tr("x_from", {t: hhmm(third)})]];
+  if (DATA.today.hmonth === 9) rows.push([tr("x_ram_now", {d: DATA.today.hday}), ""]);
+  else {
+    if (RAM_START === undefined) {
+      RAM_START = null;
+      api("/api/ramadan").then(r => { const f = r.days && r.days[0] && r.days[0].date; if (f) { const [d, m, y] = f.split("-"); RAM_START = `${y}-${m}-${d}`; renderExtra(); } }).catch(() => {});
+    }
+    if (RAM_START) { const n = Math.round((Date.parse(RAM_START + "T12:00:00Z") - Date.parse(iso + "T12:00:00Z")) / 864e5); if (n > 0) rows.push([tr("x_ram"), tr("x_days", {n})]); }
+  }
+  el.innerHTML = rows.map(([a, b]) => `<div class="r"><span>${esc(a)}</span><b>${esc(b)}</b></div>`).join("");
+  el.hidden = false;
+}
+
+/* tap on a prayer: share it, send the day card, mark it */
+function closeSheet() { $("sheet").hidden = true; try { if (!SUB) tg.BackButton.hide(); } catch (e) {} }
+async function openPrayerSheet(k) {
+  const t = DATA.today.t, iso = DATA.today.date, fard = FARD.indexOf(k), passed = wall(iso, t[k]) <= Date.now();
+  $("sheetBox").innerHTML = `<div class="hd"><div class="ic">${ICONS[k]}</div><div><b>${esc(T.pn[k])}</b><div class="sub">${esc(tr("ps_at", {t: t[k]}))} · 📍 ${esc(DATA.profile.city)}</div></div></div>`
+    + `<button class="btn" id="psShare">${esc(tr("ps_share"))}</button>`
+    + `<button class="btn ghost" id="psCard">${esc(tr("ps_card"))}</button>`
+    + (fard >= 0 && passed ? `<button class="btn ghost" id="psMark">${esc(tr("ps_mark"))}</button>` : "")
+    + `<button class="btn ghost" id="psClose" style="background:transparent!important;border:0;box-shadow:none">${esc(tr("ps_close"))}</button>`;
+  $("sheet").hidden = false;
+  try { tg.BackButton.show(); } catch (e) {}
+  $("psClose").onclick = closeSheet;
+  $("psShare").onclick = () => { haptic(); sharePrayerTimes(); };
+  $("psCard").onclick = async () => {
+    haptic(); $("psCard").disabled = true;
+    try { await apiPost("/api/share_send", {}); toast(tr("sh_sent")); closeSheet(); } catch (e) { toast(tr("sh_err")); }
+    $("psCard").disabled = false;
+  };
+  if ($("psMark")) {
+    let mask = "00000";
+    try { const r = await api("/api/tracker?from=" + iso); mask = (r.days[iso] || "00000"); } catch (e) {}
+    const done = () => { $("psMark").textContent = tr("ps_marked"); $("psMark").disabled = true; };
+    if (mask[fard] === "1") done();
+    $("psMark").onclick = async () => {
+      haptic();
+      const m = mask.split(""); m[fard] = "1"; mask = m.join("");
+      try { await apiPost("/api/tracker", {day: iso, mask}); TRK[iso] = mask; done(); try { tg.HapticFeedback.notificationOccurred("success"); } catch (e) {} } catch (e) { toast(tr("st_err")); }
+    };
+  }
+}
+function sharePrayerTimes() {
+  if (DATA.bot && ver("6.7") && tg.switchInlineQuery) { try { tg.switchInlineQuery("", ["users", "groups", "channels"]); return; } catch (e) {} }
+  const t = DATA.today.t, link = (DATA.ref && DATA.ref.link) || `https://t.me/${DATA.bot}`;
+  const text = tr("ps_text", {city: DATA.profile.city}) + "\n" + PRAYERS.map(k => `${ICONS[k]} ${T.pn[k]} — ${t[k]}`).join("\n");
+  const u = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
+  try { tg.openTelegramLink(u); } catch (e) { openLink(u); }
+}
+
+/* developer and invitations */
+function openDev() { haptic(); const u = "https://t.me/" + (DATA && DATA.dev || "bdurrokhman"); try { tg.openTelegramLink(u); } catch (e) { openLink(u); } }
+function renderInvite() {
+  $("invTitle").textContent = tr("inv_title"); $("invCountL").textContent = ""; $("invText").textContent = tr("inv_text");
+  $("invCount").textContent = (DATA.ref && DATA.ref.count) || 0; $("invCountL").textContent = tr("inv_count");
+  $("invShare").textContent = tr("inv_btn"); $("invCopy").textContent = tr("inv_copy");
+  api("/api/me").then(d => { if (d.ref) { DATA.ref = d.ref; $("invCount").textContent = d.ref.count; } }).catch(() => {});
+}
+function shareInvite() {
+  haptic(); const link = DATA.ref && DATA.ref.link; if (!link) return;
+  const u = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(tr("inv_msg"))}`;
+  try { tg.openTelegramLink(u); } catch (e) { openLink(u); }
+}
+async function copyInvite() {
+  haptic(); const link = DATA.ref && DATA.ref.link; if (!link) return;
+  try { await navigator.clipboard.writeText(link); toast(tr("inv_copied")); }
+  catch (e) { const i = document.createElement("textarea"); i.value = link; document.body.appendChild(i); i.select(); try { document.execCommand("copy"); toast(tr("inv_copied")); } catch (e2) {} i.remove(); }
+}
 
 let COMM_AT = 0;
 async function loadCommunity() {
@@ -2065,7 +2311,7 @@ async function load(silent) {
     if (!silent) {
       const qs = new URLSearchParams(location.search), want = qs.get("tab"), sub = qs.get("sub"), az = qs.get("az");
       go(["today", "qibla", "cal", "tasbih", "more"].concat(d.is_admin ? ["admin"] : []).includes(want) ? want : "today");
-      if (want === "more" && ["tracker", "challenges", "azkar", "duas", "qada", "dates", "ramadan", "cities", "mosques", "names", "settings"].includes(sub)) {
+      if (want === "more" && ["tracker", "challenges", "invite", "azkar", "duas", "qada", "dates", "ramadan", "cities", "mosques", "names", "settings"].includes(sub)) {
         if (sub === "azkar" && (az === "m" || az === "e")) AZ_MODE = az;
         openSub(sub);
       }
@@ -2097,6 +2343,8 @@ function init() {
     const ad = e.target.closest("#adSeg button"); if (ad) { haptic(); AD_TAB = ad.dataset.ad; renderAdmin(); return; }
     if (e.target.closest("[data-adref]")) { haptic(); renderAdmin(); return; }
     const c = e.target.closest("#trChecks .c"); if (c) { toggleTrack(+c.dataset.i); return; }
+    const pt = e.target.closest("#times .t"); if (pt) { haptic(); openPrayerSheet(pt.dataset.k); return; }
+    if (e.target.id === "sheet") { closeSheet(); return; }
     const z = e.target.closest(".zk"); if (z) { tapZikr(z.dataset.z); return; }
     const az = e.target.closest("#azSeg button"); if (az) { AZ_MODE = az.dataset.az; haptic(); renderAzkar(); return; }
     const qb = e.target.closest("#qdList .pm"); if (qb) { qdChange(qb.dataset.q, +qb.dataset.d); return; }
@@ -2119,6 +2367,9 @@ function init() {
   $("ciFind").onclick = findOther;
   $("ciQ").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); findOther(); } };
   $("chCreate").onclick = createChallenge;
+  $("stDev").onclick = openDev; $("invShare").onclick = shareInvite; $("invCopy").onclick = copyInvite;
+  store.get(["app_sky"]).then(v => { SKY_ON = v.app_sky !== "0"; updateSky(true); });
+  detectLite();
   $("trChBtn").addEventListener("click", () => { CH_FROM = "tracker"; });
   $("trPrev").onclick = () => shiftTrMonth(-1); $("trNext").onclick = () => shiftTrMonth(1);
   ["cvDate", "cvHd", "cvHm", "cvHy"].forEach(id => $(id).addEventListener("input", convert));

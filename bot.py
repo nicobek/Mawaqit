@@ -24,9 +24,9 @@ import math
 import os
 import time as _time
 from collections import deque
-from datetime import datetime, time as dtime, timedelta
+from datetime import date, datetime, time as dtime, timedelta
 from pathlib import Path
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, quote
 from zoneinfo import ZoneInfo
 
 import asyncpg
@@ -45,6 +45,8 @@ from telegram import (
     MenuButtonWebApp,
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
+    LinkPreviewOptions,
+    SwitchInlineQueryChosenChat,
     Update,
     WebAppInfo,
 )
@@ -704,6 +706,126 @@ EXTRA4 = {
 for _l, _d in EXTRA4.items():
     T[_l].update(_d)
 
+EXTRA5 = {
+    "en": {"on": "on", "off": "off",
+           "btn_rem_s_on": "🔔 Reminders ✅", "btn_rem_s_off": "🔕 Reminders ❌",
+           "sb_lead": "⏰ In advance", "sb_at_on": "🕌 At time ✅", "sb_at_off": "🕌 At time ❌",
+           "sb_auto": "🔄 Auto-update", "sb_ram_on": "🌙 Ramadan ✅", "sb_ram_off": "🌙 Ramadan ❌",
+           "sb_wk_on": "📈 Report ✅", "sb_wk_off": "📈 Report ❌", "sb_azan": "🔊 Adhan: {v}",
+           "st_at": "🕌 At prayer time: {v}", "st_ram": "🌙 Ramadan mode: {v}", "st_wk": "📈 Weekly report: {v}", "st_azan": "🔊 Adhan: {v}",
+           "btn_groups": "👥 Groups & channels", "btn_dev": "👨‍💻 Developer",
+           "groups_title": "👥 <b>Groups & channels</b>\n\nAdd me to a group or a channel — I'll post the prayer times there and remind everyone 🤍",
+           "btn_share": "📤 Share", "share_footer": "🕌 Prayer times for your city — {bot}",
+           "btn_prayed": "✅ I prayed", "btn_prayed_done": "✅ Marked in the tracker", "prayed_toast": "Marked in the tracker 🤍",
+           "azan_title": "🔊 <b>Adhan</b>\n\nRight after the reminder at prayer time, a recording of the adhan will arrive silently. Choose a muezzin:",
+           "badge_new": "🏅 <b>New achievement!</b>\n\n{list}\n\nMay Allah accept your prayers 🤍",
+           "badge_share": "I earned «{name}» in Mawaqit 🤍",
+           "b_s7": "🔥 7 days in a row — all 5 prayers", "b_s30": "🏅 30 days in a row — all 5 prayers", "b_s100": "👑 100 days in a row — all 5 prayers",
+           "b_t100": "💯 100 prayers", "b_t500": "🏆 500 prayers", "b_t1000": "🌟 1000 prayers",
+           "btn_open_tracker2": "✅ Tracker",
+           "sum_m_title": "🎁 <b>Your {period}</b>", "sum_y_title": "🎁 <b>Your year {period}</b>",
+           "sum_prayers": "✅ Prayers: <b>{n}</b> of {m} ({p}%)", "sum_full": "🟢 Complete days: <b>{d}</b>",
+           "sum_best": "🔥 Best streak: <b>{s}</b> d.", "sum_top": "⭐ Most steady prayer: <b>{name}</b>",
+           "sum_end": "May Allah accept every prayer 🤍", "sum_share": "My {period} in Mawaqit: {n} prayers 🤍",
+           "img_prayers": "prayers", "img_full": "complete days", "img_best": "best streak", "img_top": "most steady",
+           "ref_joined": "🤲 One more person joined through you. Total: <b>{n}</b>\n\nMay it be a sadaqah jariyah for you 🤍",
+           "months": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]},
+    "ru": {"on": "вкл", "off": "выкл",
+           "btn_rem_s_on": "🔔 Напоминания ✅", "btn_rem_s_off": "🔕 Напоминания ❌",
+           "sb_lead": "⏰ Заранее", "sb_at_on": "🕌 В момент ✅", "sb_at_off": "🕌 В момент ❌",
+           "sb_auto": "🔄 Автообновление", "sb_ram_on": "🌙 Рамадан ✅", "sb_ram_off": "🌙 Рамадан ❌",
+           "sb_wk_on": "📈 Отчёт ✅", "sb_wk_off": "📈 Отчёт ❌", "sb_azan": "🔊 Азан: {v}",
+           "st_at": "🕌 В момент намаза: {v}", "st_ram": "🌙 Режим Рамадана: {v}", "st_wk": "📈 Отчёт за неделю: {v}", "st_azan": "🔊 Азан: {v}",
+           "btn_groups": "👥 Группы и каналы", "btn_dev": "👨‍💻 Разработчик",
+           "groups_title": "👥 <b>Группы и каналы</b>\n\nДобавьте меня в группу или канал — я буду публиковать время намаза и напоминать всем 🤍",
+           "btn_share": "📤 Поделиться", "share_footer": "🕌 Время намаза для вашего города — {bot}",
+           "btn_prayed": "✅ Прочитал", "btn_prayed_done": "✅ Отмечено в трекере", "prayed_toast": "Отмечено в трекере 🤍",
+           "azan_title": "🔊 <b>Азан</b>\n\nСразу после напоминания в момент намаза тихо придёт запись азана. Выберите муэдзина:",
+           "badge_new": "🏅 <b>Новое достижение!</b>\n\n{list}\n\nПусть Аллах примет ваши намазы 🤍",
+           "badge_share": "Я получил достижение «{name}» в Mawaqit 🤍",
+           "b_s7": "🔥 7 дней подряд все 5 намазов", "b_s30": "🏅 30 дней подряд все 5 намазов", "b_s100": "👑 100 дней подряд все 5 намазов",
+           "b_t100": "💯 100 намазов", "b_t500": "🏆 500 намазов", "b_t1000": "🌟 1000 намазов",
+           "btn_open_tracker2": "✅ Трекер",
+           "sum_m_title": "🎁 <b>Итоги: {period}</b>", "sum_y_title": "🎁 <b>Итоги {period} года</b>",
+           "sum_prayers": "✅ Намазов: <b>{n}</b> из {m} ({p}%)", "sum_full": "🟢 Полных дней: <b>{d}</b>",
+           "sum_best": "🔥 Лучшая серия: <b>{s}</b> дн.", "sum_top": "⭐ Самый стабильный намаз: <b>{name}</b>",
+           "sum_end": "Пусть Аллах примет каждый намаз 🤍", "sum_share": "Мои итоги ({period}) в Mawaqit: {n} намазов 🤍",
+           "img_prayers": "намазов", "img_full": "полных дней", "img_best": "лучшая серия", "img_top": "самый стабильный",
+           "ref_joined": "🤲 Через тебя присоединился ещё 1 человек. Всего: <b>{n}</b>\n\nПусть это будет садака джария 🤍",
+           "months": ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]},
+    "uz": {"on": "yoqilgan", "off": "o'chiq",
+           "btn_rem_s_on": "🔔 Eslatmalar ✅", "btn_rem_s_off": "🔕 Eslatmalar ❌",
+           "sb_lead": "⏰ Oldindan", "sb_at_on": "🕌 Vaqtida ✅", "sb_at_off": "🕌 Vaqtida ❌",
+           "sb_auto": "🔄 Avtoyangilash", "sb_ram_on": "🌙 Ramazon ✅", "sb_ram_off": "🌙 Ramazon ❌",
+           "sb_wk_on": "📈 Hisobot ✅", "sb_wk_off": "📈 Hisobot ❌", "sb_azan": "🔊 Azon: {v}",
+           "st_at": "🕌 Namoz vaqtida: {v}", "st_ram": "🌙 Ramazon rejimi: {v}", "st_wk": "📈 Haftalik hisobot: {v}", "st_azan": "🔊 Azon: {v}",
+           "btn_groups": "👥 Guruh va kanallar", "btn_dev": "👨‍💻 Dasturchi",
+           "groups_title": "👥 <b>Guruh va kanallar</b>\n\nMeni guruh yoki kanalga qo'shing — u yerda namoz vaqtlarini e'lon qilib, hammaga eslataman 🤍",
+           "btn_share": "📤 Ulashish", "share_footer": "🕌 Shahringiz uchun namoz vaqtlari — {bot}",
+           "btn_prayed": "✅ O'qidim", "btn_prayed_done": "✅ Kundalikda belgilandi", "prayed_toast": "Kundalikda belgilandi 🤍",
+           "azan_title": "🔊 <b>Azon</b>\n\nNamoz vaqtidagi eslatmadan so'ng azon yozuvi ovozsiz keladi. Muazzinni tanlang:",
+           "badge_new": "🏅 <b>Yangi yutuq!</b>\n\n{list}\n\nAlloh namozlaringizni qabul qilsin 🤍",
+           "badge_share": "Mawaqit'da «{name}» yutug'ini oldim 🤍",
+           "b_s7": "🔥 7 kun ketma-ket 5 vaqt namoz", "b_s30": "🏅 30 kun ketma-ket 5 vaqt namoz", "b_s100": "👑 100 kun ketma-ket 5 vaqt namoz",
+           "b_t100": "💯 100 namoz", "b_t500": "🏆 500 namoz", "b_t1000": "🌟 1000 namoz",
+           "btn_open_tracker2": "✅ Kundalik",
+           "sum_m_title": "🎁 <b>Yakunlar: {period}</b>", "sum_y_title": "🎁 <b>{period} yil yakunlari</b>",
+           "sum_prayers": "✅ Namozlar: <b>{m} tadan {n} ta</b> ({p}%)", "sum_full": "🟢 To'liq kunlar: <b>{d}</b>",
+           "sum_best": "🔥 Eng uzun ketma-ketlik: <b>{s}</b> kun", "sum_top": "⭐ Eng barqaror namoz: <b>{name}</b>",
+           "sum_end": "Alloh har bir namozni qabul qilsin 🤍", "sum_share": "Mawaqit'dagi yakunlarim ({period}): {n} namoz 🤍",
+           "img_prayers": "namoz", "img_full": "to'liq kun", "img_best": "eng uzun seriya", "img_top": "eng barqaror",
+           "ref_joined": "🤲 Siz orqali yana 1 kishi qo'shildi. Jami: <b>{n}</b>\n\nBu siz uchun sadaqai joriya bo'lsin 🤍",
+           "months": ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"]},
+    "tg": {"on": "фаъол", "off": "хомӯш",
+           "btn_rem_s_on": "🔔 Ёдовариҳо ✅", "btn_rem_s_off": "🔕 Ёдовариҳо ❌",
+           "sb_lead": "⏰ Пешакӣ", "sb_at_on": "🕌 Дар вақташ ✅", "sb_at_off": "🕌 Дар вақташ ❌",
+           "sb_auto": "🔄 Навсозии худкор", "sb_ram_on": "🌙 Рамазон ✅", "sb_ram_off": "🌙 Рамазон ❌",
+           "sb_wk_on": "📈 Ҳисобот ✅", "sb_wk_off": "📈 Ҳисобот ❌", "sb_azan": "🔊 Азон: {v}",
+           "st_at": "🕌 Дар вақти намоз: {v}", "st_ram": "🌙 Ҳолати Рамазон: {v}", "st_wk": "📈 Ҳисоботи ҳафтаина: {v}", "st_azan": "🔊 Азон: {v}",
+           "btn_groups": "👥 Гурӯҳҳо ва каналҳо", "btn_dev": "👨‍💻 Барномасоз",
+           "groups_title": "👥 <b>Гурӯҳҳо ва каналҳо</b>\n\nМаро ба гурӯҳ ё канал илова кунед — ман вақти намозро нашр карда, ба ҳама ёдрас мекунам 🤍",
+           "btn_share": "📤 Мубодила", "share_footer": "🕌 Вақти намоз барои шаҳри шумо — {bot}",
+           "btn_prayed": "✅ Хондам", "btn_prayed_done": "✅ Дар рӯйхат қайд шуд", "prayed_toast": "Дар рӯйхат қайд шуд 🤍",
+           "azan_title": "🔊 <b>Азон</b>\n\nБаъди ёдоварӣ дар вақти намоз сабти азон бесадо меояд. Муаззинро интихоб кунед:",
+           "badge_new": "🏅 <b>Дастоварди нав!</b>\n\n{list}\n\nАллоҳ намозҳои шуморо қабул кунад 🤍",
+           "badge_share": "Ман дар Mawaqit дастоварди «{name}»-ро гирифтам 🤍",
+           "b_s7": "🔥 7 рӯз пайиҳам ҳамаи 5 намоз", "b_s30": "🏅 30 рӯз пайиҳам ҳамаи 5 намоз", "b_s100": "👑 100 рӯз пайиҳам ҳамаи 5 намоз",
+           "b_t100": "💯 100 намоз", "b_t500": "🏆 500 намоз", "b_t1000": "🌟 1000 намоз",
+           "btn_open_tracker2": "✅ Рӯйхат",
+           "sum_m_title": "🎁 <b>Натиҷаҳо: {period}</b>", "sum_y_title": "🎁 <b>Натиҷаҳои соли {period}</b>",
+           "sum_prayers": "✅ Намозҳо: <b>{n}</b> аз {m} ({p}%)", "sum_full": "🟢 Рӯзҳои пурра: <b>{d}</b>",
+           "sum_best": "🔥 Беҳтарин силсила: <b>{s}</b> рӯз", "sum_top": "⭐ Устувортарин намоз: <b>{name}</b>",
+           "sum_end": "Аллоҳ ҳар намозро қабул кунад 🤍", "sum_share": "Натиҷаҳои ман ({period}) дар Mawaqit: {n} намоз 🤍",
+           "img_prayers": "намоз", "img_full": "рӯзи пурра", "img_best": "беҳтарин силсила", "img_top": "устувортарин",
+           "ref_joined": "🤲 Тавассути шумо боз 1 нафар ҳамроҳ шуд. Ҳамагӣ: <b>{n}</b>\n\nБигзор ин барои шумо садақаи ҷория бошад 🤍",
+           "months": ["Январ", "Феврал", "Март", "Апрел", "Май", "Июн", "Июл", "Август", "Сентябр", "Октябр", "Ноябр", "Декабр"]},
+    "ar": {"on": "مفعّل", "off": "متوقف",
+           "btn_rem_s_on": "🔔 التذكيرات ✅", "btn_rem_s_off": "🔕 التذكيرات ❌",
+           "sb_lead": "⏰ مسبقاً", "sb_at_on": "🕌 عند الوقت ✅", "sb_at_off": "🕌 عند الوقت ❌",
+           "sb_auto": "🔄 التحديث التلقائي", "sb_ram_on": "🌙 رمضان ✅", "sb_ram_off": "🌙 رمضان ❌",
+           "sb_wk_on": "📈 التقرير ✅", "sb_wk_off": "📈 التقرير ❌", "sb_azan": "🔊 الأذان: {v}",
+           "st_at": "🕌 عند دخول الوقت: {v}", "st_ram": "🌙 وضع رمضان: {v}", "st_wk": "📈 التقرير الأسبوعي: {v}", "st_azan": "🔊 الأذان: {v}",
+           "btn_groups": "👥 المجموعات والقنوات", "btn_dev": "👨‍💻 المطوّر",
+           "groups_title": "👥 <b>المجموعات والقنوات</b>\n\nأضفني إلى مجموعة أو قناة — سأنشر مواقيت الصلاة وأذكّر الجميع 🤍",
+           "btn_share": "📤 مشاركة", "share_footer": "🕌 مواقيت الصلاة لمدينتك — {bot}",
+           "btn_prayed": "✅ صلّيت", "btn_prayed_done": "✅ سُجّلت في المتابعة", "prayed_toast": "سُجّلت في المتابعة 🤍",
+           "azan_title": "🔊 <b>الأذان</b>\n\nبعد التذكير عند دخول الوقت يصلك تسجيل الأذان بصمت. اختر المؤذن:",
+           "badge_new": "🏅 <b>إنجاز جديد!</b>\n\n{list}\n\nتقبّل الله صلواتك 🤍",
+           "badge_share": "حصلت على إنجاز «{name}» في مواقيت 🤍",
+           "b_s7": "🔥 7 أيام متتالية بالصلوات الخمس", "b_s30": "🏅 30 يوماً متتالياً بالصلوات الخمس", "b_s100": "👑 100 يوم متتالٍ بالصلوات الخمس",
+           "b_t100": "💯 100 صلاة", "b_t500": "🏆 500 صلاة", "b_t1000": "🌟 1000 صلاة",
+           "btn_open_tracker2": "✅ المتابعة",
+           "sum_m_title": "🎁 <b>حصاد {period}</b>", "sum_y_title": "🎁 <b>حصاد عام {period}</b>",
+           "sum_prayers": "✅ الصلوات: <b>{n}</b> من {m} ({p}%)", "sum_full": "🟢 الأيام الكاملة: <b>{d}</b>",
+           "sum_best": "🔥 أطول سلسلة: <b>{s}</b> يوم", "sum_top": "⭐ أكثر صلاة ثباتاً: <b>{name}</b>",
+           "sum_end": "تقبّل الله كل صلاة 🤍", "sum_share": "حصادي ({period}) في مواقيت: {n} صلاة 🤍",
+           "img_prayers": "صلاة", "img_full": "يوم كامل", "img_best": "أطول سلسلة", "img_top": "الأكثر ثباتاً",
+           "ref_joined": "🤲 انضم شخص آخر عن طريقك. المجموع: <b>{n}</b>\n\nجعلها الله لك صدقة جارية 🤍",
+           "months": ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]},
+}
+for _l, _d in EXTRA5.items():
+    T[_l].update(_d)
+
 GROUP_WELCOME = ("🕌 <b>Assalamu alaikum!</b>\n\n"
                  "I'll post prayer times and reminders here. Group admins, please set me up 👇\n\n" + LANG_PICK_TEXT)
 
@@ -775,6 +897,23 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS username  TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS azkar_rem BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS weekly    BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_weekly DATE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_summary DATE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by BIGINT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS azan TEXT;
+CREATE INDEX IF NOT EXISTS users_referred_by ON users (referred_by);
+CREATE TABLE IF NOT EXISTS badges (
+    user_id BIGINT NOT NULL,
+    code    TEXT NOT NULL,
+    at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, code)
+);
+CREATE TABLE IF NOT EXISTS azans (
+    id         SERIAL PRIMARY KEY,
+    name       TEXT NOT NULL,
+    file_id    TEXT NOT NULL,
+    kind       TEXT NOT NULL DEFAULT 'audio',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS tracker (
     user_id BIGINT NOT NULL,
     day     DATE NOT NULL,
@@ -1132,9 +1271,8 @@ def qibla_btn(u):
 def screen_menu(u):
     lang = u["lang"]
     rows = [
-        [btn(t(lang, "btn_times"), "m:times")],
-        [qibla_btn(u)],
-        [btn(t(lang, "btn_rem_on" if u["remind"] else "btn_rem_off"), "m:toggle")],
+        [InlineKeyboardButton(t(lang, "btn_times"), callback_data="m:times", style="success")],
+        [qibla_btn(u), btn(t(lang, "btn_rem_s_on" if u["remind"] else "btn_rem_s_off"), "m:toggle")],
         [btn(t(lang, "btn_settings"), "m:settings")],
     ]
     if kind(u) == "channel":
@@ -1142,9 +1280,7 @@ def screen_menu(u):
         return t(lang, "channel_menu_title", title=esc(u["title"] or "—"), city=esc(u["city"] or "—")), kb(*rows)
     if is_private(u):
         if WEBAPP_URL:
-            rows.insert(0, [webapp_btn(t(lang, "btn_app"), "today")])
-        rows.append([add_group_btn(lang), add_channel_btn(lang)])
-        rows.append([btn(t(lang, "btn_my_channels"), "ch:list")])
+            rows.insert(1, [webapp_btn(t(lang, "btn_app"), "today")])
         if is_admin(u["user_id"]):
             rows.append([btn("🛠 Админка", "a:home")])
     return t(lang, "menu_title", city=esc(u["city"])), kb(*rows)
@@ -1162,23 +1298,28 @@ def screen_settings(u):
              f"🌐 {LANG_BUTTONS[lang]}",
              f"🕌 {madhab}",
              f"⏰ {lead_label(lang, u['lead_min'])}",
-             f"🔕 {quiet_label(lang, u['quiet_start'], u['quiet_end'])}"]
+             f"🔕 {quiet_label(lang, u['quiet_start'], u['quiet_end'])}",
+             t(lang, "st_at", v=t(lang, "on" if u["at_time"] else "off")),
+             f"🔄 {auto_label(lang, u['auto_mode'])}",
+             t(lang, "st_ram", v=t(lang, "on" if u["ramadan"] else "off"))]
     rows = [
         [btn(t(lang, "btn_city"), "s:city")],
         [btn(t(lang, "btn_lang"), "s:lang"), btn(t(lang, "btn_madhab"), "s:madhab")],
-        [btn(t(lang, "btn_lead"), "s:lead")],
-        [btn(t(lang, "btn_at_on" if u["at_time"] else "btn_at_off"), "s:attime")],
-        [btn(t(lang, "btn_auto", v=auto_label(lang, u["auto_mode"])), "s:auto")],
-        [btn(t(lang, "btn_quiet"), "s:quiet")],
-        [btn(t(lang, "btn_ram_on" if u["ramadan"] else "btn_ram_off"), "s:ramadan")],
+        [btn(t(lang, "sb_lead"), "s:lead"), btn(t(lang, "sb_at_on" if u["at_time"] else "sb_at_off"), "s:attime")],
+        [btn(t(lang, "sb_auto"), "s:auto"), btn(t(lang, "btn_quiet"), "s:quiet")],
     ]
+    ram = btn(t(lang, "sb_ram_on" if u["ramadan"] else "sb_ram_off"), "s:ramadan")
     if not is_private(u):
         lines.append(f"📅 {daily_label(lang, u['daily'])}")
-        rows.append([btn(t(lang, "btn_daily"), "s:daily")])
+        rows.append([ram, btn(t(lang, "btn_daily"), "s:daily")])
     else:
-        rows.append([btn(t(lang, "btn_wk_on" if u["weekly"] else "btn_wk_off"), "s:wk")])
-        if ADMINS:
-            rows.append([btn(t(lang, "btn_support"), "s:support")])
+        lines.append(t(lang, "st_wk", v=t(lang, "on" if u["weekly"] else "off")))
+        rows.append([ram, btn(t(lang, "sb_wk_on" if u["weekly"] else "sb_wk_off"), "s:wk")])
+        if AZANS:
+            lines.append(t(lang, "st_azan", v=esc(azan_label(lang, u))))
+            rows.append([btn(t(lang, "sb_azan", v=azan_label(lang, u)), "s:azan")])
+        rows.append([btn(t(lang, "btn_groups"), "s:groups")])
+        rows.append(([btn(t(lang, "btn_support"), "s:support")] if ADMINS else []) + [dev_btn(lang)])
     rows.append([btn(t(lang, "btn_back"), "m:home")])
     return "\n".join(lines), kb(*rows)
 
@@ -1274,6 +1415,8 @@ def auto_label(lang, n):
 
 def card_markup(u):
     lang = u["lang"]
+    if is_private(u):
+        return kb([qibla_btn(u), btn("🔄", "tc:refresh")], [share_times_btn(lang)], [btn(t(lang, "btn_menu"), "m:new")])
     return kb([qibla_btn(u), btn("🔄", "tc:refresh")], [btn(t(lang, "btn_menu"), "m:new")])
 
 
@@ -1407,8 +1550,14 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             ctx.user_data.pop(k, None)
     elif _time.time() - ctx.chat_data.get("welcomed", 0) < 20:
         return  # the bot was just added and already greeted the group
-    if chat.type == "private" and ctx.args and ctx.args[0].startswith("ch_"):
-        await join_challenge(update, ctx, ctx.args[0][3:])
+    if chat.type == "private" and ctx.args:
+        arg = ctx.args[0]
+        if arg.startswith("r_") and arg[2:].isdigit():
+            await credit_referral(ctx.bot, update.effective_user.id, int(arg[2:]))
+        elif arg.startswith("ch_"):
+            owner = await POOL.fetchval("SELECT owner FROM challenges WHERE code = $1", arg[3:20])
+            await credit_referral(ctx.bot, update.effective_user.id, owner)
+            await join_challenge(update, ctx, arg[3:])
     u = await target_for(update, ctx)
     await resume(update, ctx, u)
 
@@ -1511,6 +1660,8 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if chat.type == "private":
             return await channel_button(update, ctx, parts)
         return
+    if act == "pr":
+        return await on_prayed(update, ctx, parts)
 
     u = await target_for(update, ctx)
     public = act == "tc" or (act == "m" and len(parts) > 1 and parts[1] in ("home", "times", "qibla", "new"))
@@ -1531,6 +1682,19 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not u["lang"]:
         return await resume(update, ctx, u)
     lang = u["lang"]
+
+    if act == "set" and parts[1] == "azan" and len(parts) > 2 and is_private(u):
+        if parts[2] == "off" or azan_by_id(parts[2]):
+            await save(tid, azan=None if parts[2] == "off" else parts[2])
+            u = await get_user(tid)
+            a = azan_by_id(u["azan"])
+            if a:  # let them hear it
+                try:
+                    await send_azan_file(ctx.bot, tid, a, caption="🔊 " + a["name"], disable_notification=True)
+                except Exception:  # noqa: BLE001
+                    log.exception("adhan preview failed")
+        text, markup = screen_settings(await get_user(tid))
+        return await render(update, text, markup)
 
     if act == "set" and parts[1] == "madhab" and parts[2] in ("std", "hanafi"):
         await save(tid, madhab=parts[2])
@@ -1616,6 +1780,10 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             text, markup = screen_daily(u)
         elif sub == "auto":
             text, markup = screen_auto(u)
+        elif sub == "groups" and is_private(u):
+            text, markup = screen_groups(u)
+        elif sub == "azan" and is_private(u):
+            text, markup = screen_azan(u)
         elif sub == "wk" and is_private(u):
             await save(tid, weekly=not u["weekly"])
             text, markup = screen_settings(await get_user(tid))
@@ -1769,6 +1937,9 @@ async def support_msg(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
     uid = update.effective_user.id
+    if is_admin(uid) and ctx.user_data.get("admin_state") == "azan" and not (update.message.text or "").startswith("/"):
+        await admin_azan_upload(update, ctx)
+        raise ApplicationHandlerStop
     if is_admin(uid) and ctx.user_data.get("reply_to"):
         await admin_reply(update, ctx)
         raise ApplicationHandlerStop
@@ -1936,7 +2107,12 @@ async def process_user(bot, u):
             else:
                 kind_ = "std"
             text = t(lang, f"rem_{kind_}_{suffix}", name=PN[lang][key.lower()], n=u["lead_min"], time=data[key])
-            await send_reminder(bot, u, text)
+            markup = None
+            if is_private(u) and (suffix == "n" or not u["at_time"]):
+                markup = prayed_markup(lang, d.isoformat(), EVENTS.index(key))
+            await send_reminder(bot, u, text, markup)
+            if suffix == "n" and is_private(u) and u["azan"]:
+                await send_azan(bot, u)
 
 
 async def tick(context: ContextTypes.DEFAULT_TYPE):
@@ -2060,6 +2236,7 @@ async def screen_admin_home():
         [btn("📣 Рассылка", "a:bc"), btn("🔎 Поиск", "a:user")],
         [btn("✉️ Тест напоминания", "a:test"), btn("🚫 Баны", "a:bans")],
         [btn("📤 Экспорт CSV", "a:export"), btn("🩺 Здоровье", "a:health")],
+        [btn("🔊 Азаны", "a:azan")],
         [btn("🏠 В меню бота", "m:home")],
     )
     return text, markup
@@ -2438,6 +2615,12 @@ async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
     if sub == "bans":
         text, markup = await screen_admin_bans()
         return await render(update, text, markup)
+    if sub == "azan":
+        if len(parts) > 2 and parts[2] == "add":
+            await admin_azan(update, ctx, parts)
+            ctx.user_data["admin_state"] = "azan"  # set after the router's reset above
+            return
+        return await admin_azan(update, ctx, parts)
 
     if sub == "card" and len(parts) > 2 and parts[2].lstrip("-").isdigit():
         back = parts[3] if len(parts) > 3 else None
@@ -2687,7 +2870,8 @@ def profile_json(u, lang):
     return {"lang": lang, "city": u["city"], "lat": u["lat"], "lon": u["lon"], "tz": u["tz"],
             "madhab": u["madhab"], "country": u["country"], "lead": u["lead_min"], "at_time": u["at_time"],
             "remind": u["remind"], "auto": u["auto_mode"], "ramadan": u["ramadan"], "quiet": quiet,
-            "weekly": u["weekly"],
+            "weekly": u["weekly"], "azan": u["azan"] if azan_by_id(u["azan"]) else "off",
+            "azan_options": [[str(a["id"]), a["name"]] for a in AZANS],
             "lead_options": LEAD_OPTIONS, "auto_options": AUTO_OPTIONS,
             "quiet_options": ["off"] + [f"{a}-{b}" for a, b in QUIET_PRESETS]}
 
@@ -2721,6 +2905,9 @@ async def api_settings(request):
                      ("weekly", "weekly")):
         if isinstance(body.get(key), bool):
             fields[col] = body[key]
+    az = body.get("azan")
+    if az == "off" or (az is not None and azan_by_id(az)):
+        fields["azan"] = None if az == "off" else str(az)
     q = body.get("quiet")
     if q == "off":
         fields["quiet_start"], fields["quiet_end"] = None, None
@@ -2800,6 +2987,9 @@ async def api_me(request):
     return web.json_response({
         "ok": True, "need_setup": False, "bot": BOT_USERNAME, "profile": profile_json(u, lang),
         "share_url": share_url(u["user_id"], now.date().isoformat()), "is_admin": is_admin(u["user_id"]),
+        "ref": {"count": await POOL.fetchval("SELECT count(*) FROM users WHERE referred_by = $1", u["user_id"]),
+                "link": ref_link(u["user_id"])},
+        "dev": DEV_CONTACT,
         "today": {"date": now.date().isoformat(), "t": {k: today[k] for k in TIMING_KEYS},
                   "hday": today["hday"], "hmonth": today["hmonth"], "hyear": today["hyear"]},
         "tomorrow": {"t": {k: tomorrow[k] for k in TIMING_KEYS}},
@@ -3033,7 +3223,7 @@ async def api_share_send(request):
     day_iso = datetime.now(ZoneInfo(u["tz"])).date().isoformat()
     try:
         png = await share_png_for(u, day_iso)
-        await request.app["bot"].send_photo(u["user_id"], png, caption=f"🕌 {esc(u['city'])} · @{BOT_USERNAME}",
+        await request.app["bot"].send_photo(u["user_id"], png, caption=f"🕌 {esc(u['city'])}\n\n" + t(u["lang"], "share_footer", bot=f'<a href="{ref_link(u["user_id"])}">@{BOT_USERNAME}</a>'),
                                             parse_mode=ParseMode.HTML)
     except Exception:  # noqa: BLE001
         log.exception("share send failed")
@@ -3476,14 +3666,18 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         pu["tz"] = first["tz"]
         day = await get_timings(pu, datetime.now(ZoneInfo(pu["tz"])).date())
         text, _ = await screen_times(pu, onboarding=True)
+        text = text.rsplit("\n\n", 1)[0]  # "next prayer in …" would be stale for whoever reads it later
+        link = ref_link(iq.from_user.id)
+        text += "\n\n" + t(lang, "share_footer", bot=f'<a href="{link}">@{BOT_USERNAME}</a>')
         desc = " · ".join(f"{PN[lang][k.lower()]} {day[k]}" for k in EVENTS)
-        open_btn = InlineKeyboardMarkup([[InlineKeyboardButton(t(lang, "in_open"), url=f"https://t.me/{BOT_USERNAME}?start=inline")]])
+        open_btn = InlineKeyboardMarkup([[InlineKeyboardButton(t(lang, "in_open"), url=link)]])
         result = InlineQueryResultArticle(
             id=hashlib.md5(f"{lat:.3f},{lon:.3f},{lang},{pu['madhab']}".encode()).hexdigest(),
             title=f"🕌 {name}", description=desc,
-            input_message_content=InputTextMessageContent(text, parse_mode=ParseMode.HTML),
+            input_message_content=InputTextMessageContent(text, parse_mode=ParseMode.HTML,
+                                                          link_preview_options=LinkPreviewOptions(is_disabled=True)),
             reply_markup=open_btn)
-        await iq.answer([result], cache_time=120, is_personal=not q, button=hint)
+        await iq.answer([result], cache_time=120, is_personal=True, button=hint)
     except BadRequest as e:
         log.info("inline answer skipped: %s", e)  # the query expired while the user kept typing
     except Exception:  # noqa: BLE001
@@ -3520,6 +3714,8 @@ async def api_tracker_set(request):
         raise web.HTTPBadRequest(text="bad mark")
     await POOL.execute("INSERT INTO tracker (user_id, day, mask) VALUES ($1, $2, $3) "
                        "ON CONFLICT (user_id, day) DO UPDATE SET mask = EXCLUDED.mask", int(tg_user["id"]), day, mask)
+    if "1" in mask:
+        asyncio.get_running_loop().create_task(check_badges(request.app["bot"], int(tg_user["id"])))
     return web.json_response({"ok": True})
 
 
@@ -3667,7 +3863,8 @@ async def send_weekly(bot, u, today):
         t(lang, "wk_great" if p >= 85 else ("wk_good" if p >= 50 else "wk_start"))])
     markup = kb([webapp_btn(t(lang, "btn_open_tracker"), "more&sub=tracker")]) if WEBAPP_URL else None
     try:
-        await bot.send_message(u["user_id"], text, parse_mode=ParseMode.HTML, reply_markup=markup)
+        await bot.send_message(u["user_id"], text, parse_mode=ParseMode.HTML, reply_markup=markup,
+                               disable_notification=True)
     except Forbidden:
         await POOL.execute("UPDATE users SET blocked = TRUE WHERE user_id = $1", u["user_id"])
     except Exception:  # noqa: BLE001
@@ -3712,6 +3909,10 @@ async def periodic(context: ContextTypes.DEFAULT_TYPE):
     except Exception:  # noqa: BLE001
         log.exception("weekly reports failed")
     try:
+        await periodic_summaries(bot)
+    except Exception:  # noqa: BLE001
+        log.exception("summaries failed")
+    try:
         for admin in sorted(ADMINS):
             a = await get_user(admin)
             tz = (a or {}).get("tz") or "Asia/Tashkent"
@@ -3733,35 +3934,390 @@ async def periodic(context: ContextTypes.DEFAULT_TYPE):
         log.exception("admin summary failed")
 
 
+
+# ───────────────────────── developer, share, groups screen ─────────────────────────
+
+DEV_CONTACT = (os.environ.get("DEV_CONTACT") or "bdurrokhman").lstrip("@").strip()
+
+
+def dev_btn(lang):
+    return InlineKeyboardButton(t(lang, "btn_dev"), url=f"https://t.me/{DEV_CONTACT}")
+
+
+def share_times_btn(lang):
+    """Opens the chat picker; the chosen chat gets this user's prayer-times card via inline mode."""
+    return InlineKeyboardButton(t(lang, "btn_share"), switch_inline_query_chosen_chat=SwitchInlineQueryChosenChat(
+        query="", allow_user_chats=True, allow_bot_chats=False, allow_group_chats=True, allow_channel_chats=True))
+
+
+def ref_link(uid):
+    return f"https://t.me/{BOT_USERNAME}?start=r_{uid}"
+
+
+def share_url_for(text, url):
+    return f"https://t.me/share/url?url={quote(url, safe='')}&text={quote(text, safe='')}"
+
+
+def screen_groups(u):
+    lang = u["lang"]
+    return t(lang, "groups_title"), kb([add_group_btn(lang)], [add_channel_btn(lang)],
+                                       [btn(t(lang, "btn_my_channels"), "ch:list")],
+                                       [btn(t(lang, "btn_back"), "s:settings")])
+
+
+# ───────────────────────── adhan recordings (uploaded by admins) ─────────────────────────
+
+AZANS = []  # [{"id", "name", "file_id", "kind"}]
+
+
+async def load_azans():
+    global AZANS
+    AZANS = [dict(r) for r in await POOL.fetch("SELECT id, name, file_id, kind FROM azans ORDER BY id")]
+
+
+def azan_by_id(v):
+    return next((a for a in AZANS if str(a["id"]) == str(v or "")), None)
+
+
+def azan_label(lang, u):
+    a = azan_by_id(u.get("azan"))
+    return a["name"] if a else t(lang, "off")
+
+
+def screen_azan(u):
+    lang = u["lang"]
+    cur = azan_by_id(u.get("azan"))
+    rows = [[btn(("✅ " if cur and cur["id"] == a["id"] else "") + "🔊 " + a["name"], f"set:azan:{a['id']}")] for a in AZANS]
+    rows.append([btn(("✅ " if not cur else "") + "🔇 " + t(lang, "off").capitalize(), "set:azan:off")])
+    rows.append([btn(t(lang, "btn_back"), "s:settings")])
+    return t(lang, "azan_title"), kb(*rows)
+
+
+async def send_azan_file(bot, chat_id, a, **kw):
+    if a["kind"] == "voice":
+        return await bot.send_voice(chat_id, a["file_id"], **kw)
+    if a["kind"] == "document":
+        return await bot.send_document(chat_id, a["file_id"], **kw)
+    return await bot.send_audio(chat_id, a["file_id"], **kw)
+
+
+async def send_azan(bot, u):
+    a = azan_by_id(u.get("azan"))
+    if not a:
+        return
+    try:
+        await send_azan_file(bot, u["user_id"], a, disable_notification=True)
+    except Exception:  # noqa: BLE001
+        log.exception("adhan send failed for %s", u["user_id"])
+
+
+async def screen_admin_azans():
+    lines = ["🔊 <b>Азаны</b>", "",
+             "Пользователи выбирают муэдзина в настройках. Запись приходит тихо сразу после напоминания в момент намаза.", ""]
+    if AZANS:
+        for a in AZANS:
+            n = await POOL.fetchval("SELECT count(*) FROM users WHERE azan = $1", str(a["id"]))
+            lines.append(f"• <b>{esc(a['name'])}</b> — выбрали {n}")
+    else:
+        lines.append("Пока нет ни одной записи. Пока их нет, кнопка азана у пользователей скрыта.")
+    rows = [[btn("▶️ " + a["name"], f"a:azan:play:{a['id']}"), btn("🗑", f"a:azan:del:{a['id']}")] for a in AZANS]
+    rows.append([btn("➕ Добавить азан", "a:azan:add")])
+    rows.append(ADMIN_BACK)
+    return "\n".join(lines), kb(*rows)
+
+
+async def admin_azan(update, ctx, parts):
+    op = parts[2] if len(parts) > 2 else ""
+    if op == "add":
+        ctx.user_data["admin_state"] = "azan"
+        return await render(update, "➕ <b>Новый азан</b>\n\nОтправьте аудиофайл (mp3/m4a) или голосовое сообщение. "
+                                    "В подписи к файлу напишите имя муэдзина — так его увидят пользователи.",
+                            kb([btn("⬅️ Назад", "a:azan")]))
+    if op == "play" and len(parts) > 3:
+        a = azan_by_id(parts[3])
+        if a:
+            await send_azan_file(update.get_bot(), update.effective_chat.id, a, caption=a["name"])
+        return
+    if op == "del" and len(parts) > 3 and parts[3].isdigit():
+        await POOL.execute("DELETE FROM azans WHERE id = $1", int(parts[3]))
+        await POOL.execute("UPDATE users SET azan = NULL WHERE azan = $1", parts[3])
+        await load_azans()
+    text, markup = await screen_admin_azans()
+    return await render(update, text, markup)
+
+
+async def admin_azan_upload(update, ctx):
+    """While the admin is adding an adhan: takes the audio file. Returns True if consumed."""
+    msg = update.message
+    f, kind_ = None, None
+    if msg.audio:
+        f, kind_ = msg.audio, "audio"
+    elif msg.voice:
+        f, kind_ = msg.voice, "voice"
+    elif msg.document and (msg.document.mime_type or "").startswith("audio/"):
+        f, kind_ = msg.document, "document"
+    if not f:
+        await msg.reply_text("Нужен аудиофайл или голосовое сообщение. Или нажмите «Назад».")
+        return True
+    name = (msg.caption or getattr(f, "title", None) or getattr(f, "performer", None) or "Азан").strip()[:40]
+    await POOL.execute("INSERT INTO azans (name, file_id, kind) VALUES ($1, $2, $3)", name, f.file_id, kind_)
+    await load_azans()
+    ctx.user_data.pop("admin_state", None)
+    text, markup = await screen_admin_azans()
+    await msg.reply_text("✅ Добавлено: " + esc(name) + "\n\n" + text, parse_mode=ParseMode.HTML, reply_markup=markup)
+    return True
+
+
+# ───────────────────────── "I prayed" from the reminder, achievements ─────────────────────────
+
+BADGES = [("s7", "streak", 7), ("s30", "streak", 30), ("s100", "streak", 100),
+          ("t100", "total", 100), ("t500", "total", 500), ("t1000", "total", 1000)]
+
+
+def prayed_markup(lang, day, idx, done=False):
+    first = btn(t(lang, "btn_prayed_done"), "pr:ok") if done else btn(t(lang, "btn_prayed"), f"pr:{day}:{idx}")
+    return kb([first], [btn(t(lang, "btn_menu"), "m:home")])
+
+
+async def on_prayed(update, ctx, parts):
+    q = update.callback_query
+    uid = q.from_user.id
+    u = await get_user(uid)
+    lang = (u or {}).get("lang") or "en"
+    if len(parts) < 3:
+        return await q.answer(t(lang, "prayed_toast"))
+    try:
+        day = datetime.strptime(parts[1], "%Y-%m-%d").date()
+        idx = int(parts[2])
+        assert 0 <= idx < 5
+    except (ValueError, AssertionError):
+        return await q.answer()
+    mask = await POOL.fetchval("SELECT mask FROM tracker WHERE user_id = $1 AND day = $2", uid, day) or "00000"
+    mask = mask[:idx] + "1" + mask[idx + 1:]
+    await POOL.execute("INSERT INTO tracker (user_id, day, mask) VALUES ($1, $2, $3) "
+                       "ON CONFLICT (user_id, day) DO UPDATE SET mask = EXCLUDED.mask", uid, day, mask)
+    await q.answer(t(lang, "prayed_toast"))
+    try:
+        await q.edit_message_reply_markup(prayed_markup(lang, parts[1], idx, done=True))
+    except Exception:  # noqa: BLE001
+        pass
+    await check_badges(update.get_bot(), uid)
+
+
+async def tracker_stats(uid, today):
+    rows = await POOL.fetch("SELECT day, mask FROM tracker WHERE user_id = $1 AND day > $2", uid, today - timedelta(days=400))
+    masks = {r["day"]: r["mask"] for r in rows}
+    total = await POOL.fetchval("SELECT coalesce(sum(length(replace(mask, '0', ''))), 0) FROM tracker WHERE user_id = $1", uid)
+    d = today if masks.get(today) == "11111" else today - timedelta(days=1)
+    streak = 0
+    while masks.get(d) == "11111":
+        streak += 1
+        d -= timedelta(days=1)
+    return streak, total
+
+
+async def check_badges(bot, uid):
+    """Sends one silent message when new achievements are earned."""
+    try:
+        u = await get_user(uid)
+        if not u or not u["lang"] or u["banned"]:
+            return
+        lang = u["lang"]
+        streak, total = await tracker_stats(uid, user_today(u))
+        have = {r["code"] for r in await POOL.fetch("SELECT code FROM badges WHERE user_id = $1", uid)}
+        new = [code for code, kind_, need in BADGES if code not in have and (streak if kind_ == "streak" else total) >= need]
+        if not new:
+            return
+        got = []
+        for code in new:
+            if await POOL.fetchval("INSERT INTO badges (user_id, code) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING 1", uid, code):
+                got.append(code)
+        if not got:
+            return
+        best = t(lang, "b_" + got[-1])
+        rows = [[InlineKeyboardButton(t(lang, "btn_share"), url=share_url_for(t(lang, "badge_share", name=best), ref_link(uid)))]]
+        if WEBAPP_URL:
+            rows.append([webapp_btn(t(lang, "btn_open_tracker2"), "more&sub=tracker")])
+        await bot.send_message(uid, t(lang, "badge_new", list="\n".join(t(lang, "b_" + c) for c in got)),
+                               parse_mode=ParseMode.HTML, reply_markup=kb(*rows), disable_notification=True)
+    except Forbidden:
+        pass
+    except Exception:  # noqa: BLE001
+        log.exception("badges failed for %s", uid)
+
+
+# ───────────────────────── sadaqah jariyah: invitations ─────────────────────────
+
+async def credit_referral(bot, uid, ref_id):
+    """Counts a newcomer for the person whose link brought them (only once, only for new users)."""
+    if not ref_id or ref_id == uid:
+        return
+    try:
+        row = await POOL.fetchrow("SELECT onboarded, referred_by, created_at > now() - interval '15 minutes' AS fresh "
+                                  "FROM users WHERE user_id = $1", uid)
+        ref = await get_user(ref_id)
+        if not row or not ref or row["onboarded"] or row["referred_by"] or not row["fresh"] or ref["chat_type"] != "private":
+            return
+        await POOL.execute("UPDATE users SET referred_by = $2 WHERE user_id = $1", uid, ref_id)
+        n = await POOL.fetchval("SELECT count(*) FROM users WHERE referred_by = $1", ref_id)
+        if ref["lang"] and not ref["banned"] and not ref["blocked"]:
+            await bot.send_message(ref_id, t(ref["lang"], "ref_joined", n=n), parse_mode=ParseMode.HTML, disable_notification=True)
+    except Forbidden:
+        pass
+    except Exception:  # noqa: BLE001
+        log.exception("referral failed")
+
+
+# ───────────────────────── monthly and yearly summary ─────────────────────────
+
+def period_stats(masks, start, end):
+    days = [start + timedelta(days=i) for i in range((end - start).days + 1)]
+    n = sum(masks.get(d, "").count("1") for d in days)
+    full = sum(1 for d in days if masks.get(d) == "11111")
+    best = cur = 0
+    for d in days:
+        cur = cur + 1 if masks.get(d) == "11111" else 0
+        best = max(best, cur)
+    per = [sum(1 for d in days if masks.get(d, "00000")[i] == "1") for i in range(5)]
+    top = max(range(5), key=lambda i: per[i]) if any(per) else None
+    return {"n": n, "m": len(days) * 5, "full": full, "best": best, "top": top}
+
+
+def render_summary(u, title, period, st):
+    """A 1080×1350 card with the period's numbers."""
+    from PIL import Image, ImageDraw
+    lang = u["lang"] or "en"
+    rtl = lang == "ar"
+    W, H = 1080, 1350
+    img = Image.new("RGB", (W, H), (12, 21, 38))
+    d = ImageDraw.Draw(img)
+    for y in range(H):
+        k = y / H
+        d.line([(0, y), (W, y)], fill=(int(14 + 30 * k), int(24 + 12 * k), int(44 + 30 * k)))
+    gold, white, hint, card, green = (212, 175, 55), (238, 242, 248), (160, 172, 194), (30, 44, 72), (34, 163, 122)
+
+    def text(xy, s, font, fill, anchor="mm"):
+        kw = {"direction": "rtl"} if rtl and any("؀" <= ch <= "ۿ" for ch in s) else {}
+        try:
+            d.text(xy, s, font=font, fill=fill, anchor=anchor, **kw)
+        except Exception:  # noqa: BLE001
+            d.text(xy, s, font=font, fill=fill, anchor=anchor)
+
+    d.ellipse([W // 2 - 60, 90, W // 2 + 60, 210], fill=gold)
+    d.ellipse([W // 2 - 32, 74, W // 2 + 80, 186], fill=(14, 24, 44))
+    text((W // 2, 280), title, _font(64, True), white)
+    text((W // 2, 350), u["city"] or "", _font(36), hint)
+    pct = round(100 * st["n"] / st["m"]) if st["m"] else 0
+    # big ring
+    cx, cy, r = W // 2, 600, 190
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=card, width=34)
+    if pct:
+        d.arc([cx - r, cy - r, cx + r, cy + r], start=-90, end=-90 + 360 * pct / 100, fill=gold, width=34)
+    text((cx, cy - 20), str(st["n"]), _font(110, True), white)
+    text((cx, cy + 70), f"{t(lang, 'img_prayers')} · {pct}%", _font(36), hint)
+    boxes = [(str(st["full"]), t(lang, "img_full"), green), (str(st["best"]), t(lang, "img_best"), gold)]
+    if st["top"] is not None:
+        boxes.append((PN[lang][EVENTS[st["top"]].lower()], t(lang, "img_top"), white))
+    bw = (W - 180 - 30 * (len(boxes) - 1)) // len(boxes)
+    for i, (big, small, col) in enumerate(boxes):
+        x = 90 + i * (bw + 30)
+        d.rounded_rectangle([x, 880, x + bw, 1080], radius=36, fill=card)
+        text((x + bw // 2, 955), big, _font(64 if len(big) < 6 else 44, True), col)
+        text((x + bw // 2, 1035), small, _font(30), hint)
+    if BOT_USERNAME:
+        text((W // 2, H - 110), f"@{BOT_USERNAME}", _font(40, True), hint)
+    buf = io.BytesIO()
+    img.save(buf, "PNG", optimize=True)
+    return buf.getvalue()
+
+
+async def send_summary(bot, u, today):
+    """1st of the month: last month's summary; on January 1st: the whole last year."""
+    lang = u["lang"]
+    yearly = today.month == 1
+    end = today - timedelta(days=1)
+    start = date(end.year, 1, 1) if yearly else end.replace(day=1)
+    rows = await POOL.fetch("SELECT day, mask FROM tracker WHERE user_id = $1 AND day >= $2 AND day <= $3",
+                            u["user_id"], start, end)
+    masks = {r["day"]: r["mask"] for r in rows}
+    if not any(m != "00000" for m in masks.values()):
+        return
+    st = period_stats(masks, start, end)
+    period = str(end.year) if yearly else f"{T[lang]['months'][end.month - 1]} {end.year}"
+    title = t(lang, "sum_y_title" if yearly else "sum_m_title", period=period)
+    lines = [title, "", t(lang, "sum_prayers", n=st["n"], m=st["m"], p=round(100 * st["n"] / st["m"])),
+             t(lang, "sum_full", d=st["full"]), t(lang, "sum_best", s=st["best"])]
+    if st["top"] is not None:
+        lines.append(t(lang, "sum_top", name=PN[lang][EVENTS[st["top"]].lower()]))
+    lines += ["", t(lang, "sum_end"), "", f'<a href="{ref_link(u["user_id"])}">@{BOT_USERNAME}</a>']
+    plain = title.replace("<b>", "").replace("</b>", "").replace("🎁 ", "")
+    png = await asyncio.get_running_loop().run_in_executor(None, render_summary, u, plain, period, st)
+    rows = [[InlineKeyboardButton(t(lang, "btn_share"),
+                                  url=share_url_for(t(lang, "sum_share", period=period, n=st["n"]), ref_link(u["user_id"])))]]
+    if WEBAPP_URL:
+        rows.append([webapp_btn(t(lang, "btn_open_tracker2"), "more&sub=tracker")])
+    try:
+        await bot.send_photo(u["user_id"], png, caption="\n".join(lines), parse_mode=ParseMode.HTML,
+                             reply_markup=kb(*rows), disable_notification=True)
+    except Forbidden:
+        await POOL.execute("UPDATE users SET blocked = TRUE WHERE user_id = $1", u["user_id"])
+    except Exception:  # noqa: BLE001
+        log.exception("summary failed for %s", u["user_id"])
+
+
+async def periodic_summaries(bot):
+    rows = await POOL.fetch(
+        "SELECT u.* FROM users u WHERE chat_type = 'private' AND NOT banned AND NOT blocked "
+        "AND tz IS NOT NULL AND lang IS NOT NULL "
+        "AND EXISTS (SELECT 1 FROM tracker t WHERE t.user_id = u.user_id AND t.day > CURRENT_DATE - 400)")
+    for r in rows:
+        u = dict(r)
+        now = datetime.now(ZoneInfo(u["tz"]))
+        if now.day == 1 and now.hour == 10 and u["last_summary"] != now.date():
+            await POOL.execute("UPDATE users SET last_summary = $2 WHERE user_id = $1", u["user_id"], now.date())
+            await send_summary(bot, u, now.date())
+            await asyncio.sleep(0.05)
+
+
 # ───────────────────────── app ─────────────────────────
 
 
 # Bot profile texts per language (set automatically on startup). Telegram shows each user
 # the version for their app language; "en" is also used as the default for everyone else.
 BOT_ABOUT = {
-    "en": "🕌 Prayer times & reminders for your city. Qibla, Ramadan, Jumu'ah. For private chats, groups & channels 🤍",
-    "ru": "🕌 Время намаза и напоминания для вашего города. Кибла, Рамадан, Джума. Для лички, групп и каналов 🤍",
-    "uz": "🕌 Shahringiz uchun namoz vaqtlari va eslatmalar. Qibla, Ramazon, Juma. Shaxsiy chat, guruh va kanallar uchun 🤍",
-    "tg": "🕌 Вақти намоз ва ёдовариҳо барои шаҳри шумо. Қибла, Рамазон, Ҷумъа. Барои чат, гурӯҳ ва каналҳо 🤍",
-    "ar": "🕌 مواقيت الصلاة والتذكيرات لمدينتك. القبلة، رمضان، الجمعة. للمحادثات الخاصة والمجموعات والقنوات 🤍",
+    "en": "🕌 Prayer times, reminders, Qibla and a prayer tracker — for any city in the world 🤍",
+    "ru": "🕌 Время намаза, напоминания, кибла и трекер — для любого города мира 🤍",
+    "uz": "🕌 Namoz vaqtlari, eslatmalar, qibla va namoz kundaligi — dunyoning istalgan shahri uchun 🤍",
+    "tg": "🕌 Вақти намоз, ёдовариҳо, қибла ва рӯйхати намозҳо — барои ҳар шаҳри ҷаҳон 🤍",
+    "ar": "🕌 مواقيت الصلاة والتذكيرات والقبلة ومتابعة الصلوات — لأي مدينة في العالم 🤍",
 }
 _LANG_LINE = "🌐 English · Русский · Oʻzbekcha · Тоҷикӣ · العربية"
 BOT_DESCRIPTION = {
-    "en": ("🕌 Assalamu alaikum!\n\nI'll show accurate prayer times for your city and remind you before every prayer.\n\n"
-           "🔔 Reminders 5–30 minutes ahead\n🕋 Qibla direction\n🌙 Suhoor & Iftar in Ramadan\n"
-           "🕌 Jumu'ah reminder\n👥 Works in groups and channels\n\n" + _LANG_LINE + "\n\nTap «Start» 👇"),
-    "ru": ("🕌 Ассаламу алейкум!\n\nЯ покажу точное время намаза для вашего города и напомню о каждой молитве заранее.\n\n"
-           "🔔 Напоминания за 5–30 минут\n🕋 Направление Киблы\n🌙 Сухур и ифтар в Рамадан\n"
-           "🕌 Напоминание о Джума-намазе\n👥 Работаю в группах и каналах\n\n" + _LANG_LINE + "\n\nНажмите «Старт» 👇"),
-    "uz": ("🕌 Assalomu alaykum!\n\nShahringiz uchun aniq namoz vaqtlarini ko'rsataman va har bir namozdan oldin eslataman.\n\n"
-           "🔔 5–30 daqiqa oldin eslatma\n🕋 Qibla yo'nalishi\n🌙 Ramazonda saharlik va iftor\n"
-           "🕌 Juma namozi eslatmasi\n👥 Guruh va kanallarda ishlayman\n\n" + _LANG_LINE + "\n\n«Start» tugmasini bosing 👇"),
-    "tg": ("🕌 Ассалому алайкум!\n\nМан вақти дақиқи намозро барои шаҳри шумо нишон медиҳам ва пеш аз ҳар намоз ёдрас мекунам.\n\n"
-           "🔔 Ёдоварӣ 5–30 дақиқа пеш\n🕋 Самти қибла\n🌙 Саҳарӣ ва ифтор дар Рамазон\n"
-           "🕌 Ёдоварии намози ҷумъа\n👥 Дар гурӯҳҳо ва каналҳо кор мекунам\n\n" + _LANG_LINE + "\n\nТугмаи «Start»-ро пахш кунед 👇"),
-    "ar": ("🕌 السلام عليكم!\n\nسأعرض لك مواقيت الصلاة الدقيقة لمدينتك وأذكّرك قبل كل صلاة.\n\n"
-           "🔔 تذكير قبل 5–30 دقيقة\n🕋 اتجاه القبلة\n🌙 السحور والإفطار في رمضان\n"
-           "🕌 تذكير بصلاة الجمعة\n👥 أعمل في المجموعات والقنوات\n\n" + _LANG_LINE + "\n\nاضغط «ابدأ» 👇"),
+    "en": ("🕌 Mawaqit — prayer times by your side\n\n"
+           "Accurate prayer times for any city in the world and gentle reminders so you never miss a prayer 🤍\n\n"
+           "🔔 Reminders ahead of time and at the adhan\n🧭 Qibla with a live compass\n📿 Tasbih, adhkar and the 99 Names of Allah\n"
+           "✅ Prayer tracker and challenges with friends\n🌙 Suhoor & Iftar in Ramadan\n👥 Works in groups and channels\n\n"
+           + _LANG_LINE + "\n\nTap «Start» — and may every prayer be on time 🤲"),
+    "ru": ("🕌 Mawaqit — время намаза рядом с тобой\n\n"
+           "Точное время намаза для любого города мира и бережные напоминания, чтобы не пропустить ни одной молитвы 🤍\n\n"
+           "🔔 Напоминание заранее и в момент азана\n🧭 Кибла с живым компасом\n📿 Тасбих, азкары и 99 имён Аллаха\n"
+           "✅ Трекер намазов и вызовы с друзьями\n🌙 Сухур и ифтар в Рамадан\n👥 Работает в группах и каналах\n\n"
+           + _LANG_LINE + "\n\nНажми «Старт» — и пусть каждая молитва будет вовремя 🤲"),
+    "uz": ("🕌 Mawaqit — namoz vaqti doim yoningizda\n\n"
+           "Dunyoning istalgan shahri uchun aniq namoz vaqtlari va birorta namozni qoldirmaslik uchun e'tiborli eslatmalar 🤍\n\n"
+           "🔔 Oldindan va azon vaqtida eslatma\n🧭 Jonli kompasli qibla\n📿 Tasbeh, zikrlar va Allohning 99 ismi\n"
+           "✅ Namoz kundaligi va do'stlar bilan musobaqalar\n🌙 Ramazonda saharlik va iftor\n👥 Guruh va kanallarda ishlaydi\n\n"
+           + _LANG_LINE + "\n\n«Start»ni bosing — har bir namoz o'z vaqtida bo'lsin 🤲"),
+    "tg": ("🕌 Mawaqit — вақти намоз ҳамеша бо шумо\n\n"
+           "Вақти дақиқи намоз барои ҳар шаҳри ҷаҳон ва ёдовариҳои ғамхорона, то ягон намозро аз даст надиҳед 🤍\n\n"
+           "🔔 Ёдоварӣ пешакӣ ва дар вақти азон\n🧭 Қибла бо компаси зинда\n📿 Тасбеҳ, зикрҳо ва 99 номи Аллоҳ\n"
+           "✅ Рӯйхати намозҳо ва мусобиқа бо дӯстон\n🌙 Саҳарӣ ва ифтор дар Рамазон\n👥 Дар гурӯҳҳо ва каналҳо кор мекунад\n\n"
+           + _LANG_LINE + "\n\n«Start»-ро пахш кунед — бигзор ҳар намоз сари вақт бошад 🤲"),
+    "ar": ("🕌 مواقيت — وقت الصلاة معك دائماً\n\n"
+           "مواقيت صلاة دقيقة لأي مدينة في العالم وتذكيرات لطيفة حتى لا تفوتك أي صلاة 🤍\n\n"
+           "🔔 تذكير مسبق وعند الأذان\n🧭 القبلة مع بوصلة حيّة\n📿 التسبيح والأذكار وأسماء الله الحسنى\n"
+           "✅ متابعة الصلوات وتحديات مع الأصدقاء\n🌙 السحور والإفطار في رمضان\n👥 يعمل في المجموعات والقنوات\n\n"
+           + _LANG_LINE + "\n\nاضغط «ابدأ» — ولتكن كل صلاة في وقتها 🤲"),
 }
 BOT_COMMAND = {"en": "🕌 Menu", "ru": "🕌 Меню", "uz": "🕌 Menyu", "tg": "🕌 Меню", "ar": "🕌 القائمة"}
 
@@ -3794,6 +4350,7 @@ async def post_init(app: Application):
     async with POOL.acquire() as conn:
         await conn.execute(SCHEMA)
     HTTP = httpx.AsyncClient(timeout=15)
+    await load_azans()
     global BOT_USERNAME
     BOT_USERNAME = app.bot.username
     asyncio.get_running_loop().create_task(setup_profile(app.bot))  # in background, never blocks startup
