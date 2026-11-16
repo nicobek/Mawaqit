@@ -382,6 +382,15 @@ html.lite #sky .b{animation:none;filter:blur(60px)}
 .sheet .hd .ic{width:48px;height:48px;border-radius:15px;display:grid;place-items:center;font-size:24px;background:var(--gold-soft)}
 .sheet .hd b{font-size:19px}
 .sheet .btn{margin-top:8px}
+.aichat{display:flex;flex-direction:column;gap:10px;margin:12px 0}
+.aimsg{max-width:88%;padding:11px 14px;border-radius:18px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word}
+.aimsg.me{align-self:flex-end;background:var(--gold);color:var(--on-gold);border-bottom-right-radius:6px}
+.aimsg.bot{align-self:flex-start;background:linear-gradient(135deg,var(--glass-hi),transparent 42%),var(--glass);border:1px solid var(--glass-edge);border-bottom-left-radius:6px}
+.aimsg .ds{display:block;margin-top:8px;font-size:12px;color:var(--hint);font-style:italic}
+.aimsg.typing{color:var(--hint)}
+.aibar{position:sticky;bottom:calc(var(--nav-h) + var(--safe-bottom) + 24px);display:flex;gap:8px;align-items:flex-end}
+.aibar textarea{flex:1;resize:none;margin:0;max-height:140px}
+.aibar .btn{width:auto;flex:none;padding:12px 16px}
 .inv .big{font-size:56px;font-weight:900;color:var(--gold);line-height:1;margin:6px 0}
 </style>
 </head>
@@ -461,6 +470,14 @@ html.lite #sky .b{animation:none;filter:blur(60px)}
     <h2 id="trAchL"></h2>
     <div class="achs" id="trAch"></div>
     <button class="btn ghost" data-sub="challenges" id="trChBtn" style="margin-top:14px"></button>
+  </section>
+
+  <section class="view" id="v-ai">
+    <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
+    <h1 id="aiTitle"></h1><div class="sub" id="aiSub"></div>
+    <div class="aichat" id="aiChat"></div>
+    <div class="aibar"><textarea class="search" id="aiIn" rows="1"></textarea><button class="btn" id="aiSend">➤</button></div>
+    <button class="btn ghost" id="aiNew" style="margin-top:10px"></button>
   </section>
 
   <section class="view" id="v-invite">
@@ -874,7 +891,7 @@ function openSub(name) {
   SUB = name; show(name);
   try { tg?.BackButton?.show(); } catch (e) {}
   ({tracker: renderTracker, ramadan: renderRamadan, mosques: openMosques, names: renderNames, settings: renderSettings,
-    azkar: renderAzkar, duas: renderDuas, challenges: renderChallenges, invite: renderInvite, qada: renderQada, dates: renderDates, cities: renderCities})[name]?.();
+    azkar: renderAzkar, duas: renderDuas, challenges: renderChallenges, invite: renderInvite, ai: renderAi, qada: renderQada, dates: renderDates, cities: renderCities})[name]?.();
 }
 function back() { if (!$("sheet").hidden) return closeSheet(); if (SUB === "place") return returnFromPlace(); if (SUB === "admuser") return go("admin"); if (SUB === "challenges" && CH_FROM === "tracker") { CH_FROM = null; return openSub("tracker"); } if (SUB) go("more"); }
 
@@ -1032,6 +1049,7 @@ function renderMore() {
   const items = [["tracker", "✅", "m_tracker", "m_tracker_d"], ["challenges", "🤝", "m_ch", "m_ch_d"], ["azkar", "🌅", "m_azkar", "m_azkar_d"], ["duas", "🤲", "m_duas", "m_duas_d"],
     ["qada", "🔁", "m_qada", "m_qada_d"], ["dates", "📆", "m_dates", "m_dates_d"], ["ramadan", "🌙", "m_ramadan", "m_ramadan_d"],
     ["cities", "✈️", "m_cities", "m_cities_d"], ["names", "📖", "m_names", "m_names_d"], ["invite", "🤲", "m_invite", "m_invite_d"], ["settings", "⚙️", "m_settings", "m_settings_d"]];
+  if (DATA && DATA.ai && DATA.ai.enabled) items.unshift(["ai", "🤖", "m_ai", "m_ai_d"]);
   let h = items.map(([id, ic, t1, t2]) => `<button class="item" data-sub="${id}"><div class="ico">${ic}</div><div><div class="tt">${tr(t1)}</div><div class="ds">${tr(t2)}</div></div><div class="ch">›</div></button>`).join("");
   if (ver("8.0") && tg.addToHomeScreen) h += `<button class="item" id="homeBtn"><div class="ico">📲</div><div><div class="tt">${tr("m_home")}</div><div class="ds" id="homeDs">${tr("m_home_d")}</div></div></button>`;
   $("moreMenu").innerHTML = h;
@@ -1692,6 +1710,47 @@ const LX8 = {
   snd_title:"🔔 أصوات الصلوات",snd_hint:"بصوت، بصمت (دون اهتزاز) أو بدون تذكير",x_suh:"🥣 السحور حتى",x_ift:"🍽 الإفطار"}
 };
 for (const l in LX8) Object.assign(LX[l], LX8[l]);
+
+/* ═══════════ stage 7: AI questions about Islam ═══════════ */
+const LX9 = {
+ en:{m_ai:"Ask about Islam",m_ai_d:"AI answers questions about prayer, fasting, the Qur'an",ai_ph:"Your question…",ai_new:"🧹 New conversation",ai_left:"Questions left today: {n}",ai_unl:"Admin: no daily limit",ai_limit:"That's all the questions for today. Come back tomorrow 🤍",ai_err:"Couldn't get an answer right now. Try again a little later.",ai_disc:"🤖 AI answer — it may contain mistakes. For important matters, ask an imam.",ai_hello:"Assalamu alaikum! Ask me about prayer, fasting, adhkar, the Qur'an or Muslim manners. You can ask follow-up questions.",ai_typing:"Writing an answer…"},
+ ru:{m_ai:"Вопрос об исламе",m_ai_d:"ИИ ответит про намаз, пост, Коран и другое",ai_ph:"Ваш вопрос…",ai_new:"🧹 Новый диалог",ai_left:"Осталось вопросов сегодня: {n}",ai_unl:"Админ: без ограничений",ai_limit:"На сегодня вопросы закончились. Возвращайтесь завтра 🤍",ai_err:"Сейчас не получилось получить ответ. Попробуйте чуть позже.",ai_disc:"🤖 Ответ ИИ — он может ошибаться. По важным вопросам обращайтесь к имаму.",ai_hello:"Ассаламу алейкум! Спросите меня о намазе, посте, азкарах, Коране или этике мусульманина. Можно задавать уточняющие вопросы.",ai_typing:"Пишу ответ…"},
+ uz:{m_ai:"Islom haqida savol",m_ai_d:"Sun'iy intellekt namoz, ro'za, Qur'on haqida javob beradi",ai_ph:"Savolingiz…",ai_new:"🧹 Yangi suhbat",ai_left:"Bugun qolgan savollar: {n}",ai_unl:"Admin: cheklovsiz",ai_limit:"Bugungi savollar tugadi. Ertaga qaytib keling 🤍",ai_err:"Hozir javob olib bo'lmadi. Birozdan so'ng urinib ko'ring.",ai_disc:"🤖 Sun'iy intellekt javobi — xato bo'lishi mumkin. Muhim masalalarda imomga murojaat qiling.",ai_hello:"Assalomu alaykum! Namoz, ro'za, zikrlar, Qur'on yoki musulmon odobi haqida so'rang. Qo'shimcha savollar ham berishingiz mumkin.",ai_typing:"Javob yozilmoqda…"},
+ tg:{m_ai:"Савол дар бораи ислом",m_ai_d:"Зеҳни сунъӣ дар бораи намоз, рӯза, Қуръон ҷавоб медиҳад",ai_ph:"Саволи шумо…",ai_new:"🧹 Сӯҳбати нав",ai_left:"Саволҳои боқимондаи имрӯз: {n}",ai_unl:"Админ: бе маҳдудият",ai_limit:"Саволҳои имрӯза тамом шуданд. Фардо биёед 🤍",ai_err:"Ҳоло ҷавоб гирифта нашуд. Каме баъдтар кӯшиш кунед.",ai_disc:"🤖 Ҷавоби зеҳни сунъӣ — метавонад хато бошад. Дар масъалаҳои муҳим ба имом муроҷиат кунед.",ai_hello:"Ассалому алайкум! Дар бораи намоз, рӯза, зикрҳо, Қуръон ё одоби мусулмон пурсед. Саволҳои иловагӣ ҳам додан мумкин.",ai_typing:"Ҷавоб навишта мешавад…"},
+ ar:{m_ai:"سؤال عن الإسلام",m_ai_d:"يجيب الذكاء الاصطناعي عن الصلاة والصيام والقرآن",ai_ph:"سؤالك…",ai_new:"🧹 محادثة جديدة",ai_left:"الأسئلة المتبقية اليوم: {n}",ai_unl:"مشرف: بلا حد يومي",ai_limit:"انتهت أسئلة اليوم. عد غداً 🤍",ai_err:"تعذر الحصول على إجابة الآن. حاول بعد قليل.",ai_disc:"🤖 إجابة الذكاء الاصطناعي — قد تحتوي على أخطاء. في الأمور المهمة اسأل إماماً.",ai_hello:"السلام عليكم! اسألني عن الصلاة أو الصيام أو الأذكار أو القرآن أو آداب المسلم. يمكنك طرح أسئلة متابعة.",ai_typing:"أكتب الإجابة…"}
+};
+for (const l in LX9) Object.assign(LX[l], LX9[l]);
+
+/* AI chat (shares the conversation with the bot) */
+let AI_LOG = [];
+function aiSub() {
+  const a = DATA.ai || {};
+  $("aiSub").textContent = a.unlimited ? tr("ai_unl") : tr("ai_left", {n: a.left ?? 0});
+}
+function aiDraw() {
+  $("aiChat").innerHTML = `<div class="aimsg bot">${esc(tr("ai_hello"))}</div>` + AI_LOG.map(m =>
+    m.me ? `<div class="aimsg me">${esc(m.text)}</div>` : `<div class="aimsg bot ${m.typing ? "typing" : ""}">${m.html}${m.typing ? "" : `<span class="ds">${esc(tr("ai_disc"))}</span>`}</div>`).join("");
+}
+function renderAi() {
+  $("aiTitle").textContent = "🤖 " + tr("m_ai"); $("aiIn").placeholder = tr("ai_ph"); $("aiNew").textContent = tr("ai_new");
+  aiSub(); aiDraw();
+}
+async function aiSend() {
+  const text = $("aiIn").value.trim(); if (!text || $("aiSend").disabled) return;
+  haptic(); $("aiIn").value = ""; $("aiIn").style.height = "";
+  AI_LOG.push({me: true, text}); AI_LOG.push({typing: true, html: esc(tr("ai_typing"))}); aiDraw();
+  window.scrollTo(0, document.body.scrollHeight);
+  $("aiSend").disabled = true;
+  try {
+    const r = await apiPost("/api/ai", {text});
+    AI_LOG.pop();
+    if (r.ok) { AI_LOG.push({html: r.html}); DATA.ai.left = r.left; }
+    else AI_LOG.push({html: esc(tr(r.error === "limit" ? "ai_limit" : "ai_err"))});
+  } catch (e) { AI_LOG.pop(); AI_LOG.push({html: esc(tr("ai_err"))}); }
+  $("aiSend").disabled = false; aiSub(); aiDraw();
+  window.scrollTo(0, document.body.scrollHeight);
+}
+async function aiReset() { haptic(); AI_LOG = []; aiDraw(); try { await apiPost("/api/ai", {reset: true}); } catch (e) {} }
 
 /* ═══════════ Uzbek in Cyrillic: made from the Latin texts by the spelling rules (same as the bot) ═══════════ */
 const CYR_APOS = "'ʻʼ’‘`";
@@ -2419,7 +2478,7 @@ async function load(silent) {
       const qs = new URLSearchParams(location.search), want = qs.get("tab"), sub = qs.get("sub"), az = qs.get("az");
       go(["today", "qibla", "cal", "tasbih", "more"].concat(d.is_admin ? ["admin"] : []).includes(want) ? want : "today");
       if (qs.get("share") === "1") setTimeout(() => sharePrayerTimes(true), 300);
-      if (want === "more" && ["tracker", "challenges", "invite", "azkar", "duas", "qada", "dates", "ramadan", "cities", "names", "settings"].includes(sub)) {
+      if (want === "more" && ["tracker", "challenges", "invite", "azkar", "duas", "qada", "dates", "ramadan", "cities", "names", "settings", "ai"].includes(sub)) {
         if (sub === "azkar" && (az === "m" || az === "e")) AZ_MODE = az;
         openSub(sub);
       }
@@ -2475,6 +2534,9 @@ function init() {
   $("ciFind").onclick = findOther;
   $("ciQ").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); findOther(); } };
   $("chCreate").onclick = createChallenge;
+  $("aiSend").onclick = aiSend; $("aiNew").onclick = aiReset;
+  $("aiIn").addEventListener("input", e => { e.target.style.height = "auto"; e.target.style.height = Math.min(140, e.target.scrollHeight) + "px"; });
+  $("aiIn").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !/Android|iPhone|iPad/i.test(navigator.userAgent)) { e.preventDefault(); aiSend(); } });
   $("invShare").onclick = shareInvite; $("invCopy").onclick = copyInvite;
   store.get(["app_sky"]).then(v => { SKY_ON = v.app_sky !== "0"; updateSky(true); });
   detectLite();

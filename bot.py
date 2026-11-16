@@ -925,6 +925,47 @@ EXTRA8 = {
 for _l, _d in EXTRA8.items():
     T[_l].update(_d)
 
+
+EXTRA9 = {
+    "en": {"ai_btn": "🤖 Ask about Islam",
+           "ai_intro": "🤖 <b>Questions about Islam</b>\n\nWrite your question — about prayer, fasting, adhkar, the Qur'an, manners. You can ask follow-up questions.\n\n<i>Answers are written by AI and may contain mistakes. For important matters, ask an imam.</i>\n\n💬 Questions left today: <b>{n}</b>",
+           "ai_left": "💬 Questions left today: {n}", "ai_limit": "⏳ That's all the questions for today ({n} a day). Come back tomorrow 🤍",
+           "ai_disclaimer": "🤖 AI answer — it may contain mistakes. For important matters, ask an imam.",
+           "ai_err": "😔 Couldn't get an answer right now. Please try again a little later.",
+           "ai_new": "🧹 New conversation", "ai_exit": "❌ Exit", "ai_reset_done": "🧹 Started a new conversation. Ask your question 👇",
+           "ai_blocked": "😔 I can't answer this question."},
+    "ru": {"ai_btn": "🤖 Вопрос об исламе",
+           "ai_intro": "🤖 <b>Вопросы об исламе</b>\n\nНапишите вопрос — о намазе, посте, азкарах, Коране, этике. Можно задавать уточняющие вопросы.\n\n<i>Ответы пишет ИИ, он может ошибаться. По важным вопросам обращайтесь к имаму.</i>\n\n💬 Осталось вопросов сегодня: <b>{n}</b>",
+           "ai_left": "💬 Осталось вопросов сегодня: {n}", "ai_limit": "⏳ На сегодня вопросы закончились ({n} в день). Возвращайтесь завтра 🤍",
+           "ai_disclaimer": "🤖 Ответ ИИ — он может ошибаться. По важным вопросам обращайтесь к имаму.",
+           "ai_err": "😔 Сейчас не получилось получить ответ. Попробуйте чуть позже.",
+           "ai_new": "🧹 Новый диалог", "ai_exit": "❌ Выйти", "ai_reset_done": "🧹 Начали новый диалог. Задайте вопрос 👇",
+           "ai_blocked": "😔 На этот вопрос я ответить не могу."},
+    "uz": {"ai_btn": "🤖 Islom haqida savol",
+           "ai_intro": "🤖 <b>Islom haqida savollar</b>\n\nSavolingizni yozing — namoz, ro'za, zikrlar, Qur'on, odob haqida. Qo'shimcha savollar ham berishingiz mumkin.\n\n<i>Javoblarni sun'iy intellekt yozadi, u xato qilishi mumkin. Muhim masalalarda imomga murojaat qiling.</i>\n\n💬 Bugun qolgan savollar: <b>{n}</b>",
+           "ai_left": "💬 Bugun qolgan savollar: {n}", "ai_limit": "⏳ Bugungi savollar tugadi (kuniga {n} ta). Ertaga qaytib keling 🤍",
+           "ai_disclaimer": "🤖 Sun'iy intellekt javobi — xato bo'lishi mumkin. Muhim masalalarda imomga murojaat qiling.",
+           "ai_err": "😔 Hozir javob olib bo'lmadi. Birozdan so'ng qayta urinib ko'ring.",
+           "ai_new": "🧹 Yangi suhbat", "ai_exit": "❌ Chiqish", "ai_reset_done": "🧹 Yangi suhbat boshlandi. Savolingizni yozing 👇",
+           "ai_blocked": "😔 Bu savolga javob bera olmayman."},
+    "tg": {"ai_btn": "🤖 Савол дар бораи ислом",
+           "ai_intro": "🤖 <b>Саволҳо дар бораи ислом</b>\n\nСаволи худро нависед — дар бораи намоз, рӯза, зикрҳо, Қуръон, одоб. Саволҳои иловагӣ ҳам додан мумкин.\n\n<i>Ҷавобҳоро зеҳни сунъӣ менависад, метавонад хато кунад. Дар масъалаҳои муҳим ба имом муроҷиат кунед.</i>\n\n💬 Саволҳои боқимондаи имрӯз: <b>{n}</b>",
+           "ai_left": "💬 Саволҳои боқимондаи имрӯз: {n}", "ai_limit": "⏳ Саволҳои имрӯза тамом шуданд (рӯзе {n}). Фардо биёед 🤍",
+           "ai_disclaimer": "🤖 Ҷавоби зеҳни сунъӣ — метавонад хато бошад. Дар масъалаҳои муҳим ба имом муроҷиат кунед.",
+           "ai_err": "😔 Ҳоло ҷавоб гирифта нашуд. Каме баъдтар боз кӯшиш кунед.",
+           "ai_new": "🧹 Сӯҳбати нав", "ai_exit": "❌ Баромадан", "ai_reset_done": "🧹 Сӯҳбати нав оғоз шуд. Саволро нависед 👇",
+           "ai_blocked": "😔 Ба ин савол ҷавоб дода наметавонам."},
+    "ar": {"ai_btn": "🤖 سؤال عن الإسلام",
+           "ai_intro": "🤖 <b>أسئلة عن الإسلام</b>\n\nاكتب سؤالك — عن الصلاة والصيام والأذكار والقرآن والآداب. يمكنك طرح أسئلة متابعة.\n\n<i>الإجابات يكتبها الذكاء الاصطناعي وقد تحتوي على أخطاء. في الأمور المهمة اسأل إماماً.</i>\n\n💬 الأسئلة المتبقية اليوم: <b>{n}</b>",
+           "ai_left": "💬 الأسئلة المتبقية اليوم: {n}", "ai_limit": "⏳ انتهت أسئلة اليوم ({n} في اليوم). عد غداً 🤍",
+           "ai_disclaimer": "🤖 إجابة الذكاء الاصطناعي — قد تحتوي على أخطاء. في الأمور المهمة اسأل إماماً.",
+           "ai_err": "😔 تعذر الحصول على إجابة الآن. حاول بعد قليل.",
+           "ai_new": "🧹 محادثة جديدة", "ai_exit": "❌ خروج", "ai_reset_done": "🧹 بدأنا محادثة جديدة. اكتب سؤالك 👇",
+           "ai_blocked": "😔 لا أستطيع الإجابة عن هذا السؤال."},
+}
+for _l, _d in EXTRA9.items():
+    T[_l].update(_d)
+
 # ───────────────────────── Uzbek in Cyrillic ─────────────────────────
 # The Cyrillic Uzbek texts are produced from the Latin ones by the official spelling rules,
 # so both stay in sync. Words that the rules can't get right are listed in CYR_WORDS.
@@ -1105,6 +1146,16 @@ CREATE TABLE IF NOT EXISTS mosques (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS mosques_geo ON mosques (lat, lon);
+CREATE TABLE IF NOT EXISTS kv (
+    key   TEXT PRIMARY KEY,
+    value TEXT
+);
+CREATE TABLE IF NOT EXISTS ai_usage (
+    user_id BIGINT NOT NULL,
+    day     DATE NOT NULL,
+    n       INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, day)
+);
 CREATE TABLE IF NOT EXISTS msg_cleanup (
     chat_id BIGINT NOT NULL,
     msg_id  BIGINT NOT NULL,
@@ -1548,6 +1599,8 @@ def screen_menu(u):
     if is_private(u):
         if WEBAPP_URL:
             rows.insert(1, [webapp_btn(t(lang, "btn_app"), "today")])
+        if ai_allowed_now(u["user_id"]):
+            rows.append([btn(t(lang, "ai_btn"), "ai:start")])
         if is_admin(u["user_id"]):
             rows.append([btn("🛠 Админка", "a:home")])
     return t(lang, "menu_title", city=esc(u["city"])), kb(*rows)
@@ -1879,6 +1932,8 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             if await admin_text(update, ctx):
                 return
         u = await target_for(update, ctx)
+        if ctx.user_data.get("ai_mode") and u["onboarded"] and not u["awaiting_city"]:
+            return await ai_message(update, ctx, u)
     else:
         reply = msg.reply_to_message
         if not (reply and reply.from_user and reply.from_user.id == ctx.bot.id):
@@ -1969,6 +2024,10 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     if act == "sup":
         return await support_button(update, ctx, parts)
+    if act == "ai" and chat.type == "private":
+        return await ai_button(update, ctx, parts)
+    if chat.type == "private":
+        ctx.user_data.pop("ai_mode", None)  # any other button leaves the AI conversation
     if chat.type == "private":
         ctx.user_data.pop("support_mode", None)
         ctx.user_data.pop("reply_to", None)
@@ -2655,6 +2714,8 @@ async def screen_admin_home(uid=None):
     rows = [shown[i:i + 2] for i in range(0, len(shown), 2)]
     if uid is not None and is_main(uid):
         rows.append([btn("👮 Админы", "a:adm")])
+        if GEMINI_KEY:
+            rows.append([btn("🤖 ИИ-помощник: " + ("для всех ✅" if AI_STATE["public"] else "только админы 🔒"), "a:ai")])
     rows.append([btn("🏠 В меню бота", "m:home")])
     return text, kb(*rows)
 
@@ -3015,7 +3076,7 @@ async def run_broadcast(app, chat_id, text, bc):
 
 ADMIN_PERM_OF = {"stats": "stats", "geo": "stats", "health": "health", "test": "health", "bans": "bans", "ban": "bans",
                  "unban": "bans", "azan": "azan", "card": "users", "users": "users", "usearch": "users", "chats": "users",
-                 "user": "users", "export": "export", "bc": "bc", "bcl": "bc", "adm": "main"}
+                 "user": "users", "export": "export", "bc": "bc", "bcl": "bc", "adm": "main", "ai": "main"}
 
 
 async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
@@ -3029,6 +3090,12 @@ async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
         return await render(update, "🔒 <b>Нет доступа к этому разделу.</b>\n\n" + text, markup)
     if sub == "adm":
         return await admin_admins(update, ctx, parts)
+    if sub == "ai":
+        AI_STATE["public"] = not AI_STATE["public"]
+        await kv_set("ai_public", "1" if AI_STATE["public"] else "0")
+        text, markup = await screen_admin_home(uid)
+        return await render(update, ("✅ ИИ-помощник открыт для всех пользователей." if AI_STATE["public"]
+                                     else "🔒 ИИ-помощник теперь только для админов.") + "\n\n" + text, markup)
     if sub == "home":
         ctx.user_data.pop("bc", None)
         text, markup = await screen_admin_home(uid)
@@ -3454,6 +3521,8 @@ async def api_me(request):
         "ref": {"count": await POOL.fetchval("SELECT count(*) FROM users WHERE referred_by = $1", u["user_id"]),
                 "link": ref_link(u["user_id"])},
         "dev": DEV_CONTACT,
+        "ai": {"enabled": ai_allowed_now(u["user_id"]), "left": await ai_left(u), "limit": AI_DAILY,
+               "unlimited": is_admin(u["user_id"])},
         "today": {"date": now.date().isoformat(), "t": {k: today[k] for k in TIMING_KEYS},
                   "hday": today["hday"], "hmonth": today["hmonth"], "hyear": today["hyear"]},
         "tomorrow": {"t": {k: tomorrow[k] for k in TIMING_KEYS}},
@@ -3528,7 +3597,7 @@ async def start_web(application=None):
                     web.post("/api/tracker_bulk", api_tracker_bulk), web.get("/api/community", api_community),
                     web.get("/api/challenges", api_challenges), web.post("/api/challenges", api_challenge_new),
                     web.post("/api/challenges/leave", api_challenge_leave),
-                    web.post("/api/share_prepare", api_share_prepare)])
+                    web.post("/api/share_prepare", api_share_prepare), web.post("/api/ai", api_ai)])
     WEB_RUNNER = web.AppRunner(app, access_log=None)
     await WEB_RUNNER.setup()
     port = int(os.getenv("PORT", "8080"))
@@ -5366,6 +5435,225 @@ async def cleanup_job(context: ContextTypes.DEFAULT_TYPE):
             pass
         await asyncio.sleep(0.03)
 
+
+# ───────────────────────── AI helper: questions about Islam (Google Gemini) ─────────────────────────
+# Free Gemini API key in GEMINI_API_KEY. For now only admins can use it, unless the main admin opens it
+# to everyone (stored in the kv table). Each user gets AI_DAILY questions a day; admins are unlimited.
+
+GEMINI_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "").strip()
+GEMINI_PREFER = ("gemini-3-flash", "gemini-3-flash-preview", "gemini-2.5-flash", "gemini-2.5-flash-lite",
+                 "gemini-2.0-flash", "gemini-2.0-flash-lite")
+AI_DAILY = 20
+AI_HISTORY = {}  # user_id -> list of (role, text), the last few turns of the conversation
+AI_MODELS = []   # the models to try, best first (found once from the API's list)
+AI_COOLDOWN = {}  # model -> unix time until which it is skipped
+LANG_NAMES = {"en": "English", "ru": "Russian", "uz": "Uzbek (Latin script)", "uzc": "Uzbek (Cyrillic script)",
+              "tg": "Tajik (Cyrillic script)", "ar": "Arabic"}
+AI_SYSTEM = """You are a gentle, knowledgeable assistant inside "Mawaqit", a Muslim prayer-times app.
+You answer questions about Islam: prayer (salah), wudu, fasting, zakat, hajj, adhkar and duas, the Qur'an, the Prophet's life ﷺ,
+Islamic history, manners (adab) and everyday Muslim life.
+
+Rules:
+- Answer in {lang}. Be warm, clear and concise (usually 3–8 short paragraphs or a short list). No long introductions.
+- The user follows the {madhab} madhab: give that school's position first; if the schools differ, say so briefly.
+- Rely on the mainstream Sunni understanding. Where scholars genuinely differ, say that there are different opinions.
+- Never invent hadiths, quotes, verse numbers or sources. Quote a verse or hadith only if you are sure of it, and name
+  the source (e.g. "Sahih al-Bukhari", "Qur'an 2:255"). If unsure, explain the meaning without a reference.
+- Do not issue fatwas. For personal or serious matters (divorce, inheritance, debts, medical, legal), give general
+  guidance only and advise asking a local imam or the official muftiate.
+- If the question is not about Islam or Muslim life, politely say you only help with questions about Islam.
+- Be respectful to all people and other schools of thought; never mock or call anyone a disbeliever.
+- Format with plain text. You may use **bold** for key words and "- " for list items. No tables, no headings."""
+
+
+async def kv_get(key, default=None):
+    try:
+        v = await POOL.fetchval("SELECT value FROM kv WHERE key = $1", key)
+        return default if v is None else v
+    except Exception:  # noqa: BLE001
+        return default
+
+
+async def kv_set(key, value):
+    await POOL.execute("INSERT INTO kv (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+                       key, value)
+
+
+AI_STATE = {"public": False}  # loaded from the kv table on start, changed by the main admin
+
+
+async def ai_allowed(uid):
+    return ai_allowed_now(uid)
+
+
+def ai_allowed_now(uid):
+    return bool(GEMINI_KEY) and (is_admin(uid) or AI_STATE["public"])
+
+
+async def ai_left(u):
+    if is_admin(u["user_id"]):
+        return AI_DAILY
+    used = await POOL.fetchval("SELECT n FROM ai_usage WHERE user_id = $1 AND day = $2", u["user_id"], user_today(u)) or 0
+    return max(0, AI_DAILY - used)
+
+
+async def ai_models():
+    if AI_MODELS:
+        return AI_MODELS
+    if GEMINI_MODEL:
+        AI_MODELS.append(GEMINI_MODEL)
+    try:
+        r = await HTTP.get("https://generativelanguage.googleapis.com/v1beta/models", params={"pageSize": 200},
+                           headers={"x-goog-api-key": GEMINI_KEY}, timeout=15)
+        r.raise_for_status()
+        have = [m["name"].split("/")[-1] for m in r.json().get("models", [])
+                if "generateContent" in (m.get("supportedGenerationMethods") or [])]
+        AI_MODELS.extend(m for m in GEMINI_PREFER if m in have and m not in AI_MODELS)
+        AI_MODELS.extend(m for m in have if "flash" in m and "image" not in m and "tts" not in m
+                         and "live" not in m and "audio" not in m and m not in AI_MODELS)
+        log.info("gemini models: %s", ", ".join(AI_MODELS[:5]))
+    except Exception:  # noqa: BLE001
+        log.exception("gemini: could not list models")
+    if not AI_MODELS:
+        AI_MODELS.extend(GEMINI_PREFER[2:4])
+    return AI_MODELS
+
+
+def ai_markup_html(text):
+    """Model text (light markdown) → safe Telegram HTML."""
+    out = esc(text.strip())
+    out = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", out)
+    out = re.sub(r"(?m)^\s*[\*\-•]\s+", "• ", out)
+    out = re.sub(r"(?m)^#{1,6}\s*(.+)$", r"<b>\1</b>", out)
+    out = re.sub(r"(?<![\w*])\*(?!\s)([^*\n]+?)\*(?!\w)", r"<i>\1</i>", out)
+    return out
+
+
+async def ai_answer(u, question):
+    """Returns (answer_text or None, error_key)."""
+    lang = u["lang"] or "en"
+    hist = AI_HISTORY.setdefault(u["user_id"], [])
+    contents = [{"role": r, "parts": [{"text": x}]} for r, x in hist[-8:]]
+    contents.append({"role": "user", "parts": [{"text": question[:2000]}]})
+    system = AI_SYSTEM.format(lang=LANG_NAMES.get(lang, "English"),
+                              madhab="Hanafi" if u["madhab"] == "hanafi" else "Shafi'i/Maliki/Hanbali")
+    body = {"systemInstruction": {"parts": [{"text": system}]}, "contents": contents,
+            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 4096}}
+    models = await ai_models()
+    ready = [m for m in models if AI_COOLDOWN.get(m, 0) < _time.time()] or models
+    for model in ready:
+        try:
+            r = await HTTP.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                                json=body, headers={"x-goog-api-key": GEMINI_KEY}, timeout=60)
+            if r.status_code in (404, 429, 500, 503):
+                log.warning("gemini %s: HTTP %s %s", model, r.status_code, r.text[:200])
+                # out of free quota → rest this model for 10 min; unknown model → for a day
+                AI_COOLDOWN[model] = _time.time() + (86400 if r.status_code == 404 else 600)
+                continue
+            r.raise_for_status()
+            j = r.json()
+            if (j.get("promptFeedback") or {}).get("blockReason"):
+                return None, "ai_blocked"
+            parts = ((j.get("candidates") or [{}])[0].get("content") or {}).get("parts") or []
+            text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
+            if not text:
+                log.warning("gemini %s: empty answer %s", model, str(j)[:300])
+                continue
+            hist += [("user", question[:2000]), ("model", text[:4000])]
+            del hist[:-8]
+            return text, None
+        except Exception:  # noqa: BLE001
+            log.exception("gemini %s failed", model)
+    return None, "ai_err"
+
+
+async def ai_count(u):
+    await bump("ai_questions")
+    if not is_admin(u["user_id"]):
+        await POOL.execute("INSERT INTO ai_usage (user_id, day, n) VALUES ($1, $2, 1) "
+                           "ON CONFLICT (user_id, day) DO UPDATE SET n = ai_usage.n + 1", u["user_id"], user_today(u))
+
+
+def ai_buttons(lang):
+    return kb([btn(t(lang, "ai_new"), "ai:reset"), btn(t(lang, "ai_exit"), "ai:exit")])
+
+
+async def ai_button(update, ctx, parts):
+    q = update.callback_query
+    uid = q.from_user.id
+    u = await get_user(uid)
+    lang = (u or {}).get("lang") or "en"
+    await q.answer()
+    if not u or not await ai_allowed(uid):
+        return
+    sub = parts[1] if len(parts) > 1 else "start"
+    if sub == "exit":
+        ctx.user_data.pop("ai_mode", None)
+        text, markup = screen_menu(u)
+        return await render(update, text, markup)
+    if sub == "reset":
+        AI_HISTORY.pop(uid, None)
+        ctx.user_data["ai_mode"] = True
+        return await update.effective_chat.send_message(t(lang, "ai_reset_done"), reply_markup=ai_buttons(lang))
+    ctx.user_data["ai_mode"] = True
+    await render(update, t(lang, "ai_intro", n=await ai_left(u)), ai_buttons(lang))
+
+
+async def ai_message(update, ctx, u):
+    """A question typed while the AI mode is on."""
+    msg = update.message
+    lang = u["lang"] or "en"
+    if not await ai_allowed(u["user_id"]):
+        ctx.user_data.pop("ai_mode", None)
+        return
+    if await ai_left(u) <= 0:
+        return await msg.reply_text(t(lang, "ai_limit", n=AI_DAILY), reply_markup=ai_buttons(lang))
+    try:
+        await update.effective_chat.send_action("typing")
+    except Exception:  # noqa: BLE001
+        pass
+    answer, err = await ai_answer(u, msg.text or "")
+    if not answer:
+        return await msg.reply_text(t(lang, err), reply_markup=ai_buttons(lang))
+    await ai_count(u)
+    body = ai_markup_html(answer)
+    tail = f"\n\n<i>{t(lang, 'ai_disclaimer')}</i>"
+    if not is_admin(u["user_id"]):
+        tail += f"\n<i>{t(lang, 'ai_left', n=await ai_left(u))}</i>"
+    chunks = [body[i:i + 3600] for i in range(0, len(body), 3600)] or [""]
+    for i, ch in enumerate(chunks):
+        last = i == len(chunks) - 1
+        try:
+            await msg.reply_text(ch + (tail if last else ""), parse_mode=ParseMode.HTML,
+                                 reply_markup=ai_buttons(lang) if last else None)
+        except BadRequest:  # a tag got cut between chunks: send plain text instead
+            await msg.reply_text(re.sub(r"<[^>]+>", "", ch + (tail if last else "")),
+                                 reply_markup=ai_buttons(lang) if last else None)
+
+
+# mini app
+
+async def api_ai(request):
+    tg_user, u, lang = await api_auth(request)
+    if not u or not await ai_allowed(u["user_id"]):
+        raise web.HTTPForbidden(text="ai is off")
+    body = await read_json(request)
+    if body.get("reset"):
+        AI_HISTORY.pop(u["user_id"], None)
+        return web.json_response({"ok": True, "left": await ai_left(u)})
+    question = str(body.get("text") or "").strip()[:2000]
+    if not question:
+        raise web.HTTPBadRequest(text="empty")
+    if await ai_left(u) <= 0:
+        return web.json_response({"ok": False, "error": "limit", "left": 0})
+    answer, err = await ai_answer(u, question)
+    if not answer:
+        return web.json_response({"ok": False, "error": err})
+    await ai_count(u)
+    return web.json_response({"ok": True, "html": ai_markup_html(answer), "left": await ai_left(u),
+                              "unlimited": is_admin(u["user_id"])})
+
 # ───────────────────────── app ─────────────────────────
 
 
@@ -5444,6 +5732,9 @@ async def post_init(app: Application):
     HTTP = httpx.AsyncClient(timeout=15)
     await load_azans()
     await load_admins()
+    AI_STATE["public"] = await kv_get("ai_public") == "1"
+    if GEMINI_KEY:  # check the key and pick the model in the background
+        asyncio.get_running_loop().create_task(ai_models())
     global BOT_USERNAME
     BOT_USERNAME = app.bot.username
     asyncio.get_running_loop().create_task(setup_profile(app.bot))  # in background, never blocks startup
