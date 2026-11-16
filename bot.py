@@ -1422,7 +1422,8 @@ def screen_settings(u):
             lines.append(t(lang, "st_azan", v=esc(azan_label(lang, u))))
             rows.append([btn(t(lang, "sb_azan", v=azan_label(lang, u)), "s:azan")])
         rows.append([btn(t(lang, "btn_groups"), "s:groups")])
-        rows.append(([btn(t(lang, "btn_support"), "s:support")] if ADMINS else []) + [dev_btn(lang)])
+        if ADMINS:
+            rows.append([btn(t(lang, "btn_support"), "s:support")])
     rows.append([btn(t(lang, "btn_back"), "m:home")])
     return "\n".join(lines), kb(*rows)
 

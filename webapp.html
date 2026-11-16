@@ -527,7 +527,6 @@ html.lite #sky .b{animation:none;filter:blur(60px)}
     <div class="card"><div class="sw" id="stWk"></div></div>
     <div class="card" id="stAzanCard" hidden><div class="lbl" id="stAzanL"></div><div class="sub" id="stAzanH" style="margin:2px 0 8px"></div><div class="chips" id="stAzan"></div></div>
     <div class="card"><div class="sw" id="stSky"></div></div>
-    <button class="btn ghost" id="stDev" style="margin-top:4px"></button>
   </section>
 
   <section class="view" id="v-azkar">
@@ -1029,10 +1028,8 @@ function renderMore() {
     ["qada", "🔁", "m_qada", "m_qada_d"], ["dates", "📆", "m_dates", "m_dates_d"], ["ramadan", "🌙", "m_ramadan", "m_ramadan_d"],
     ["cities", "✈️", "m_cities", "m_cities_d"], ["mosques", "🕌", "m_mosques", "m_mosques_d"], ["names", "📖", "m_names", "m_names_d"], ["invite", "🤲", "m_invite", "m_invite_d"], ["settings", "⚙️", "m_settings", "m_settings_d"]];
   let h = items.map(([id, ic, t1, t2]) => `<button class="item" data-sub="${id}"><div class="ico">${ic}</div><div><div class="tt">${tr(t1)}</div><div class="ds">${tr(t2)}</div></div><div class="ch">›</div></button>`).join("");
-  h += `<button class="item" id="devBtn"><div class="ico">👨‍💻</div><div><div class="tt">${tr("m_dev")}</div><div class="ds">${tr("m_dev_d")}</div></div><div class="ch">›</div></button>`;
   if (ver("8.0") && tg.addToHomeScreen) h += `<button class="item" id="homeBtn"><div class="ico">📲</div><div><div class="tt">${tr("m_home")}</div><div class="ds" id="homeDs">${tr("m_home_d")}</div></div></button>`;
   $("moreMenu").innerHTML = h;
-  $("devBtn").onclick = openDev;
   const hb = $("homeBtn");
   if (hb) {
     hb.onclick = () => { try { tg.addToHomeScreen(); } catch (e) {} };
@@ -1328,7 +1325,6 @@ function renderSettings() {
     chips($("stAzan"), [["off", tr("st_azan_off")]].concat(az.map(([id, n]) => [id, "🔊 " + n])), p.azan || "off", v => saveSetting({azan: v}));
   }
   sw($("stSky"), tr("st_sky"), SKY_ON, v => { SKY_ON = v; store.set("app_sky", v ? "1" : "0"); updateSky(true); renderSettings(); });
-  $("stDev").textContent = "👨‍💻 " + tr("m_dev");
 }
 /* ───────── AZKAR ───────── */
 let AZ_MODE = null, AZ = {};
@@ -2415,7 +2411,7 @@ function init() {
   $("ciFind").onclick = findOther;
   $("ciQ").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); findOther(); } };
   $("chCreate").onclick = createChallenge;
-  $("stDev").onclick = openDev; $("invShare").onclick = shareInvite; $("invCopy").onclick = copyInvite;
+  $("invShare").onclick = shareInvite; $("invCopy").onclick = copyInvite;
   store.get(["app_sky"]).then(v => { SKY_ON = v.app_sky !== "0"; updateSky(true); });
   detectLite();
   $("trChBtn").addEventListener("click", () => { CH_FROM = "tracker"; });
