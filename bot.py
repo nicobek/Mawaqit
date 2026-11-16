@@ -703,6 +703,11 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS at_time   BOOLEAN NOT NULL DEFAULT TR
 ALTER TABLE users ADD COLUMN IF NOT EXISTS auto_mode INT NOT NULL DEFAULT 5;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS username  TEXT;
+CREATE TABLE IF NOT EXISTS daily_active (
+    day     DATE NOT NULL,
+    user_id BIGINT NOT NULL,
+    PRIMARY KEY (day, user_id)
+);
 CREATE TABLE IF NOT EXISTS times_cards (
     chat_id   BIGINT PRIMARY KEY,
     msg_id    BIGINT NOT NULL,
@@ -1918,6 +1923,8 @@ async def gate(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 "ON CONFLICT (user_id) DO UPDATE SET last_seen = now(), blocked = FALSE, "
                 "full_name = EXCLUDED.full_name, username = EXCLUDED.username RETURNING banned",
                 user.id, user.full_name, user.username)
+            await POOL.execute("INSERT INTO daily_active (day, user_id) VALUES (CURRENT_DATE, $1) ON CONFLICT DO NOTHING",
+                               user.id)
         else:
             row = await POOL.fetchrow(
                 "UPDATE users SET last_seen = now(), full_name = $2, username = $3 WHERE user_id = $1 RETURNING banned",
@@ -2242,20 +2249,23 @@ async def ask_bc_text(update, ctx):
     await render(update, text, kb([btn("❌ Отмена", "a:home")]))
 
 
-async def send_one(bot, uid, text):
+async def send_one(bot, uid, text, photo=None, markup=None):
     for _ in range(2):
         try:
-            await bot.send_message(uid, text, parse_mode=ParseMode.HTML)
-            return "ok"
+            if photo is not None:
+                m = await bot.send_photo(uid, photo, caption=text or None, parse_mode=ParseMode.HTML, reply_markup=markup)
+            else:
+                m = await bot.send_message(uid, text, parse_mode=ParseMode.HTML, reply_markup=markup)
+            return "ok", m
         except Forbidden:
             await POOL.execute("UPDATE users SET blocked = TRUE WHERE user_id = $1", uid)
-            return "blocked"
+            return "blocked", None
         except RetryAfter as e:
             await asyncio.sleep(e.retry_after + 1)
         except Exception:  # noqa: BLE001
             log.exception("broadcast send failed for %s", uid)
-            return "fail"
-    return "fail"
+            return "fail", None
+    return "fail", None
 
 
 async def run_broadcast(app, chat_id, text, bc):
@@ -2268,8 +2278,13 @@ async def run_broadcast(app, chat_id, text, bc):
         ids = [r["user_id"] for r in rows]
         total = len(ids)
         progress = await app.bot.send_message(chat_id, f"📣 Отправка… 0 / {total}")
+        photo = bc.get("photo")
+        markup = InlineKeyboardMarkup([[InlineKeyboardButton(bc["button"][0], url=bc["button"][1])]]) \
+            if bc.get("button") else None
         for i, uid in enumerate(ids, 1):
-            res = await send_one(app.bot, uid, text)
+            res, sent_msg = await send_one(app.bot, uid, text, photo, markup)
+            if res == "ok" and isinstance(photo, bytes) and sent_msg is not None and sent_msg.photo:
+                photo = sent_msg.photo[-1].file_id  # upload once, then reuse
             if res == "ok":
                 sent += 1
             elif res == "blocked":
@@ -2662,6 +2677,11 @@ async def api_city(request):
 
 async def api_me(request):
     tg_user, u, lang = await api_auth(request)
+    try:
+        await POOL.execute("INSERT INTO daily_active (day, user_id) VALUES (CURRENT_DATE, $1) ON CONFLICT DO NOTHING",
+                           int(tg_user["id"]))
+    except Exception:  # noqa: BLE001
+        pass
     if not u or not (u["city"] and u["tz"] and u["madhab"]):
         return web.json_response({"ok": True, "need_setup": True, "lang": lang, "bot": BOT_USERNAME})
     try:
@@ -2674,7 +2694,7 @@ async def api_me(request):
         return web.json_response({"ok": False, "error": "timings"}, status=502)
     return web.json_response({
         "ok": True, "need_setup": False, "bot": BOT_USERNAME, "profile": profile_json(u, lang),
-        "share_url": share_url(u["user_id"], now.date().isoformat()),
+        "share_url": share_url(u["user_id"], now.date().isoformat()), "is_admin": is_admin(u["user_id"]),
         "today": {"date": now.date().isoformat(), "t": {k: today[k] for k in TIMING_KEYS},
                   "hday": today["hday"], "hmonth": today["hmonth"], "hyear": today["hyear"]},
         "tomorrow": {"t": {k: tomorrow[k] for k in TIMING_KEYS}},
@@ -2727,16 +2747,23 @@ async def page_health(request):
     return web.Response(text="ok")
 
 
-async def start_web(bot=None):
+async def start_web(application=None):
     global WEB_RUNNER
-    app = web.Application()
-    app["bot"] = bot
+    app = web.Application(client_max_size=12 * 1024 * 1024)  # broadcast photos
+    app["ptb"] = application
+    app["bot"] = application.bot if application else None
     app.add_routes([web.get("/", page_index), web.get("/health", page_health),
                     web.get("/api/me", api_me), web.get("/api/month", api_month),
                     web.get("/api/ramadan", api_ramadan), web.post("/api/settings", api_settings),
                     web.get("/api/geocode", api_geocode), web.post("/api/city", api_city),
                     web.get("/api/city_times", api_city_times), web.post("/api/share_send", api_share_send),
-                    web.get("/share/{uid}/{day}/{sig}.png", page_share)])
+                    web.get("/share/{uid}/{day}/{sig}.png", page_share),
+                    web.get("/api/mosques", api_mosques), web.get("/api/reverse", api_reverse),
+                    web.get("/api/admin/summary", api_admin_summary), web.get("/api/admin/people", api_admin_people),
+                    web.get("/api/admin/person", api_admin_person), web.post("/api/admin/ban", api_admin_ban),
+                    web.post("/api/admin/message", api_admin_message), web.get("/api/admin/bc_count", api_admin_bc_count),
+                    web.post("/api/admin/broadcast", api_admin_broadcast), web.get("/api/admin/health", api_admin_health),
+                    web.post("/api/admin/export", api_admin_export)])
     WEB_RUNNER = web.AppRunner(app, access_log=None)
     await WEB_RUNNER.setup()
     port = int(os.getenv("PORT", "8080"))
@@ -2982,6 +3009,331 @@ async def send_qibla_image(update, u):
     await update.effective_chat.send_photo(photo, caption=caption, parse_mode=ParseMode.HTML, reply_markup=kb(*rows))
 
 
+# ───────────────────────── mini app: mosques & places ─────────────────────────
+
+OVERPASS = ("https://overpass-api.de/api/interpreter",
+            "https://overpass.kumi.systems/api/interpreter",
+            "https://overpass.private.coffee/api/interpreter")
+MOSQUE_CACHE = {}
+
+
+async def overpass(query):
+    last = None
+    for url in OVERPASS:  # the free servers are often busy, so try the mirrors in turn
+        try:
+            r = await HTTP.post(url, data={"data": query}, timeout=30,
+                                headers={"User-Agent": f"PrayerTimesTelegramBot/1.0 ({CONTACT})"})
+            r.raise_for_status()
+            return r.json().get("elements", [])
+        except Exception as e:  # noqa: BLE001
+            last = e
+            log.warning("overpass %s failed: %r", url, e)
+    raise last or RuntimeError("overpass unavailable")
+
+
+async def api_mosques(request):
+    _, u, lang = await api_auth(request)
+    try:
+        lat, lon = float(request.query["lat"]), float(request.query["lon"])
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            raise ValueError
+    except (KeyError, ValueError):
+        raise web.HTTPBadRequest(text="bad place")
+    key = (round(lat, 2), round(lon, 2))
+    hit = MOSQUE_CACHE.get(key)
+    if hit and _time.time() - hit[0] < 6 * 3600:
+        return web.json_response(hit[1])
+    items, radius = [], 5000
+    try:
+        for radius in (5000, 15000):  # widen the search if nothing is close
+            q = (f'[out:json][timeout:25];nwr["amenity"="place_of_worship"]["religion"="muslim"]'
+                 f'(around:{radius},{lat},{lon});out center 120;')
+            items = []
+            for e in await overpass(q):
+                la, lo = e.get("lat") or (e.get("center") or {}).get("lat"), e.get("lon") or (e.get("center") or {}).get("lon")
+                if la is None or lo is None:
+                    continue
+                tags = e.get("tags") or {}
+                names = {k[5:]: v for k, v in tags.items() if k.startswith("name:") and len(k) == 7}
+                items.append({"lat": la, "lon": lo, "name": tags.get("name") or "", "names": names})
+            if items:
+                break
+    except Exception:  # noqa: BLE001
+        log.exception("mosques lookup failed")
+        return web.json_response({"ok": False}, status=502)
+    out = {"ok": True, "radius": radius, "items": items}
+    if len(MOSQUE_CACHE) > 300:
+        MOSQUE_CACHE.clear()
+    MOSQUE_CACHE[key] = (_time.time(), out)
+    return web.json_response(out)
+
+
+async def api_reverse(request):
+    _, u, lang = await api_auth(request)
+    try:
+        lat, lon = float(request.query["lat"]), float(request.query["lon"])
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            raise ValueError
+    except (KeyError, ValueError):
+        raise web.HTTPBadRequest(text="bad place")
+    name, cc = await reverse_geocode(lat, lon, lang)
+    return web.json_response({"ok": True, "name": name, "cc": cc, "flag": flag(cc) if cc else "",
+                              "lat": lat, "lon": lon})
+
+
+# ───────────────────────── mini app: admin panel ─────────────────────────
+# Every call checks the signed Telegram data and that the caller is one of ADMINS.
+
+async def admin_auth(request):
+    tg_user = check_init_data(request.headers.get("X-Init-Data", ""))
+    if not tg_user or not is_admin(int(tg_user["id"])):
+        raise web.HTTPForbidden(text="admins only")
+    return int(tg_user["id"])
+
+
+def series(rows, days=30):
+    have = {r["d"].isoformat(): r["c"] for r in rows}
+    today = datetime.utcnow().date()
+    return [{"d": (today - timedelta(days=i)).isoformat(), "c": have.get((today - timedelta(days=i)).isoformat(), 0)}
+            for i in range(days - 1, -1, -1)]
+
+
+async def api_admin_summary(request):
+    await admin_auth(request)
+    r = await POOL.fetchrow("""
+        SELECT count(*) AS total,
+               count(*) FILTER (WHERE onboarded) AS setup,
+               count(*) FILTER (WHERE remind AND NOT blocked AND NOT banned) AS reminders,
+               count(*) FILTER (WHERE created_at >= date_trunc('day', now())) AS new_today,
+               count(*) FILTER (WHERE created_at >= now() - interval '7 days') AS new_week,
+               count(*) FILTER (WHERE last_seen >= now() - interval '7 days') AS active_week,
+               count(*) FILTER (WHERE banned) AS banned,
+               count(*) FILTER (WHERE blocked) AS blocked
+        FROM users WHERE chat_type = 'private'""")
+    ch = await POOL.fetchrow("""
+        SELECT count(*) FILTER (WHERE chat_type = 'group') AS groups,
+               count(*) FILTER (WHERE chat_type = 'channel') AS channels,
+               coalesce(sum(members), 0) AS members
+        FROM users WHERE chat_type <> 'private' AND NOT blocked""")
+    c = await today_counters()
+    new = await POOL.fetch("SELECT created_at::date AS d, count(*) AS c FROM users WHERE chat_type = 'private' "
+                           "AND created_at > now() - interval '31 days' GROUP BY 1")
+    act = await POOL.fetch("SELECT day AS d, count(*) AS c FROM daily_active WHERE day > CURRENT_DATE - 31 GROUP BY 1")
+    rem = await POOL.fetch("SELECT stat_day AS d, stat_value AS c FROM daily_stats "
+                           "WHERE stat_key = 'reminders_sent' AND stat_day > CURRENT_DATE - 31")
+    langs = await POOL.fetch("SELECT lang AS k, count(*) AS c FROM users WHERE lang IS NOT NULL AND chat_type = 'private' "
+                             "GROUP BY lang ORDER BY c DESC")
+    madh = await POOL.fetch("SELECT madhab AS k, count(*) AS c FROM users WHERE madhab IS NOT NULL GROUP BY madhab ORDER BY c DESC")
+    countries = await POOL.fetch("SELECT lower(country) AS k, count(*) AS c FROM users WHERE coalesce(country, '') <> '' "
+                                 "GROUP BY lower(country) ORDER BY c DESC LIMIT 10")
+    cities = await city_clusters()
+    return web.json_response({
+        "ok": True, "users": dict(r), "chats": dict(ch),
+        "today": {"support": c.get("support_msgs", 0), "sent": c.get("reminders_sent", 0), "failed": c.get("reminders_failed", 0)},
+        "new": series(new), "active": series(act), "reminders": series(rem),
+        "langs": [{"k": x["k"], "label": LANG_BUTTONS.get(x["k"], x["k"]), "c": x["c"]} for x in langs],
+        "madhabs": [{"k": x["k"], "label": MADHAB_RU.get(x["k"], x["k"]), "c": x["c"]} for x in madh],
+        "countries": [{"k": x["k"], "label": f"{flag(x['k'])} {x['k'].upper()}", "c": x["c"]} for x in countries],
+        "cities": [{"label": g["name"], "c": g["c"]} for g in cities],
+    })
+
+
+def person_json(r):
+    return {"id": r["user_id"], "name": r["full_name"], "username": r["username"], "city": r["city"],
+            "flag": flag(r["country"]) if r["country"] else "", "lang": r["lang"], "banned": r["banned"],
+            "blocked": r["blocked"], "type": r["chat_type"], "title": r["title"], "members": r["members"],
+            "last_seen": r["last_seen"].isoformat() if r["last_seen"] else None,
+            "created": r["created_at"].isoformat() if r["created_at"] else None}
+
+
+async def api_admin_people(request):
+    await admin_auth(request)
+    kind = request.query.get("kind", "users")
+    flt = request.query.get("filter", "all")
+    q = (request.query.get("q") or "").strip()[:64]
+    try:
+        page = max(0, int(request.query.get("page", "0")))
+    except ValueError:
+        page = 0
+    where, args = ("chat_type = 'private'" if kind == "users" else "chat_type <> 'private'"), []
+    if q:
+        w, args = search_where(q)
+        where += " AND " + w
+    where += {"active": " AND last_seen >= now() - interval '7 days'", "banned": " AND banned",
+              "blocked": " AND blocked"}.get(flt, "")
+    total = await POOL.fetchval(f"SELECT count(*) FROM users WHERE {where}", *args)
+    rows = await POOL.fetch(f"SELECT * FROM users WHERE {where} ORDER BY last_seen DESC NULLS LAST, created_at DESC "
+                            f"LIMIT 20 OFFSET {page * 20}", *args)
+    return web.json_response({"ok": True, "total": total, "page": page, "items": [person_json(r) for r in rows]})
+
+
+async def api_admin_person(request):
+    await admin_auth(request)
+    try:
+        uid = int(request.query["id"])
+    except (KeyError, ValueError):
+        raise web.HTTPBadRequest(text="bad id")
+    r = await POOL.fetchrow("SELECT * FROM users WHERE user_id = $1", uid)
+    if not r:
+        raise web.HTTPNotFound()
+    u = dict(r)
+    out = person_json(r)
+    owned = await POOL.fetchrow(
+        "SELECT count(*) FILTER (WHERE chat_type = 'group') AS g, count(*) FILTER (WHERE chat_type = 'channel') AS c "
+        "FROM users WHERE owner_id = $1 AND NOT blocked", uid)
+    owner = await POOL.fetchrow("SELECT user_id, full_name, username FROM users WHERE user_id = $1", u["owner_id"]) \
+        if u["owner_id"] else None
+    lead = (f"за {u['lead_min']} мин" if u["lead_min"] else "без заранее") + (" + в момент азана" if u["at_time"] else "")
+    out.update({
+        "madhab": MADHAB_RU.get(u["madhab"], "—"), "lang_label": LANG_BUTTONS.get(u["lang"], "—"), "tz": u["tz"],
+        "reminders": ("вкл: " + lead) if u["remind"] else "выкл",
+        "quiet": "выкл" if u["quiet_start"] is None else f"{u['quiet_start']:02d}:00–{u['quiet_end']:02d}:00",
+        "auto": auto_label("ru", u["auto_mode"]), "ramadan": u["ramadan"], "daily": u["daily"],
+        "owned_groups": owned["g"], "owned_channels": owned["c"], "is_admin": is_admin(uid),
+        "owner": {"id": owner["user_id"], "name": owner["full_name"], "username": owner["username"]} if owner else None,
+    })
+    return web.json_response({"ok": True, "person": out})
+
+
+async def api_admin_ban(request):
+    await admin_auth(request)
+    body = await read_json(request)
+    try:
+        uid, ban = int(body["id"]), bool(body["ban"])
+    except (KeyError, ValueError, TypeError):
+        raise web.HTTPBadRequest(text="bad request")
+    if is_admin(uid):
+        raise web.HTTPBadRequest(text="cannot ban an admin")
+    await POOL.execute("UPDATE users SET banned = $2 WHERE user_id = $1", uid, ban)
+    return web.json_response({"ok": True})
+
+
+def admin_markup_text(text):
+    """Plain text from the app, with **bold** and __italic__, made safe for Telegram HTML."""
+    import re
+    s = esc(text)
+    s = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s, flags=re.S)
+    return re.sub(r"__(.+?)__", r"<i>\1</i>", s, flags=re.S)
+
+
+async def api_admin_message(request):
+    await admin_auth(request)
+    body = await read_json(request)
+    try:
+        uid, text = int(body["id"]), str(body["text"]).strip()[:3500]
+    except (KeyError, ValueError, TypeError):
+        raise web.HTTPBadRequest(text="bad request")
+    if not text:
+        raise web.HTTPBadRequest(text="empty")
+    u = await get_user(uid)
+    lang = (u or {}).get("lang") or "en"
+    try:
+        await request.app["bot"].send_message(uid, t(lang, "support_reply_header") + "\n\n" + admin_markup_text(text),
+                                              parse_mode=ParseMode.HTML)
+    except Forbidden:
+        await POOL.execute("UPDATE users SET blocked = TRUE WHERE user_id = $1", uid)
+        return web.json_response({"ok": False, "error": "blocked"})
+    except Exception:  # noqa: BLE001
+        log.exception("admin message failed")
+        return web.json_response({"ok": False, "error": "failed"})
+    return web.json_response({"ok": True})
+
+
+def bc_from_body(body):
+    kind = body.get("kind") if body.get("kind") in ("all", "everything", "lang", "country") else "all"
+    value = None
+    if kind == "lang":
+        value = body.get("value") if body.get("value") in LANGS else "ru"
+    elif kind == "country":
+        value = str(body.get("value") or "").strip().lower()[:2]
+        if len(value) != 2 or not value.isalpha():
+            raise web.HTTPBadRequest(text="bad country")
+    return {"kind": kind, "value": value, "text": None}
+
+
+async def api_admin_bc_count(request):
+    await admin_auth(request)
+    bc = bc_from_body(dict(request.query))
+    where, args = bc_where(bc)
+    return web.json_response({"ok": True, "count": await POOL.fetchval(f"SELECT count(*) FROM users WHERE {where}", *args),
+                              "label": bc_label(bc)})
+
+
+async def api_admin_broadcast(request):
+    admin = await admin_auth(request)
+    body = await read_json(request)
+    bc = bc_from_body(body)
+    text = admin_markup_text(str(body.get("text") or "").strip()[:3500])
+    photo = None
+    if body.get("photo"):
+        import base64
+        try:
+            raw = str(body["photo"]).split(",", 1)[-1]
+            photo = base64.b64decode(raw, validate=True)
+            if len(photo) > 8 * 1024 * 1024:
+                raise ValueError
+        except Exception:  # noqa: BLE001
+            raise web.HTTPBadRequest(text="bad photo")
+    if not text and not photo:
+        raise web.HTTPBadRequest(text="empty")
+    if photo and len(text) > 1024:
+        raise web.HTTPBadRequest(text="caption too long")
+    btn_text, btn_url = str(body.get("button_text") or "").strip()[:60], str(body.get("button_url") or "").strip()[:500]
+    if btn_text or btn_url:
+        if not (btn_text and (btn_url.startswith("https://") or btn_url.startswith("http://"))):
+            raise web.HTTPBadRequest(text="bad button")
+        bc["button"] = (btn_text, btn_url)
+    bc["photo"] = photo
+    ptb = request.app["ptb"]
+    if ptb.bot_data.get("bc_running"):
+        return web.json_response({"ok": False, "error": "running"}, status=409)
+    task = asyncio.create_task(run_broadcast(ptb, admin, text, bc))
+    tasks = ptb.bot_data.setdefault("tasks", set())
+    tasks.add(task)
+    task.add_done_callback(tasks.discard)
+    return web.json_response({"ok": True})
+
+
+async def api_admin_health(request):
+    await admin_auth(request)
+    t0 = _time.perf_counter()
+    await POOL.fetchval("SELECT 1")
+    db_ms = round((_time.perf_counter() - t0) * 1000)
+    t1 = _time.perf_counter()
+    try:
+        await fetch_timings(KAABA[0], KAABA[1], datetime.utcnow().date(), 4, 0)
+        api = {"ok": True, "ms": round((_time.perf_counter() - t1) * 1000)}
+    except Exception as e:  # noqa: BLE001
+        api = {"ok": False, "error": type(e).__name__}
+    c = await today_counters()
+    active = await POOL.fetchval("SELECT count(*) FROM users WHERE remind AND NOT blocked AND NOT banned AND tz IS NOT NULL")
+    cards = await POOL.fetchval("SELECT count(*) FROM times_cards")
+    return web.json_response({
+        "ok": True, "db_ms": db_ms, "api": api, "uptime": int(_time.time() - START_TS), "reminder_users": active,
+        "cache": len(CACHE), "live_cards": cards, "sent": c.get("reminders_sent", 0), "failed": c.get("reminders_failed", 0),
+        "errors": [{"at": e[0].strftime("%d.%m %H:%M"), "msg": e[1]} for e in list(ERRBUF)[-8:]],
+        "admins": sorted(ADMINS),
+    })
+
+
+async def api_admin_export(request):
+    admin = await admin_auth(request)
+    rows = await POOL.fetch(f"SELECT {', '.join(CSV_COLUMNS)} FROM users ORDER BY created_at")
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(CSV_COLUMNS)
+    for r in rows:
+        w.writerow([r[c] for c in CSV_COLUMNS])
+    data = io.BytesIO(buf.getvalue().encode("utf-8-sig"))
+    try:
+        await request.app["bot"].send_document(admin, document=data, filename=f"users_{datetime.utcnow():%Y%m%d_%H%M}.csv",
+                                               caption=f"📤 Пользователей: {len(rows)}")
+    except Exception:  # noqa: BLE001
+        log.exception("export failed")
+        return web.json_response({"ok": False}, status=502)
+    return web.json_response({"ok": True, "rows": len(rows)})
+
+
 # ───────────────────────── app ─────────────────────────
 
 
@@ -3047,7 +3399,7 @@ async def post_init(app: Application):
     BOT_USERNAME = app.bot.username
     asyncio.get_running_loop().create_task(setup_profile(app.bot))  # in background, never blocks startup
     try:
-        await start_web(app.bot)
+        await start_web(app)
     except Exception:  # noqa: BLE001
         log.exception("mini app server failed to start (the bot keeps working)")
     log.info("Bot is ready")

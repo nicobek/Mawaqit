@@ -20,6 +20,7 @@
   --safe-top: var(--tg-content-safe-area-inset-top, 0px);
   --safe-bottom: max(env(safe-area-inset-bottom), var(--tg-safe-area-inset-bottom, 0px));
   --nav-h: 64px;
+  --on-gold: #1b1404;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
@@ -39,7 +40,7 @@ h2{font-size:17px;margin:20px 0 10px}
 .muted{color:var(--hint)}
 .center{text-align:center}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:var(--gold-soft);color:var(--gold);font-weight:600;font-size:13px}
-.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px 16px;border-radius:14px;background:var(--gold);color:#1b1404;font-weight:700}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px 16px;border-radius:14px;background:var(--gold);color:var(--on-gold);font-weight:700}
 .btn.ghost{background:var(--card);color:var(--text)}
 .state{min-height:60vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:20px}
 .state .big{font-size:56px}
@@ -98,13 +99,13 @@ h2{font-size:17px;margin:20px 0 10px}
 .dhikr{text-align:center;margin-top:8px}
 .dhikr .ar{font-size:30px;font-family:"Noto Naskh Arabic","Amiri","Geeza Pro",serif;direction:rtl}
 .dhikr .tr{color:var(--hint)}
-.bead{display:block;width:min(70vw,250px);aspect-ratio:1;margin:18px auto;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f3d77a,var(--gold) 45%,#8a6d14);box-shadow:0 18px 40px rgba(212,175,55,.35),inset 0 -10px 30px rgba(0,0,0,.25);color:#1b1404;transition:transform .08s}
+.bead{display:block;width:min(70vw,250px);aspect-ratio:1;margin:18px auto;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f3d77a,var(--gold) 45%,#8a6d14);box-shadow:0 18px 40px rgba(212,175,55,.35),inset 0 -10px 30px rgba(0,0,0,.25);color:var(--on-gold);transition:transform .08s}
 .bead:active{transform:scale(.96)}
 .bead .n{font-size:64px;font-weight:900;line-height:1}
 .bead .g{font-weight:700;opacity:.75}
 .goals{display:flex;gap:8px;justify-content:center;margin:6px 0 10px}
 .goals button{padding:8px 16px;border-radius:999px;background:var(--card);font-weight:700}
-.goals button.on{background:var(--gold);color:#1b1404}
+.goals button.on{background:var(--gold);color:var(--on-gold)}
 
 /* more */
 .menu .item{display:flex;align-items:center;gap:14px;padding:14px;border-radius:16px;background:var(--card);margin:10px 0;width:100%;text-align:start}
@@ -156,7 +157,7 @@ h2{font-size:17px;margin:20px 0 10px}
 .cur{font-weight:700;font-size:16px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{padding:8px 14px;border-radius:999px;background:var(--bg);font-weight:600;font-size:14px;border:1px solid var(--line)}
-.chip.on{background:var(--gold);color:#1b1404;border-color:var(--gold)}
+.chip.on{background:var(--gold);color:var(--on-gold);border-color:var(--gold)}
 .sw{display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:600;cursor:pointer}
 .sw .tg{width:50px;height:30px;border-radius:999px;background:var(--line);position:relative;flex:none;transition:.2s}
 .sw .tg::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
@@ -169,7 +170,7 @@ h2{font-size:17px;margin:20px 0 10px}
 /* azkar & duas */
 .seg{display:flex;background:var(--card);border-radius:14px;padding:4px;gap:4px;margin-top:10px}
 .seg button{flex:1;padding:9px;border-radius:11px;font-weight:700;color:var(--hint)}
-.seg button.on{background:var(--gold);color:#1b1404}
+.seg button.on{background:var(--gold);color:var(--on-gold)}
 .prog{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin:4px 0 10px}
 .prog div{height:100%;width:0;background:var(--green);transition:width .3s}
 .zk{display:block;width:100%;text-align:start;background:var(--card);border-radius:18px;padding:14px 16px;margin:10px 0;border:2px solid transparent;transition:.2s}
@@ -222,6 +223,76 @@ select.search{appearance:none;-webkit-appearance:none}
 .ach.ok{opacity:1;filter:none;outline:2px solid var(--gold)}
 .ach .i{font-size:24px}
 
+/* app themes */
+html[data-theme="night"]{--bg:#0b1220;--card:#151f33;--text:#eef2f8;--hint:#8b98ad;--link:#d4af37}
+html[data-theme="emerald"]{--bg:#06261e;--card:#0d372b;--text:#eafaf3;--hint:#8fbcac;--link:#e2c45c;--gold:#e2c45c;--gold-soft:rgba(226,196,92,.16);--green:#34d399;--line:rgba(160,220,200,.14)}
+html[data-theme="sand"]{--bg:#f6efe3;--card:#fffaf1;--text:#2c2416;--hint:#8c7d63;--link:#9a6b00;--gold:#c08a14;--gold-soft:rgba(192,138,20,.14);--line:rgba(80,60,20,.14)}
+html[data-theme="azure"]{--bg:#edf4ff;--card:#ffffff;--text:#0f2240;--hint:#6b7c99;--link:#2f6fe4;--gold:#2f7cf6;--gold-soft:rgba(47,124,246,.12);--on-gold:#ffffff;--line:rgba(30,60,120,.12)}
+
+/* place picker */
+.pmap{height:46vh;border-radius:18px;overflow:hidden;margin:10px 0;background:var(--card)}
+.top .place{cursor:pointer}
+.top .place::after{content:" ✏️";font-size:13px;opacity:.7}
+
+/* qibla themes */
+.compass.t-minimal .marker{border-top-color:var(--text)}
+.compass.t-minimal .hub{background:var(--text)}
+.compass.t-kaaba .hub{display:none}
+.compass.t-night .marker{border-top-color:#39ff88;filter:drop-shadow(0 0 6px #39ff88)}
+.compass.t-night .hub{background:#39ff88;box-shadow:0 0 12px #39ff88}
+.compass.t-night .glow{box-shadow:0 0 30px rgba(77,225,255,.25)}
+.center-chips{justify-content:center}
+
+/* tasbih */
+.dchips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.dchips::-webkit-scrollbar{display:none}
+.dchips .chip{flex:none;white-space:nowrap}
+.ringc,.beadsc{position:relative;display:block;width:min(72vw,260px);aspect-ratio:1;margin:16px auto;border-radius:50%}
+.ringc svg,.beadsc svg{width:100%;height:100%}
+.ringc .rb{fill:none;stroke:var(--line);stroke-width:14}
+.ringc .rf{fill:none;stroke:var(--gold);stroke-width:14;stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset .2s}
+.beadsc circle{fill:var(--line);transition:fill .15s}
+.beadsc circle.on{fill:var(--gold)}
+.ringc .in,.beadsc .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ringc .n,.beadsc .n{font-size:60px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
+.ringc .g,.beadsc .g{color:var(--hint);font-weight:700}
+.ringc:active,.beadsc:active{transform:scale(.97)}
+#dCustomIn{text-align:center}
+
+/* admin */
+.adgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.adgrid .card{margin:0}
+.adgrid b{display:block;font-size:22px;margin-top:2px;font-variant-numeric:tabular-nums}
+.adseg{overflow-x:auto}
+.adseg button{flex:none;padding:9px 12px}
+.chart{width:100%;height:110px;margin-top:10px;display:block}
+.donut{display:flex;gap:14px;align-items:center;margin-top:8px}
+.donut svg{width:120px;height:120px;flex:none}
+.donut > div{flex:1;min-width:0}
+.lg{display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0}
+.lg i{width:10px;height:10px;border-radius:3px;flex:none}
+.lg span:first-of-type{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hb{display:grid;grid-template-columns:minmax(0,1.3fr) 1fr auto;gap:8px;align-items:center;font-size:13px;margin-top:8px}
+.hb span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hb div{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.hb i{display:block;height:100%;background:var(--gold);border-radius:99px}
+.plist .p{display:flex;align-items:center;gap:12px;width:100%;text-align:start;padding:10px 4px;border-bottom:1px solid var(--line)}
+.av{width:42px;height:42px;border-radius:50%;background:var(--gold-soft);color:var(--gold);display:grid;place-items:center;font-weight:800;font-size:18px;flex:none}
+.av.big{width:72px;height:72px;font-size:30px;margin:0 auto}
+.plist .nm{flex:1;min-width:0}
+.plist .nm b,.plist .nm span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;margin:2px}
+.badge.g{background:var(--green-soft);color:var(--green)}
+.badge.r{background:rgba(230,92,92,.15);color:#e65c5c}
+.kv > div{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+.kv > div:last-child{border-bottom:0}
+.kv b{text-align:end}
+textarea.search{resize:vertical;min-height:80px;font:inherit}
+.bubble{background:var(--card);border-radius:18px 18px 18px 4px;padding:10px 12px;max-width:92%}
+.bubble img{width:100%;border-radius:12px;margin-bottom:8px;display:block}
+.bubble .bbtn{margin-top:8px;text-align:center;padding:9px;border-radius:10px;background:var(--gold-soft);color:var(--link);font-weight:700}
+.err{font-size:12px;padding:6px 0;border-bottom:1px solid var(--line);word-break:break-word}
+
 /* nav */
 nav{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:6px 6px calc(6px + var(--safe-bottom));border-top:1px solid var(--line);z-index:10}
 nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:12px;color:var(--hint);font-size:11px;font-weight:600}
@@ -260,6 +331,8 @@ nav button.on .i{filter:none;opacity:1}
     <div style="margin:14px 0" id="qEnableWrap"><button class="btn" id="qEnable"></button></div>
     <div class="qinfo"><div class="card"><span class="sub" id="qDegL">°</span><b id="qDeg"></b></div><div class="card"><span class="sub">🕋</span><b id="qDist" dir="auto"></b></div></div>
     <div class="sub center" style="margin-top:12px" id="qCalib"></div>
+    <div class="lbl center" id="qThemeL" style="margin-top:16px"></div>
+    <div class="chips center-chips" id="qThemes"></div>
   </section>
 
   <!-- CALENDAR -->
@@ -270,9 +343,14 @@ nav button.on .i{filter:none;opacity:1}
 
   <!-- TASBIH -->
   <section class="view" id="v-tasbih">
+    <div class="dchips" id="dChips"></div>
+    <div id="dCustom" hidden><input class="search" id="dCustomIn" maxlength="120" autocomplete="off"></div>
     <div class="dhikr"><div class="ar" id="dAr"></div><div class="tr" id="dTr"></div></div>
-    <button class="bead" id="bead"><div class="n" id="tCount">0</div><div class="g" id="tGoal"></div></button>
+    <div id="counter"></div>
+    <div class="lbl center" id="tGoalL"></div>
     <div class="goals" id="goals"></div>
+    <div class="lbl center" id="tStyleL"></div>
+    <div class="goals" id="tStyles"></div>
     <div class="row between card"><span class="muted" id="tTotalL"></span><b id="tTotal">0</b></div>
     <button class="btn ghost" id="tReset"></button>
   </section>
@@ -326,9 +404,9 @@ nav button.on .i{filter:none;opacity:1}
     <div class="card">
       <div class="lbl" id="stCityL"></div>
       <div class="cur" id="stCity"></div>
-      <div class="row" style="margin-top:10px"><input class="search" id="stCityQ" style="margin:0" autocomplete="off"><button class="chip on" id="stCityFind" style="flex:none"></button></div>
-      <div id="stCityRes"></div>
+      <button class="btn ghost" id="stCityChange" style="margin-top:10px;background:var(--bg)"></button>
     </div>
+    <div class="card"><div class="lbl" id="stThemeL"></div><div class="chips" id="stTheme"></div></div>
     <div class="card"><div class="lbl" id="stLangL"></div><div class="chips" id="stLang"></div></div>
     <div class="card"><div class="lbl" id="stMadhabL"></div><div class="chips" id="stMadhab"></div></div>
     <div class="card">
@@ -388,9 +466,30 @@ nav button.on .i{filter:none;opacity:1}
     <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
     <h1 id="ciTitle"></h1><div class="sub" id="ciHint"></div>
     <div class="row" style="margin-top:10px"><input class="search" id="ciQ" style="margin:0" autocomplete="off"><button class="chip on" id="ciFind" style="flex:none"></button></div>
+    <div class="share" style="margin-top:10px"><button class="btn ghost" id="ciNear"></button><button class="btn ghost" id="ciMap"></button></div>
     <div id="ciRes"></div>
     <h2 id="ciFavL"></h2>
     <div id="ciFavs"></div>
+  </section>
+
+  <section class="view" id="v-place">
+    <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
+    <h1 id="plTitle"></h1><div class="sub" id="plHint"></div>
+    <button class="btn" id="plAuto" style="margin-top:12px"></button>
+    <div class="row" style="margin-top:10px"><input class="search" id="plQ" style="margin:0" autocomplete="off"><button class="chip on" id="plFind" style="flex:none"></button></div>
+    <div class="pmap" id="plMap"></div>
+    <div class="found" id="plPick" hidden><b id="plName"></b><button class="chip on" id="plUse" style="flex:none"></button></div>
+  </section>
+
+  <section class="view" id="v-admin">
+    <h1>🛠 Админка</h1>
+    <div class="seg adseg" id="adSeg"><button data-ad="dash">📊 Обзор</button><button data-ad="users">👥 Люди</button><button data-ad="chats">📢 Чаты</button><button data-ad="bc">📣 Рассылка</button><button data-ad="sys">🩺 Система</button></div>
+    <div id="adBody" style="margin-top:10px"></div>
+  </section>
+
+  <section class="view" id="v-admuser">
+    <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
+    <div id="auBody"></div>
   </section>
 </div>
 
@@ -400,6 +499,7 @@ nav button.on .i{filter:none;opacity:1}
   <button data-tab="cal"><span class="i">📅</span><span data-l="t_cal"></span></button>
   <button data-tab="tasbih"><span class="i">📿</span><span data-l="t_tasbih"></span></button>
   <button data-tab="more"><span class="i">☰</span><span data-l="t_more"></span></button>
+  <button data-tab="admin" id="navAdmin" hidden><span class="i">🛠</span><span>Админ</span></button>
 </nav>
 
 <script>
@@ -652,6 +752,7 @@ function go(tab) {
   if (tab === "qibla") { startCompass(); if (target != null && !rafOn) { rafOn = true; requestAnimationFrame(frame); } }
   if (tab === "cal") renderCal();
   if (tab === "tasbih") renderTasbih();
+  if (tab === "admin") renderAdmin();
 }
 function openSub(name) {
   SUB = name; show(name);
@@ -659,7 +760,7 @@ function openSub(name) {
   ({tracker: renderTracker, ramadan: renderRamadan, mosques: openMosques, names: renderNames, settings: renderSettings,
     azkar: renderAzkar, duas: renderDuas, qada: renderQada, dates: renderDates, cities: renderCities})[name]?.();
 }
-function back() { if (SUB) go("more"); }
+function back() { if (SUB === "place") return returnFromPlace(); if (SUB === "admuser") return go("admin"); if (SUB) go("more"); }
 
 /* ───────── TODAY ───────── */
 function eventsAround() {
@@ -711,23 +812,6 @@ function distanceKm(lat, lon, lat2 = KAABA[0], lon2 = KAABA[1]) {
   const r = Math.PI / 180, dLa = (lat2 - lat) * r, dLo = (lon2 - lon) * r;
   const a = Math.sin(dLa / 2) ** 2 + Math.cos(lat * r) * Math.cos(lat2 * r) * Math.sin(dLo / 2) ** 2;
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-function buildDial() {
-  const c = 150, R = 136, parts = [];
-  parts.push(`<circle cx="${c}" cy="${c}" r="${R + 10}" fill="var(--card)"/>`);
-  parts.push(`<circle cx="${c}" cy="${c}" r="${R}" fill="none" stroke="#d4af37" stroke-width="3"/>`);
-  for (let a = 0; a < 360; a += 5) {
-    const big = a % 30 === 0, r1 = R - (big ? 16 : 8), rad = a * Math.PI / 180;
-    parts.push(`<line x1="${c + r1 * Math.sin(rad)}" y1="${c - r1 * Math.cos(rad)}" x2="${c + (R - 2) * Math.sin(rad)}" y2="${c - (R - 2) * Math.cos(rad)}" stroke="${big ? "var(--text)" : "var(--hint)"}" stroke-width="${big ? 2.5 : 1.2}" opacity="${big ? .9 : .6}"/>`);
-  }
-  [["N", 0, "#e65c5c"], ["E", 90], ["S", 180], ["W", 270]].forEach(([l, a, col]) => {
-    const rad = a * Math.PI / 180, r = R - 36;
-    parts.push(`<text x="${c + r * Math.sin(rad)}" y="${c - r * Math.cos(rad)}" text-anchor="middle" dominant-baseline="central" font-size="22" font-weight="800" fill="${col || "var(--text)"}" transform="rotate(${a} ${c + r * Math.sin(rad)} ${c - r * Math.cos(rad)})">${l}</text>`);
-  });
-  const q = QIBLA * Math.PI / 180, kx = c + (R - 2) * Math.sin(q), ky = c - (R - 2) * Math.cos(q);
-  parts.push(`<line x1="${c}" y1="${c}" x2="${c + (R - 40) * Math.sin(q)}" y2="${c - (R - 40) * Math.cos(q)}" stroke="#d4af37" stroke-width="6" stroke-linecap="round"/>`);
-  parts.push(`<g transform="translate(${kx} ${ky}) rotate(${QIBLA})"><rect x="-17" y="-17" width="34" height="34" rx="4" fill="#151515" stroke="#d4af37" stroke-width="3"/><rect x="-17" y="-9" width="34" height="6" fill="#d4af37"/></g>`);
-  $("dial").innerHTML = parts.join("");
 }
 /* One heading source only (mixing iPhone's compass with Telegram's made the dial jump between two values),
    and a single animation loop that eases the dial towards the latest reading. */
@@ -824,26 +908,6 @@ async function renderCal(y, m) {
   const el = $("calToday"); if (el) el.scrollIntoView({block: "center"});
 }
 function shiftMonth(n) { let y = CAL.y, m = CAL.m + n; if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; } haptic(); renderCal(y, m); }
-
-/* ───────── TASBIH ───────── */
-let TS = {c: 0, goal: 33, total: 0};
-async function loadTasbih() { const v = (await store.get(["tasbih"])).tasbih; try { if (v) TS = Object.assign(TS, JSON.parse(v)); } catch (e) {} }
-function renderTasbih() {
-  $("tCount").textContent = TS.c; $("tGoal").textContent = tr("s_goal", {n: TS.goal});
-  $("tTotal").textContent = TS.total.toLocaleString(); $("tTotalL").textContent = tr("s_total"); $("tReset").textContent = tr("s_reset");
-  const step = TS.goal >= 99 ? Math.min(2, Math.floor(Math.max(TS.c - 1, 0) / 33)) : 0;
-  $("dAr").textContent = DHIKR[step][0]; $("dTr").textContent = TS.c >= TS.goal ? tr("s_done") : DHIKR[step][1];
-  $("goals").innerHTML = [33, 99, 100].map(g => `<button class="${g === TS.goal ? "on" : ""}" data-g="${g}">${g}</button>`).join("");
-}
-let saveT = null;
-function saveTasbih() { clearTimeout(saveT); saveT = setTimeout(() => store.set("tasbih", JSON.stringify(TS)), 600); }
-function tapBead() {
-  if (TS.c >= TS.goal) TS.c = 0;
-  TS.c++; TS.total++;
-  if (TS.c === TS.goal) { try { tg?.HapticFeedback?.notificationOccurred("success"); } catch (e) {} }
-  else haptic(TS.c % 33 === 0 ? "heavy" : "light");
-  renderTasbih(); saveTasbih();
-}
 
 /* ───────── MORE ───────── */
 function renderMore() {
@@ -949,13 +1013,10 @@ async function findMosques(lat, lon) {
     }
     MAP.setView([lat, lon], 14); MLAYER.clearLayers();
     L_.circleMarker([lat, lon], {radius: 8, color: "#fff", weight: 3, fillColor: "#3b82f6", fillOpacity: 1}).addTo(MLAYER);
-    const q = `[out:json][timeout:20];nwr["amenity"="place_of_worship"]["religion"="muslim"](around:5000,${lat},${lon});out center 60;`;
-    const r = await fetch("https://overpass-api.de/api/interpreter", {method: "POST", body: "data=" + encodeURIComponent(q), headers: {"Content-Type": "application/x-www-form-urlencoded"}});
-    const j = await r.json();
-    const list = (j.elements || []).map(e => {
-      const la = e.lat ?? e.center?.lat, lo = e.lon ?? e.center?.lon, tags = e.tags || {};
-      return {la, lo, name: tags["name:" + LANG] || tags.name || tr("mo_noname"), d: distanceKm(lat, lon, la, lo)};
-    }).filter(x => x.la != null).sort((a, b) => a.d - b.d).slice(0, 40);
+    setTimeout(() => MAP.invalidateSize(), 200);
+    const j = await api(`/api/mosques?lat=${lat}&lon=${lon}`);
+    const list = (j.items || []).map(e => ({la: e.lat, lo: e.lon, name: (e.names && e.names[LANG]) || e.name || tr("mo_noname"), d: distanceKm(lat, lon, e.lat, e.lon)}))
+      .sort((a, b) => a.d - b.d).slice(0, 60);
     if (!list.length) { $("moList").innerHTML = `<div class="muted">${tr("mo_none")}</div>`; return; }
     const icon = L_.divIcon({html: '<div style="font-size:24px;line-height:24px">🕌</div>', className: "", iconSize: [24, 24], iconAnchor: [12, 12]});
     list.forEach((m, i) => { m.mk = L_.marker([m.la, m.lo], {icon}).addTo(MLAYER).bindPopup(esc(m.name)); });
@@ -965,20 +1026,11 @@ async function findMosques(lat, lon) {
     $("moList").querySelectorAll("button.go").forEach(b => b.onclick = () => openLink(`https://www.google.com/maps/dir/?api=1&destination=${b.dataset.la},${b.dataset.lo}`));
   } catch (e) { $("moList").innerHTML = `<div class="muted">${tr("mo_err")}</div>`; }
 }
-function nearMe() {
+async function nearMe() {
   haptic();
-  const fallback = () => findMosques(DATA.profile.lat, DATA.profile.lon);
-  const viaBrowser = () => navigator.geolocation ? navigator.geolocation.getCurrentPosition(p => findMosques(p.coords.latitude, p.coords.longitude), fallback, {enableHighAccuracy: true, timeout: 10000}) : fallback();
-  if (ver("8.0") && tg.LocationManager) {
-    try {
-      tg.LocationManager.init(() => {
-        if (!tg.LocationManager.isLocationAvailable) return viaBrowser();
-        tg.LocationManager.getLocation(loc => loc ? findMosques(loc.latitude, loc.longitude) : viaBrowser());
-      });
-      return;
-    } catch (e) {}
-  }
-  viaBrowser();
+  const loc = await getMyLocation();
+  if (!loc) { toast(tr("pl_err_loc")); return findMosques(DATA.profile.lat, DATA.profile.lon); }
+  findMosques(loc.lat, loc.lon);
 }
 function openLink(u) { try { tg.openLink(u); } catch (e) { window.open(u, "_blank"); } }
 const L_ = new Proxy({}, {get: (_, k) => window.L[k]});  // Leaflet
@@ -1141,7 +1193,7 @@ async function saveSetting(patch) {
 function renderSettings() {
   const p = DATA.profile;
   $("stTitle").textContent = tr("m_settings"); $("stCityL").textContent = tr("st_city"); $("stCity").textContent = "📍 " + p.city;
-  $("stCityQ").placeholder = tr("st_city_ph"); $("stCityFind").textContent = tr("st_find");
+  $("stCityChange").textContent = tr("pl_change"); renderThemePicker();
   $("stLangL").textContent = tr("st_lang"); $("stMadhabL").textContent = tr("st_madhab");
   $("stLeadL").textContent = tr("st_lead"); $("stAutoL").textContent = tr("st_auto"); $("stQuietL").textContent = tr("st_quiet");
   chips($("stLang"), [["en", "🇬🇧 English"], ["ru", "🇷🇺 Русский"], ["uz", "🇺🇿 Oʻzbekcha"], ["tg", "🇹🇯 Тоҷикӣ"], ["ar", "🇸🇦 العربية"]], LANG, v => saveSetting({lang: v}));
@@ -1153,21 +1205,6 @@ function renderSettings() {
   chips($("stQuiet"), (p.quiet_options || ["off"]).map(q => [q, q === "off" ? tr("st_quiet_off") : q.split("-").map(h => pad(h) + ":00").join("–")]), p.quiet, v => saveSetting({quiet: v}));
   sw($("stRam"), tr("st_ram"), p.ramadan, v => saveSetting({ramadan: v}));
 }
-async function findCity() {
-  const q = $("stCityQ").value.trim(); if (q.length < 2) return;
-  haptic(); $("stCityRes").innerHTML = `<div class="sub" style="margin-top:10px">${tr("loading")}</div>`;
-  try {
-    const r = await api("/api/geocode?q=" + encodeURIComponent(q));
-    if (!r.found) { $("stCityRes").innerHTML = `<div class="sub" style="margin-top:10px">${tr("st_nf")}</div>`; return; }
-    $("stCityRes").innerHTML = `<div class="found"><b>📍 ${esc(r.name)} ${r.flag}</b><button class="chip on" id="stCityUse">${tr("st_use")}</button></div>`;
-    $("stCityUse").onclick = async () => {
-      haptic();
-      try { await apiPost("/api/city", {name: r.name, lat: r.lat, lon: r.lon, cc: r.cc}); RAM = null; await load(true); $("stCityQ").value = ""; $("stCityRes").innerHTML = ""; toast(tr("st_saved")); renderSettings(); }
-      catch (e) { toast(tr("st_err")); }
-    };
-  } catch (e) { $("stCityRes").innerHTML = `<div class="sub" style="margin-top:10px">${tr("err")}</div>`; }
-}
-
 /* ───────── AZKAR ───────── */
 let AZ_MODE = null, AZ = {};
 const azKey = () => `az_${AZ_MODE}_${todayISO().replace(/-/g, "")}`;
@@ -1342,6 +1379,7 @@ let CI_FOUND = null;
 async function renderCities() {
   $("ciTitle").textContent = tr("m_cities"); $("ciHint").textContent = tr("ci_hint");
   $("ciQ").placeholder = tr("st_city_ph"); $("ciFind").textContent = tr("st_find"); $("ciFavL").textContent = tr("ci_favs");
+  $("ciNear").textContent = tr("ci_near"); $("ciMap").textContent = tr("ci_map");
   await loadFavs(); drawFavs();
 }
 async function drawFavs() {
@@ -1407,6 +1445,485 @@ function shiftTrMonth(n) {
   TRM = {y, m}; haptic(); drawTrackerStats();
 }
 
+
+/* ═══════════ stage 3: location picker, themes, mosques via bot, tasbih, qibla themes ═══════════ */
+const LX4 = {
+ en:{ts_cycle:"✨ 33·33·34",ts_custom:"✍️ My dhikr",ts_custom_ph:"Type your own dhikr",ts_goal:"Goal",ts_style:"Counter style",sty_bead:"Bead",sty_ring:"Ring",sty_beads:"Prayer beads",
+  q_theme:"Compass theme",qt_classic:"Classic",qt_minimal:"Minimal",qt_kaaba:"Kaaba",qt_night:"Night",
+  st_theme:"🎨 App theme",th_tg:"Like Telegram",th_night:"Night & gold",th_emerald:"Emerald",th_sand:"Sand",th_azure:"Azure",
+  pl_title:"Location",pl_hint:"Tap the map or drag the pin",pl_auto:"📍 Detect automatically",pl_err_loc:"Could not get your location. Allow location access or pick a place on the map.",pl_change:"📍 Change location",ci_near:"📍 Near me",ci_map:"🗺 On the map"},
+ ru:{ts_cycle:"✨ 33·33·34",ts_custom:"✍️ Свой зикр",ts_custom_ph:"Впишите свой зикр",ts_goal:"Цель",ts_style:"Вид счётчика",sty_bead:"Бусина",sty_ring:"Кольцо",sty_beads:"Чётки",
+  q_theme:"Тема компаса",qt_classic:"Классика",qt_minimal:"Минимал",qt_kaaba:"Кааба",qt_night:"Ночь",
+  st_theme:"🎨 Тема приложения",th_tg:"Как в Telegram",th_night:"Ночь и золото",th_emerald:"Изумрудная",th_sand:"Песочная",th_azure:"Лазурная",
+  pl_title:"Местоположение",pl_hint:"Нажмите на карту или передвиньте булавку",pl_auto:"📍 Определить автоматически",pl_err_loc:"Не удалось определить местоположение. Разрешите доступ к геопозиции или выберите место на карте.",pl_change:"📍 Изменить местоположение",ci_near:"📍 Рядом со мной",ci_map:"🗺 На карте"},
+ uz:{ts_cycle:"✨ 33·33·34",ts_custom:"✍️ O'z zikrim",ts_custom_ph:"O'z zikringizni yozing",ts_goal:"Maqsad",ts_style:"Hisoblagich ko'rinishi",sty_bead:"Munchoq",sty_ring:"Halqa",sty_beads:"Tasbeh donalari",
+  q_theme:"Kompas mavzusi",qt_classic:"Klassik",qt_minimal:"Minimal",qt_kaaba:"Ka'ba",qt_night:"Tun",
+  st_theme:"🎨 Ilova mavzusi",th_tg:"Telegramdagidek",th_night:"Tun va oltin",th_emerald:"Zumrad",th_sand:"Qumrang",th_azure:"Moviy",
+  pl_title:"Joylashuv",pl_hint:"Xaritani bosing yoki belgini suring",pl_auto:"📍 Avtomatik aniqlash",pl_err_loc:"Joylashuvni aniqlab bo'lmadi. Geolokatsiyaga ruxsat bering yoki xaritadan joy tanlang.",pl_change:"📍 Joylashuvni o'zgartirish",ci_near:"📍 Yonimda",ci_map:"🗺 Xaritada"},
+ tg:{ts_cycle:"✨ 33·33·34",ts_custom:"✍️ Зикри худам",ts_custom_ph:"Зикри худро нависед",ts_goal:"Ҳадаф",ts_style:"Намуди ҳисобкунак",sty_bead:"Мӯҳра",sty_ring:"Ҳалқа",sty_beads:"Тасбеҳ",
+  q_theme:"Мавзӯи компас",qt_classic:"Классикӣ",qt_minimal:"Минимал",qt_kaaba:"Каъба",qt_night:"Шаб",
+  st_theme:"🎨 Мавзӯи барнома",th_tg:"Мисли Telegram",th_night:"Шаб ва тилло",th_emerald:"Зумуррадӣ",th_sand:"Регӣ",th_azure:"Осмонӣ",
+  pl_title:"Ҷойгиршавӣ",pl_hint:"Харитаро пахш кунед ё аломатро кашед",pl_auto:"📍 Худкор муайян кардан",pl_err_loc:"Ҷойгиршавӣ муайян нашуд. Ба геолокатсия иҷозат диҳед ё ҷойро дар харита интихоб кунед.",pl_change:"📍 Иваз кардани ҷойгиршавӣ",ci_near:"📍 Наздики ман",ci_map:"🗺 Дар харита"},
+ ar:{ts_cycle:"✨ 33·33·34",ts_custom:"✍️ ذكري الخاص",ts_custom_ph:"اكتب ذكرك الخاص",ts_goal:"الهدف",ts_style:"شكل العدّاد",sty_bead:"خرزة",sty_ring:"حلقة",sty_beads:"مسبحة",
+  q_theme:"سمة البوصلة",qt_classic:"كلاسيكي",qt_minimal:"بسيط",qt_kaaba:"الكعبة",qt_night:"ليلي",
+  st_theme:"🎨 سمة التطبيق",th_tg:"مثل تيليجرام",th_night:"ليل وذهب",th_emerald:"زمردي",th_sand:"رملي",th_azure:"سماوي",
+  pl_title:"الموقع",pl_hint:"اضغط على الخريطة أو اسحب الدبوس",pl_auto:"📍 تحديد تلقائي",pl_err_loc:"تعذر تحديد موقعك. اسمح بالوصول إلى الموقع أو اختر مكاناً على الخريطة.",pl_change:"📍 تغيير الموقع",ci_near:"📍 بالقرب مني",ci_map:"🗺 على الخريطة"}
+};
+for (const l in LX4) Object.assign(LX[l], LX4[l]);
+
+/* ───────── location helpers ───────── */
+function getMyLocation() {
+  return new Promise(res => {
+    const browser = () => navigator.geolocation
+      ? navigator.geolocation.getCurrentPosition(p => res({lat: p.coords.latitude, lon: p.coords.longitude}), () => res(null), {enableHighAccuracy: true, timeout: 12000})
+      : res(null);
+    if (ver("8.0") && tg.LocationManager) {
+      try {
+        tg.LocationManager.init(() => {
+          if (!tg.LocationManager.isLocationAvailable) return browser();
+          tg.LocationManager.getLocation(l => l ? res({lat: l.latitude, lon: l.longitude}) : browser());
+        });
+        return;
+      } catch (e) {}
+    }
+    browser();
+  });
+}
+const OSM_TILES = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+const PIN = () => L_.divIcon({html: '<div style="font-size:34px;line-height:34px;transform:translateY(-6px)">📍</div>', className: "", iconSize: [34, 34], iconAnchor: [17, 34]});
+
+/* ───────── PLACE PICKER (auto / map / search) ───────── */
+let PLACE = null, PMAP = null, PMARK = null, placeTimer = null;
+async function openPlace(mode, ret) {
+  PLACE = {mode, ret: ret || {tab: TAB, sub: SUB}, lat: null, lon: null, name: null, cc: "", flag: ""};
+  SUB = "place"; show("place");
+  try { tg?.BackButton?.show(); } catch (e) {}
+  $("plTitle").textContent = tr("pl_title"); $("plHint").textContent = tr("pl_hint"); $("plAuto").textContent = tr("pl_auto");
+  $("plQ").placeholder = tr("st_city_ph"); $("plFind").textContent = tr("st_find"); $("plUse").textContent = tr("st_use");
+  $("plPick").hidden = true; $("plQ").value = "";
+  try {
+    await loadLeaflet();
+    if (!PMAP) {
+      PMAP = L_.map("plMap", {zoomControl: true, attributionControl: true});
+      L_.tileLayer(OSM_TILES, {maxZoom: 19, attribution: "© OpenStreetMap"}).addTo(PMAP);
+      PMARK = L_.marker([0, 0], {draggable: true, icon: PIN()}).addTo(PMAP);
+      PMAP.on("click", e => setPlace(e.latlng.lat, e.latlng.lng));
+      PMARK.on("dragend", () => { const p = PMARK.getLatLng(); setPlace(p.lat, p.lng); });
+    }
+    const p = DATA.profile;
+    PMAP.setView([p.lat, p.lon], 11); PMARK.setLatLng([p.lat, p.lon]);
+    setTimeout(() => PMAP.invalidateSize(), 250);
+  } catch (e) { $("plMap").innerHTML = `<div class="muted" style="padding:20px">${tr("mo_err")}</div>`; }
+}
+function setPlace(lat, lon, name, cc, flagS) {
+  PLACE.lat = lat; PLACE.lon = lon;
+  if (PMARK) PMARK.setLatLng([lat, lon]);
+  $("plPick").hidden = false;
+  if (name) { PLACE.name = name; PLACE.cc = cc || ""; PLACE.flag = flagS || ""; $("plName").textContent = `📍 ${name} ${flagS || ""}`; return; }
+  PLACE.name = null; $("plName").textContent = tr("loading");
+  clearTimeout(placeTimer);
+  placeTimer = setTimeout(async () => {
+    try {
+      const r = await api(`/api/reverse?lat=${lat}&lon=${lon}`);
+      if (PLACE.lat !== lat) return;
+      PLACE.name = r.name; PLACE.cc = r.cc; PLACE.flag = r.flag; $("plName").textContent = `📍 ${r.name} ${r.flag}`;
+    } catch (e) { PLACE.name = `${lat.toFixed(3)}, ${lon.toFixed(3)}`; $("plName").textContent = "📍 " + PLACE.name; }
+  }, 450);
+}
+async function placeAuto() {
+  haptic(); $("plAuto").disabled = true;
+  const loc = await getMyLocation();
+  $("plAuto").disabled = false;
+  if (!loc) return toast(tr("pl_err_loc"));
+  if (PMAP) PMAP.setView([loc.lat, loc.lon], 14);
+  setPlace(loc.lat, loc.lon);
+}
+async function placeFind() {
+  const q = $("plQ").value.trim(); if (q.length < 2) return;
+  haptic();
+  try {
+    const r = await api("/api/geocode?q=" + encodeURIComponent(q));
+    if (!r.found) return toast(tr("st_nf"));
+    if (PMAP) PMAP.setView([r.lat, r.lon], 12);
+    setPlace(r.lat, r.lon, r.name, r.cc, r.flag);
+  } catch (e) { toast(tr("err")); }
+}
+async function placeUse() {
+  if (PLACE.lat == null || !PLACE.name) return;
+  haptic();
+  if (PLACE.mode === "home") {
+    try {
+      await apiPost("/api/city", {name: PLACE.name, lat: PLACE.lat, lon: PLACE.lon, cc: PLACE.cc});
+      RAM = null; await load(true); toast(tr("st_saved")); returnFromPlace();
+    } catch (e) { toast(tr("st_err")); }
+  } else {
+    const p = Object.assign({}, PLACE); returnFromPlace(); showOtherAt(p.lat, p.lon, p.name, p.cc, p.flag);
+  }
+}
+function returnFromPlace() {
+  const r = (PLACE && PLACE.ret) || {tab: "today"};
+  if (r.sub) { go(r.tab || "more"); openSub(r.sub); } else go(r.tab || "today");
+}
+
+/* ───────── OTHER CITIES: near me / on the map ───────── */
+async function showOtherAt(lat, lon, name, cc, flagS) {
+  $("ciRes").innerHTML = `<div class="sub" style="padding:6px 2px">${tr("loading")}</div>`;
+  try {
+    if (!name) { const g = await api(`/api/reverse?lat=${lat}&lon=${lon}`); name = g.name; cc = g.cc; flagS = g.flag; }
+    const r = await api(`/api/city_times?lat=${lat}&lon=${lon}&cc=${cc || ""}`);
+    CI_FOUND = {name, lat, lon, cc, flag: flagS};
+    $("ciRes").innerHTML = cityCard(CI_FOUND, r, FAVS.some(f => favKey(f) === favKey(CI_FOUND)));
+  } catch (e) { $("ciRes").innerHTML = `<div class="sub" style="padding:6px 2px">${tr("err")}</div>`; }
+}
+async function citiesNear() {
+  haptic(); const loc = await getMyLocation();
+  if (!loc) return toast(tr("pl_err_loc"));
+  showOtherAt(loc.lat, loc.lon);
+}
+
+/* ───────── APP THEMES ───────── */
+const APP_THEMES = ["tg", "night", "emerald", "sand", "azure"];
+let APP_THEME = "tg";
+function applyTheme(th) {
+  APP_THEME = APP_THEMES.includes(th) ? th : "tg";
+  if (APP_THEME === "tg") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", APP_THEME);
+  try {
+    if (APP_THEME === "tg") { tg.setHeaderColor("bg_color"); tg.setBackgroundColor("bg_color"); }
+    else {
+      const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+      if (/^#[0-9a-f]{6}$/i.test(bg)) { tg.setHeaderColor(bg); tg.setBackgroundColor(bg); if (ver("7.10")) tg.setBottomBarColor(bg); }
+    }
+  } catch (e) {}
+}
+function renderThemePicker() {
+  $("stThemeL").textContent = tr("st_theme");
+  chips($("stTheme"), APP_THEMES.map(k => [k, tr("th_" + k)]), APP_THEME, v => { applyTheme(v); store.set("app_theme", v); renderThemePicker(); });
+}
+
+/* ───────── QIBLA THEMES ───────── */
+const QTHEMES = ["classic", "minimal", "kaaba", "night"];
+let QTHEME = "classic";
+const QPAL = {
+  classic: {face: "var(--card)", ring: "var(--gold)", ringW: 3, big: "var(--text)", small: "var(--hint)", n: "#e65c5c", letter: "var(--text)", arrow: "var(--gold)", arrowW: 6},
+  minimal: {face: "none", ring: "var(--line)", ringW: 1.5, big: "var(--hint)", small: null, n: "#e65c5c", letter: "var(--hint)", arrow: "var(--text)", arrowW: 9},
+  kaaba: {face: "var(--card)", ring: "var(--gold)", ringW: 2, big: "var(--hint)", small: "var(--line)", n: "#e65c5c", letter: "var(--hint)", arrow: "var(--gold)", arrowW: 5, center: true},
+  night: {face: "#060a14", ring: "#4de1ff", ringW: 2.5, big: "#4de1ff", small: "#1f6f86", n: "#ff4fd8", letter: "#bdf6ff", arrow: "#39ff88", arrowW: 6, glow: true}
+};
+function buildDial() {
+  const P = QPAL[QTHEME] || QPAL.classic, c = 150, R = 136, parts = [];
+  const f = P.glow ? ' filter="url(#qglow)"' : "";
+  if (P.glow) parts.push(`<defs><filter id="qglow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`);
+  if (P.face !== "none") parts.push(`<circle cx="${c}" cy="${c}" r="${R + 10}" fill="${P.face}"/>`);
+  parts.push(`<circle cx="${c}" cy="${c}" r="${R}" fill="none" stroke="${P.ring}" stroke-width="${P.ringW}"${f}/>`);
+  for (let a = 0; a < 360; a += 5) {
+    const big = a % 30 === 0;
+    if (!big && !P.small) continue;
+    const r1 = R - (big ? 16 : 8), rad = a * Math.PI / 180;
+    parts.push(`<line x1="${c + r1 * Math.sin(rad)}" y1="${c - r1 * Math.cos(rad)}" x2="${c + (R - 2) * Math.sin(rad)}" y2="${c - (R - 2) * Math.cos(rad)}" stroke="${big ? P.big : P.small}" stroke-width="${big ? 2.5 : 1.2}"${big ? f : ""}/>`);
+  }
+  [["N", 0], ["E", 90], ["S", 180], ["W", 270]].forEach(([l, a]) => {
+    const rad = a * Math.PI / 180, r = R - 36, x = c + r * Math.sin(rad), y = c - r * Math.cos(rad);
+    parts.push(`<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="${QTHEME === "minimal" ? 16 : 22}" font-weight="800" fill="${l === "N" ? P.n : P.letter}" transform="rotate(${a} ${x} ${y})"${f}>${l}</text>`);
+  });
+  const q = QIBLA * Math.PI / 180, ex = c + (R - 40) * Math.sin(q), ey = c - (R - 40) * Math.cos(q);
+  const sx = P.center ? c + 46 * Math.sin(q) : c, sy = P.center ? c - 46 * Math.cos(q) : c;
+  parts.push(`<line x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" stroke="${P.arrow}" stroke-width="${P.arrowW}" stroke-linecap="round"${f}/>`);
+  const kx = c + (R - 2) * Math.sin(q), ky = c - (R - 2) * Math.cos(q), ks = QTHEME === "minimal" ? 11 : 17;
+  if (P.center) {
+    parts.push(`<g transform="translate(${c} ${c}) rotate(${QIBLA})"><rect x="-34" y="-34" width="68" height="68" rx="6" fill="#151515" stroke="var(--gold)" stroke-width="3"/><rect x="-34" y="-18" width="68" height="10" fill="var(--gold)"/><rect x="-8" y="10" width="16" height="24" rx="3" fill="var(--gold)" opacity=".85"/></g>`);
+    parts.push(`<circle cx="${kx}" cy="${ky}" r="9" fill="var(--gold)"/>`);
+  } else {
+    parts.push(`<g transform="translate(${kx} ${ky}) rotate(${QIBLA})"${f}><rect x="-${ks}" y="-${ks}" width="${ks * 2}" height="${ks * 2}" rx="4" fill="${P.glow ? "#060a14" : "#151515"}" stroke="${P.glow ? "#39ff88" : "var(--gold)"}" stroke-width="3"/><rect x="-${ks}" y="-${Math.round(ks / 2)}" width="${ks * 2}" height="${Math.max(3, Math.round(ks / 3))}" fill="${P.glow ? "#39ff88" : "var(--gold)"}"/></g>`);
+  }
+  $("dial").innerHTML = parts.join("");
+  $("compass").className = "compass t-" + QTHEME + (lastOk ? " ok" : "");
+  chips($("qThemes"), QTHEMES.map(k => [k, tr("qt_" + k)]), QTHEME, v => { QTHEME = v; store.set("qibla_theme", v); buildDial(); });
+  $("qThemeL").textContent = tr("q_theme");
+}
+
+/* ───────── TASBIH: many dhikrs, own dhikr, goals, three styles ───────── */
+const DHIKRS = [
+  {id: "cycle"},
+  {id: "astaghfir", ar: "أَسْتَغْفِرُ اللَّهَ", tl: "Astaghfirullah"},
+  {id: "tahlil", ar: "لَا إِلَهَ إِلَّا اللَّهُ", tl: "La ilaha illallah"},
+  {id: "salawat", ar: "اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ", tl: "Allahumma salli 'ala Muhammad"},
+  {id: "hawqala", ar: "لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ", tl: "La hawla wa la quwwata illa billah"},
+  {id: "subhan", ar: "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ", tl: "SubhanAllahi wa bihamdih"},
+  {id: "custom"}
+];
+const GOALS = [33, 99, 100, 1000], STYLES = ["bead", "ring", "beads"];
+let TS = {sel: "cycle", goal: 33, style: "bead", custom: "", data: {}};
+async function loadTasbih() {
+  const v = await store.get(["tasbih2", "tasbih"]);
+  try {
+    if (v.tasbih2) TS = Object.assign(TS, JSON.parse(v.tasbih2));
+    else if (v.tasbih) { const o = JSON.parse(v.tasbih); TS.goal = GOALS.includes(o.goal) ? o.goal : 33; TS.data.cycle = {c: o.c || 0, total: o.total || 0}; }
+  } catch (e) {}
+}
+const tsCur = () => (TS.data[TS.sel] = TS.data[TS.sel] || {c: 0, total: 0});
+let saveT = null;
+function saveTasbih() { clearTimeout(saveT); saveT = setTimeout(() => store.set("tasbih2", JSON.stringify(TS)), 500); }
+function counterHTML(c) {
+  const g = tr("s_goal", {n: TS.goal}), p = Math.min(1, c.c / TS.goal);
+  if (TS.style === "ring") {
+    const C = 2 * Math.PI * 88;
+    return `<button class="ringc" id="tapper"><svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="88" class="rb"/><circle cx="100" cy="100" r="88" class="rf" style="stroke-dasharray:${C};stroke-dashoffset:${C * (1 - p)}"/></svg><div class="in"><div class="n">${c.c}</div><div class="g">${g}</div></div></button>`;
+  }
+  if (TS.style === "beads") {
+    const n = 33, filled = c.c === 0 ? 0 : (c.c % n === 0 ? n : c.c % n), R = 92, beads = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * 2 * Math.PI - Math.PI / 2, x = 110 + R * Math.cos(a), y = 110 + R * Math.sin(a);
+      beads.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${i === filled - 1 ? 9 : 7.2}" class="${i < filled ? "on" : ""}"/>`);
+    }
+    return `<button class="beadsc" id="tapper"><svg viewBox="0 0 220 220">${beads.join("")}</svg><div class="in"><div class="n">${c.c}</div><div class="g">${g}</div></div></button>`;
+  }
+  return `<button class="bead" id="tapper"><div class="n">${c.c}</div><div class="g">${g}</div></button>`;
+}
+function renderTasbih() {
+  const d = DHIKRS.find(x => x.id === TS.sel) || DHIKRS[0], c = tsCur();
+  $("dChips").innerHTML = DHIKRS.map(x => `<button class="chip ${x.id === TS.sel ? "on" : ""}" data-dz="${x.id}">${esc(x.id === "cycle" ? tr("ts_cycle") : x.id === "custom" ? tr("ts_custom") : x.tl)}</button>`).join("");
+  $("dCustom").hidden = TS.sel !== "custom";
+  $("dCustomIn").placeholder = tr("ts_custom_ph");
+  if (document.activeElement !== $("dCustomIn")) $("dCustomIn").value = TS.custom || "";
+  let ar, sub;
+  if (d.id === "cycle") {
+    const step = TS.goal >= 99 ? Math.min(2, Math.floor(Math.max(c.c - 1, 0) / 33)) : 0;
+    ar = DHIKR[step][0]; sub = DHIKR[step][1];
+  } else if (d.id === "custom") { ar = TS.custom || "…"; sub = ""; }
+  else { ar = d.ar; sub = d.tl; }
+  $("dAr").textContent = ar; $("dTr").textContent = c.c >= TS.goal ? tr("s_done") : sub;
+  $("counter").innerHTML = counterHTML(c);
+  $("tGoalL").textContent = tr("ts_goal"); $("tStyleL").textContent = tr("ts_style");
+  $("goals").innerHTML = GOALS.map(g => `<button class="${g === TS.goal ? "on" : ""}" data-g="${g}">${g}</button>`).join("");
+  $("tStyles").innerHTML = STYLES.map(s => `<button class="${s === TS.style ? "on" : ""}" data-st="${s}">${tr("sty_" + s)}</button>`).join("");
+  $("tTotal").textContent = c.total.toLocaleString(); $("tTotalL").textContent = tr("s_total"); $("tReset").textContent = tr("s_reset");
+}
+function tapBead() {
+  const c = tsCur();
+  if (c.c >= TS.goal) c.c = 0;
+  c.c++; c.total++;
+  if (c.c === TS.goal) { try { tg?.HapticFeedback?.notificationOccurred("success"); } catch (e) {} }
+  else haptic(c.c % 33 === 0 ? "heavy" : "light");
+  renderTasbih(); saveTasbih();
+}
+
+/* ═══════════ ADMIN (admins only; every call is checked on the server too) ═══════════ */
+let AD_TAB = "dash";
+const AD = {people: {users: {q: "", filter: "all", page: 0, items: [], total: 0}, chats: {q: "", filter: "all", page: 0, items: [], total: 0}},
+            bc: {kind: "all", value: "ru", photo: null, count: null}};
+const COLORS = ["#d4af37", "#22a37a", "#3b82f6", "#e65c5c", "#a855f7", "#f97316", "#14b8a6", "#64748b"];
+function ago(iso) {
+  if (!iso) return "—";
+  const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
+  if (m < 1) return "только что"; if (m < 60) return `${m} мин назад`;
+  const h = Math.round(m / 60); if (h < 24) return `${h} ч назад`;
+  const d = Math.round(h / 24); return d < 60 ? `${d} дн. назад` : new Date(iso).toLocaleDateString("ru-RU");
+}
+const fdate = iso => iso ? new Date(iso).toLocaleString("ru-RU", {day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"}) : "—";
+const shortD = d => d.slice(8, 10) + "." + d.slice(5, 7);
+async function apiAdmin(path, body) {
+  return body === undefined ? api(path) : apiPost(path, body);
+}
+function renderAdmin() {
+  document.querySelectorAll("#adSeg button").forEach(b => b.classList.toggle("on", b.dataset.ad === AD_TAB));
+  ({dash: adDash, users: () => adPeople("users"), chats: () => adPeople("chats"), bc: adBc, sys: adSys})[AD_TAB]();
+}
+const adBody = html => { $("adBody").innerHTML = html; };
+const adLoading = () => adBody(`<div class="muted" style="padding:24px 4px">Загрузка…</div>`);
+
+/* ── dashboard ── */
+function barChart(title, s, color) {
+  const W = 340, H = 110, n = s.length, max = Math.max(1, ...s.map(x => x.c)), bw = W / n, total = s.reduce((a, x) => a + x.c, 0);
+  const bars = s.map((x, i) => { const h = Math.max(x.c ? 3 : 1, Math.round((H - 12) * x.c / max)); return `<rect x="${(i * bw + 1).toFixed(1)}" y="${H - h}" width="${(bw - 2).toFixed(1)}" height="${h}" rx="2" fill="${x.c ? color : "var(--line)"}" opacity="${i === n - 1 ? 1 : .8}"/>`; }).join("");
+  return `<div class="card"><div class="row between"><b>${title}</b><span class="sub">30 дн: <b>${total}</b> · сегодня <b>${s[n - 1].c}</b></span></div>
+    <svg viewBox="0 0 ${W} ${H}" class="chart" preserveAspectRatio="none">${bars}</svg>
+    <div class="row between sub"><span>${shortD(s[0].d)}</span><span>макс. ${max}</span><span>${shortD(s[n - 1].d)}</span></div></div>`;
+}
+function donut(title, items) {
+  const total = items.reduce((a, x) => a + x.c, 0) || 1, C = 2 * Math.PI * 40;
+  let off = 0;
+  const arcs = items.map((x, i) => { const len = C * x.c / total, s = `<circle cx="60" cy="60" r="40" fill="none" stroke="${COLORS[i % COLORS.length]}" stroke-width="18" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 60 60)"/>`; off += len; return s; }).join("");
+  const legend = items.map((x, i) => `<div class="lg"><i style="background:${COLORS[i % COLORS.length]}"></i><span>${esc(x.label)}</span><b>${x.c}</b><span class="sub">${Math.round(100 * x.c / total)}%</span></div>`).join("");
+  return `<div class="card"><b>${title}</b><div class="donut"><svg viewBox="0 0 120 120">${items.length ? arcs : `<circle cx="60" cy="60" r="40" fill="none" stroke="var(--line)" stroke-width="18"/>`}<text x="60" y="60" text-anchor="middle" dominant-baseline="central" font-size="18" font-weight="800" fill="var(--text)">${items.length ? total : 0}</text></svg><div>${legend || '<div class="sub">нет данных</div>'}</div></div></div>`;
+}
+function hbars(title, items) {
+  const max = Math.max(1, ...items.map(x => x.c));
+  return `<div class="card"><b>${title}</b>${items.map(x => `<div class="hb"><span>${esc(x.label)}</span><div><i style="width:${Math.round(100 * x.c / max)}%"></i></div><b>${x.c}</b></div>`).join("") || '<div class="sub" style="margin-top:6px">нет данных</div>'}</div>`;
+}
+async function adDash() {
+  adLoading();
+  let s; try { s = await apiAdmin("/api/admin/summary"); } catch (e) { return adBody(`<div class="muted">Не удалось загрузить</div>`); }
+  const u = s.users, ch = s.chats;
+  const tiles = [["👥", "Пользователей", u.total], ["👁", "Активны 7 дн", u.active_week], ["🔔", "С напоминаниями", u.reminders], ["🆕", "Новых сегодня", u.new_today],
+    ["📈", "Новых за 7 дн", u.new_week], ["✅", "Настроили бота", u.setup], ["👥", "Групп", ch.groups], ["📢", "Каналов", ch.channels], ["👤", "Участников в них", ch.members],
+    ["📩", "Поддержка сегодня", s.today.support], ["📬", "Напоминаний сегодня", s.today.sent], ["🚫", "В бане", u.banned], ["🧱", "Заблокировали бота", u.blocked]];
+  adBody(`<div class="adgrid">${tiles.map(([i, l, v]) => `<div class="card"><div class="sub">${i} ${l}</div><b>${(v || 0).toLocaleString("ru-RU")}</b></div>`).join("")}</div>
+    ${barChart("🆕 Новые пользователи", s.new, "#d4af37")}
+    ${barChart("👁 Активные пользователи", s.active, "#22a37a")}
+    ${barChart("📬 Отправлено напоминаний", s.reminders, "#3b82f6")}
+    ${donut("🌐 Языки", s.langs)}
+    ${donut("🕌 Мазхабы", s.madhabs)}
+    ${hbars("📍 Города (топ-10)", s.cities)}
+    ${hbars("🌍 Страны (топ-10)", s.countries)}
+    <button class="btn ghost" data-adref="1">🔄 Обновить</button>`);
+}
+
+/* ── people & chats ── */
+let peopleT = null;
+async function adPeople(kind, more) {
+  const st = AD.people[kind];
+  if (!more) { st.page = 0; st.items = []; }
+  if (!more || !$("adList")) {
+    const filters = kind === "users" ? [["all", "Все"], ["active", "Активные"], ["banned", "В бане"], ["blocked", "Заблокировали"]] : [["all", "Все"], ["blocked", "Бот удалён"]];
+    adBody(`<input class="search" id="adQ" placeholder="${kind === "users" ? "Имя, @username, ID или город" : "Название, ID или город"}" value="${esc(st.q)}" autocomplete="off">
+      <div class="chips" id="adF" style="margin:4px 0 10px">${filters.map(([k, l]) => `<button class="chip ${k === st.filter ? "on" : ""}" data-f="${k}">${l}</button>`).join("")}</div>
+      <div class="sub" id="adTotal"></div><div class="plist" id="adList"></div><div id="adMore"></div>`);
+    $("adQ").oninput = e => { st.q = e.target.value; clearTimeout(peopleT); peopleT = setTimeout(() => adPeople(kind), 400); };
+    $("adF").querySelectorAll("[data-f]").forEach(b => b.onclick = () => { haptic(); st.filter = b.dataset.f; adPeople(kind); });
+  }
+  let r;
+  try { r = await apiAdmin(`/api/admin/people?kind=${kind}&filter=${st.filter}&page=${st.page}&q=${encodeURIComponent(st.q)}`); }
+  catch (e) { $("adList").innerHTML = `<div class="muted">Не удалось загрузить</div>`; return; }
+  st.items = st.items.concat(r.items); st.total = r.total;
+  $("adTotal").textContent = `Найдено: ${r.total}`;
+  $("adList").innerHTML = st.items.map(p => {
+    const name = p.type === "private" ? (p.name || (p.username ? "@" + p.username : p.id)) : (p.title || p.id);
+    const icon = p.type === "private" ? (p.name || "?").trim().charAt(0).toUpperCase() || "?" : (p.type === "group" ? "👥" : "📢");
+    const line2 = p.type === "private" ? [p.username ? "@" + p.username : null, p.city ? `${p.flag} ${p.city.split(",")[0]}` : null].filter(Boolean).join(" · ")
+      : [p.members ? `${p.members} уч.` : null, p.city ? `${p.flag} ${p.city.split(",")[0]}` : null].filter(Boolean).join(" · ");
+    return `<button class="p" data-person="${p.id}"><div class="av">${esc(icon)}</div><div class="nm"><b>${esc(name)}${p.banned ? " 🚫" : ""}${p.blocked ? " 🧱" : ""}</b><span class="sub">${esc(line2 || "—")}</span></div><span class="sub">${ago(p.last_seen)}</span></button>`;
+  }).join("") || `<div class="muted" style="padding:10px 2px">Ничего не найдено</div>`;
+  $("adMore").innerHTML = st.items.length < r.total ? `<button class="btn ghost" id="adMoreBtn">Показать ещё</button>` : "";
+  if ($("adMoreBtn")) $("adMoreBtn").onclick = () => { st.page++; adPeople(kind, true); };
+}
+async function openAdmUser(id) {
+  SUB = "admuser"; show("admuser");
+  try { tg?.BackButton?.show(); } catch (e) {}
+  $("auBody").innerHTML = `<div class="muted" style="padding:24px 4px">Загрузка…</div>`;
+  let p; try { p = (await apiAdmin(`/api/admin/person?id=${id}`)).person; } catch (e) { $("auBody").innerHTML = `<div class="muted">Не найдено</div>`; return; }
+  const priv = p.type === "private";
+  const rows = (priv ? [] : [["🏷 Тип", p.type === "group" ? "Группа" : "Канал"], ["👤 Участников", p.members || "—"], ["📅 Расписание на день", p.daily]])
+    .concat([["🌐 Язык", p.lang_label], ["🕌 Мазхаб", p.madhab], ["📍 Город", `${p.city || "—"} ${p.flag}`], ["🕒 Часовой пояс", p.tz || "—"], ["🔔 Напоминания", p.reminders],
+      ["🔕 Тихие часы", p.quiet], ["🔄 Автообновление", p.auto], ["🌙 Рамадан", p.ramadan ? "вкл" : "выкл"]])
+    .concat(priv ? [["📢 Добавил каналов", p.owned_channels], ["👥 Добавил групп", p.owned_groups]] : [])
+    .concat([["📅 С нами с", fdate(p.created)], ["👁 Был(а)", `${fdate(p.last_seen)} (${ago(p.last_seen)})`]]);
+  const badges = [p.is_admin ? `<span class="badge g">🛠 Админ</span>` : "", p.banned ? `<span class="badge r">🚫 В бане</span>` : "", p.blocked ? `<span class="badge r">🧱 ${priv ? "Заблокировал бота" : "Бот удалён"}</span>` : "", !p.banned && !p.blocked ? `<span class="badge g">✅ Активен</span>` : ""].join("");
+  $("auBody").innerHTML = `<div class="card center"><div class="av big">${priv ? esc((p.name || "?").charAt(0).toUpperCase()) : (p.type === "group" ? "👥" : "📢")}</div>
+      <h1 style="margin:8px 0 2px">${esc(priv ? (p.name || "Без имени") : (p.title || "—"))}</h1>
+      <div class="sub">${p.username ? "@" + esc(p.username) + " · " : ""}ID <span dir="ltr">${p.id}</span></div><div style="margin-top:8px">${badges}</div></div>
+    <div class="card kv">${rows.map(([k, v]) => `<div><span class="sub">${k}</span><b>${esc(v)}</b></div>`).join("")}</div>
+    ${!priv && p.owner ? `<button class="btn ghost" data-person="${p.owner.id}">🙋 Добавил: ${esc(p.owner.name || p.owner.username || p.owner.id)}</button>` : ""}
+    ${priv && !p.is_admin ? `<div class="card"><b>✉️ Написать</b><textarea class="search" id="auMsg" rows="3" placeholder="Сообщение придёт от бота. **жирный**, __курсив__" style="margin-top:8px"></textarea>
+      <button class="btn" id="auSend">Отправить</button></div>
+      <button class="btn ghost" id="auBan" style="margin-top:10px">${p.banned ? "✅ Разбанить" : "🚫 Забанить"}</button>` : ""}
+    ${p.username ? `<button class="btn ghost" id="auOpen" style="margin-top:10px">💬 Открыть в Telegram</button>` : ""}`;
+  if ($("auSend")) $("auSend").onclick = async () => {
+    const text = $("auMsg").value.trim(); if (!text) return;
+    haptic(); $("auSend").disabled = true;
+    try { const r = await apiAdmin("/api/admin/message", {id: p.id, text}); toast(r.ok ? "Отправлено ✓" : (r.error === "blocked" ? "Пользователь заблокировал бота" : "Не удалось отправить")); if (r.ok) $("auMsg").value = ""; }
+    catch (e) { toast("Не удалось отправить"); }
+    $("auSend").disabled = false;
+  };
+  if ($("auBan")) $("auBan").onclick = () => confirmBox(p.banned ? "Разбанить пользователя?" : "Забанить пользователя? Бот перестанет ему отвечать.", async () => {
+    try { await apiAdmin("/api/admin/ban", {id: p.id, ban: !p.banned}); toast(p.banned ? "Разбанен ✓" : "Забанен ✓"); openAdmUser(p.id); } catch (e) { toast("Ошибка"); }
+  });
+  if ($("auOpen")) $("auOpen").onclick = () => { try { tg.openTelegramLink("https://t.me/" + p.username); } catch (e) { openLink("https://t.me/" + p.username); } };
+}
+function confirmBox(text, ok) {
+  try { if (ver("6.2")) return tg.showConfirm(text, yes => { if (yes) ok(); }); } catch (e) {}
+  if (window.confirm(text)) ok();
+}
+
+/* ── broadcast ── */
+let bcCountT = null;
+function adBc() {
+  const b = AD.bc;
+  adBody(`<div class="card"><b>📝 Текст</b><textarea class="search" id="bcText" rows="5" placeholder="Текст рассылки. **жирный**, __курсив__" style="margin-top:8px">${esc(b.text || "")}</textarea>
+      <label class="btn ghost" style="margin-top:4px">🖼 ${b.photo ? "Заменить фото" : "Добавить фото"}<input type="file" id="bcPhoto" accept="image/*" hidden></label>
+      ${b.photo ? `<button class="chip" id="bcPhotoRm" style="margin-top:8px">✕ Убрать фото</button>` : ""}</div>
+    <div class="card"><b>🔘 Кнопка-ссылка (необязательно)</b>
+      <input class="search" id="bcBtnT" placeholder="Текст кнопки" value="${esc(b.btnT || "")}" style="margin-top:8px"><input class="search" id="bcBtnU" placeholder="https://…" value="${esc(b.btnU || "")}" inputmode="url"></div>
+    <div class="card"><b>👥 Кому</b><div class="chips" id="bcKind" style="margin-top:8px">${[["all", "Всем пользователям"], ["lang", "По языку"], ["country", "По стране"], ["everything", "+ группы и каналы"]].map(([k, l]) => `<button class="chip ${k === b.kind ? "on" : ""}" data-k="${k}">${l}</button>`).join("")}</div>
+      ${b.kind === "lang" ? `<div class="chips" id="bcLang" style="margin-top:8px">${["en", "ru", "uz", "tg", "ar"].map(l => `<button class="chip ${l === b.value ? "on" : ""}" data-l2="${l}">${LANG_LABEL[l]}</button>`).join("")}</div>` : ""}
+      ${b.kind === "country" ? `<input class="search" id="bcCountry" maxlength="2" placeholder="Код страны: uz, ru, tj…" value="${esc(b.kind === "country" ? (b.value.length === 2 ? b.value : "") : "")}" style="margin-top:8px">` : ""}
+      <div class="sub" id="bcCount" style="margin-top:8px">…</div></div>
+    <div class="lbl">👁 Предпросмотр</div><div class="bubble" id="bcPrev"></div>
+    <button class="btn" id="bcSend" style="margin-top:12px">📣 Отправить рассылку</button>`);
+  const upd = () => { b.text = $("bcText").value; b.btnT = $("bcBtnT").value; b.btnU = $("bcBtnU").value; bcPreview(); };
+  ["bcText", "bcBtnT", "bcBtnU"].forEach(id => $(id).oninput = upd);
+  $("bcKind").querySelectorAll("[data-k]").forEach(x => x.onclick = () => { haptic(); b.kind = x.dataset.k; if (b.kind === "lang" && !["en", "ru", "uz", "tg", "ar"].includes(b.value)) b.value = "ru"; if (b.kind === "country") b.value = ""; adBc(); });
+  if ($("bcLang")) $("bcLang").querySelectorAll("[data-l2]").forEach(x => x.onclick = () => { haptic(); b.value = x.dataset.l2; adBc(); });
+  if ($("bcCountry")) $("bcCountry").oninput = e => { b.value = e.target.value.trim().toLowerCase(); bcCount(); };
+  $("bcPhoto").onchange = e => { const f = e.target.files[0]; if (f) shrinkPhoto(f).then(d => { b.photo = d; adBc(); }).catch(() => toast("Не удалось прочитать фото")); };
+  if ($("bcPhotoRm")) $("bcPhotoRm").onclick = () => { b.photo = null; adBc(); };
+  $("bcSend").onclick = bcSend;
+  bcPreview(); bcCount();
+}
+const LANG_LABEL = {en: "🇬🇧 English", ru: "🇷🇺 Русский", uz: "🇺🇿 Oʻzbekcha", tg: "🇹🇯 Тоҷикӣ", ar: "🇸🇦 العربية"};
+function fmtRich(s) { return esc(s).replace(/\*\*(.+?)\*\*/gs, "<b>$1</b>").replace(/__(.+?)__/gs, "<i>$1</i>").replace(/\n/g, "<br>"); }
+function bcPreview() {
+  const b = AD.bc;
+  $("bcPrev").innerHTML = (b.photo ? `<img src="${b.photo}">` : "") + `<div>${fmtRich(b.text || "") || '<span class="sub">Текст рассылки…</span>'}</div>` +
+    (b.btnT ? `<div class="bbtn">${esc(b.btnT)}</div>` : "");
+}
+function bcCount() {
+  clearTimeout(bcCountT);
+  bcCountT = setTimeout(async () => {
+    const b = AD.bc;
+    if (b.kind === "country" && !/^[a-z]{2}$/.test(b.value || "")) { $("bcCount").textContent = "Введите двухбуквенный код страны"; b.count = null; return; }
+    try { const r = await apiAdmin(`/api/admin/bc_count?kind=${b.kind}&value=${encodeURIComponent(b.value || "")}`); b.count = r.count; $("bcCount").innerHTML = `👥 Получателей: <b>${r.count}</b> · ${esc(r.label)}`; }
+    catch (e) { $("bcCount").textContent = "Не удалось посчитать"; }
+  }, 250);
+}
+function shrinkPhoto(file) {
+  return new Promise((ok, bad) => {
+    const rd = new FileReader();
+    rd.onerror = bad;
+    rd.onload = () => {
+      const img = new Image();
+      img.onerror = bad;
+      img.onload = () => {
+        const k = Math.min(1, 1600 / Math.max(img.width, img.height)), cv = document.createElement("canvas");
+        cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+        cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+        ok(cv.toDataURL("image/jpeg", 0.86));
+      };
+      img.src = rd.result;
+    };
+    rd.readAsDataURL(file);
+  });
+}
+function bcSend() {
+  const b = AD.bc;
+  if (!(b.text || "").trim() && !b.photo) return toast("Добавьте текст или фото");
+  if ((b.btnT || b.btnU) && !(b.btnT && /^https?:\/\//.test(b.btnU || ""))) return toast("У кнопки нужен текст и ссылка https://…");
+  if (b.photo && (b.text || "").length > 1000) return toast("С фото текст должен быть до 1000 символов");
+  if (b.count == null) return toast("Проверьте получателей");
+  confirmBox(`Отправить рассылку ${b.count} получателям?`, async () => {
+    haptic("medium");
+    try {
+      const r = await apiAdmin("/api/admin/broadcast", {text: b.text || "", kind: b.kind, value: b.value, photo: b.photo, button_text: b.btnT || "", button_url: b.btnU || ""});
+      if (r.ok) { toast("Рассылка запущена. Отчёт придёт в бот ✓"); AD.bc = {kind: "all", value: "ru", photo: null, count: null}; adBc(); }
+    } catch (e) { toast(String(e.message) === "409" ? "Другая рассылка ещё идёт" : "Не удалось запустить"); }
+  });
+}
+
+/* ── system ── */
+async function adSys() {
+  adLoading();
+  let h; try { h = await apiAdmin("/api/admin/health"); } catch (e) { return adBody(`<div class="muted">Не удалось загрузить</div>`); }
+  const up = h.uptime, d = Math.floor(up / 86400), hh = Math.floor(up % 86400 / 3600), mm = Math.floor(up % 3600 / 60);
+  const tiles = [["🗄", "База данных", `✅ ${h.db_ms} мс`], ["🕌", "Сервис времён", h.api.ok ? `✅ ${h.api.ms} мс` : `❌ ${h.api.error}`], ["⏱", "Работает", `${d} д ${hh} ч ${mm} мин`],
+    ["🔔", "Получают напоминания", h.reminder_users], ["🔄", "Живых карточек", h.live_cards], ["🧠", "Кэш времён", h.cache], ["📬", "Отправлено сегодня", h.sent], ["⚠️", "Ошибок отправки", h.failed]];
+  adBody(`<div class="adgrid">${tiles.map(([i, l, v]) => `<div class="card"><div class="sub">${i} ${l}</div><b>${esc(v)}</b></div>`).join("")}</div>
+    <div class="card"><b>🛠 Админы</b><div class="sub" style="margin-top:6px" dir="ltr">${h.admins.join(", ")}</div></div>
+    <div class="card"><b>🧾 Последние ошибки</b>${h.errors.length ? h.errors.map(e => `<div class="err"><span class="sub">${esc(e.at)}</span> ${esc(e.msg)}</div>`).join("") : `<div class="sub" style="margin-top:6px">Ошибок нет 🎉</div>`}</div>
+    <button class="btn" id="adExport">📤 Экспорт пользователей (CSV) в чат</button>
+    <button class="btn ghost" data-adref="1" style="margin-top:10px">🔄 Обновить</button>`);
+  $("adExport").onclick = async () => { haptic(); try { const r = await apiAdmin("/api/admin/export", {}); toast(`Файл отправлен в чат ✓ (${r.rows})`); } catch (e) { toast("Не удалось"); } };
+}
+
 /* ───────── boot ───────── */
 function applyLang() {
   T = LX[LANG] || LX.en;
@@ -1424,10 +1941,10 @@ async function load(silent) {
     const d = await api("/api/me");
     const lang = d.lang || (d.profile && d.profile.lang); LANG = lang in LX ? lang : "en"; applyLang();
     if (d.need_setup) return stateScreen("📍", tr("need"), tr("to_bot"));
-    DATA = d; TZ = d.profile.tz;
-    $("boot").hidden = true; $("nav").hidden = false;
+    DATA = d; TZ = d.profile.tz; HSHIFT = null;
+    $("boot").hidden = true; $("nav").hidden = false; $("navAdmin").hidden = !d.is_admin;
     renderToday(); renderQibla(); renderMore();
-    if (!silent) { const want = new URLSearchParams(location.search).get("tab"); go(["today", "qibla", "cal", "tasbih", "more"].includes(want) ? want : "today"); }
+    if (!silent) { const want = new URLSearchParams(location.search).get("tab"); go(["today", "qibla", "cal", "tasbih", "more"].concat(d.is_admin ? ["admin"] : []).includes(want) ? want : "today"); }
   } catch (e) {
     if (!silent) stateScreen("⚠️", tr("err"));
   }
@@ -1447,7 +1964,13 @@ function init() {
   document.addEventListener("click", e => {
     const s = e.target.closest("[data-sub]"); if (s) { haptic(); openSub(s.dataset.sub); return; }
     if (e.target.closest("[data-back]")) { back(); return; }
-    const g = e.target.closest("#goals button"); if (g) { TS.goal = +g.dataset.g; TS.c = 0; haptic(); renderTasbih(); saveTasbih(); return; }
+    if (e.target.closest("#tapper")) { tapBead(); return; }
+    const dz = e.target.closest("[data-dz]"); if (dz) { TS.sel = dz.dataset.dz; haptic(); renderTasbih(); saveTasbih(); return; }
+    const g = e.target.closest("#goals button"); if (g) { TS.goal = +g.dataset.g; tsCur().c = 0; haptic(); renderTasbih(); saveTasbih(); return; }
+    const sty = e.target.closest("#tStyles button"); if (sty) { TS.style = sty.dataset.st; haptic(); renderTasbih(); saveTasbih(); return; }
+    const pr = e.target.closest("[data-person]"); if (pr) { haptic(); openAdmUser(+pr.dataset.person); return; }
+    const ad = e.target.closest("#adSeg button"); if (ad) { haptic(); AD_TAB = ad.dataset.ad; renderAdmin(); return; }
+    if (e.target.closest("[data-adref]")) { haptic(); renderAdmin(); return; }
     const c = e.target.closest("#trChecks .c"); if (c) { toggleTrack(+c.dataset.i); return; }
     const z = e.target.closest(".zk"); if (z) { tapZikr(z.dataset.z); return; }
     const az = e.target.closest("#azSeg button"); if (az) { AZ_MODE = az.dataset.az; haptic(); renderAzkar(); return; }
@@ -1455,13 +1978,17 @@ function init() {
     const cv = e.target.closest("#cvSeg button"); if (cv) { haptic(); setCv(cv.dataset.cv); return; }
     const fv = e.target.closest("[data-fav]"); if (fv) { toggleFav(fv.dataset.fav); return; }
   });
-  $("bead").onclick = tapBead;
-  $("tReset").onclick = () => { TS.c = 0; haptic("medium"); renderTasbih(); saveTasbih(); };
+  $("tReset").onclick = () => { tsCur().c = 0; haptic("medium"); renderTasbih(); saveTasbih(); };
+  $("dCustomIn").oninput = e => { TS.custom = e.target.value; $("dAr").textContent = TS.custom || "…"; saveTasbih(); };
+  $("place").onclick = () => { haptic(); openPlace("home", {tab: "today"}); };
+  $("stCityChange").onclick = () => { haptic(); openPlace("home", {tab: "more", sub: "settings"}); };
+  $("plAuto").onclick = placeAuto; $("plFind").onclick = placeFind; $("plUse").onclick = placeUse;
+  $("plQ").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); placeFind(); } };
+  $("ciNear").onclick = citiesNear; $("ciMap").onclick = () => { haptic(); openPlace("other", {tab: "more", sub: "cities"}); };
+  store.get(["app_theme", "qibla_theme"]).then(v => { applyTheme(v.app_theme || "tg"); if (QTHEMES.includes(v.qibla_theme)) { QTHEME = v.qibla_theme; if (DATA) buildDial(); } });
   $("calPrev").onclick = () => shiftMonth(-1); $("calNext").onclick = () => shiftMonth(1);
   $("moNear").onclick = nearMe;
   $("nSearch").oninput = e => renderNames(e.target.value);
-  $("stCityFind").onclick = findCity;
-  $("stCityQ").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); findCity(); } };
   $("azReset").onclick = () => { AZ = {}; store.set(azKey(), "{}"); haptic("medium"); drawAzkar(); };
   $("qdAdd").onclick = qdAddDays;
   $("ciFind").onclick = findOther;
