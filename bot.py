@@ -1062,6 +1062,15 @@ CREATE TABLE IF NOT EXISTS admins (
     added_by BIGINT,
     added_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS mosques (
+    osm_id     TEXT PRIMARY KEY,
+    lat        DOUBLE PRECISION NOT NULL,
+    lon        DOUBLE PRECISION NOT NULL,
+    name       TEXT,
+    names      TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS mosques_geo ON mosques (lat, lon);
 CREATE TABLE IF NOT EXISTS msg_cleanup (
     chat_id BIGINT NOT NULL,
     msg_id  BIGINT NOT NULL,
@@ -3719,17 +3728,22 @@ async def send_qibla_image(update, u):
 
 # ───────────────────────── mini app: mosques & places ─────────────────────────
 
-OVERPASS = ("https://overpass-api.de/api/interpreter",
-            "https://overpass.kumi.systems/api/interpreter",
-            "https://overpass.private.coffee/api/interpreter")
+OVERPASS = (  # free OpenStreetMap servers; each is tried in turn
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.osm.jp/api/interpreter",
+)
 MOSQUE_CACHE = {}
+MOSQUE_RADII = (3000, 10000, 25000)
 
 
 async def overpass(query):
     last = None
-    for url in OVERPASS:  # the free servers are often busy, so try the mirrors in turn
+    for url in OVERPASS:  # the free servers are often busy, so try the mirrors in turn (short wait each)
         try:
-            r = await HTTP.post(url, data={"data": query}, timeout=30,
+            r = await HTTP.post(url, data={"data": query}, timeout=httpx.Timeout(14, connect=5),
                                 headers={"User-Agent": f"PrayerTimesTelegramBot/1.0 ({CONTACT})"})
             r.raise_for_status()
             return r.json().get("elements", [])
@@ -3737,6 +3751,90 @@ async def overpass(query):
             last = e
             log.warning("overpass %s failed: %r", url, e)
     raise last or RuntimeError("overpass unavailable")
+
+
+def _mosque_item(osm_id, la, lo, name, names):
+    return {"id": osm_id, "lat": la, "lon": lo, "name": name or "", "names": names or {}}
+
+
+async def mosques_overpass(lat, lon, radius):
+    q = (f'[out:json][timeout:20];(nwr["amenity"="place_of_worship"]["religion"="muslim"](around:{radius},{lat},{lon});'
+         f'nwr["building"="mosque"](around:{radius},{lat},{lon}););out center 300;')
+    items = []
+    for e in await overpass(q):
+        la = e.get("lat") or (e.get("center") or {}).get("lat")
+        lo = e.get("lon") or (e.get("center") or {}).get("lon")
+        if la is None or lo is None:
+            continue
+        tags = e.get("tags") or {}
+        names = {k[5:]: v for k, v in tags.items() if k.startswith("name:") and len(k) == 7}
+        items.append(_mosque_item(f"{e.get('type', 'n')[0]}{e.get('id')}", la, lo, tags.get("name"), names))
+    return items
+
+
+async def mosques_nominatim(lat, lon, radius):
+    """Backup when every Overpass server is down: OpenStreetMap's geocoder knows mosques too."""
+    dlat = radius / 111000
+    dlon = radius / (111000 * max(0.2, math.cos(math.radians(lat))))
+    items = []
+    for q in ("mosque", "masjid"):
+        data = await nominatim("search", {"q": q, "limit": 50, "bounded": 1, "extratags": 1, "namedetails": 1,
+                                          "viewbox": f"{lon - dlon},{lat + dlat},{lon + dlon},{lat - dlat}"})
+        for d in data or []:
+            cat, typ = d.get("category") or d.get("class"), d.get("type")
+            if not ((cat == "amenity" and typ == "place_of_worship") or (cat == "building" and typ == "mosque")):
+                continue  # streets or shops that are only called "masjid"
+            nd = d.get("namedetails") or {}
+            names = {k[5:]: v for k, v in nd.items() if k.startswith("name:") and len(k) == 7}
+            items.append(_mosque_item(f"{(d.get('osm_type') or 'n')[0]}{d.get('osm_id')}", float(d["lat"]), float(d["lon"]),
+                                      nd.get("name") or d.get("name"), names))
+    uniq = {i["id"]: i for i in items}
+    return list(uniq.values())
+
+
+async def mosques_saved(lat, lon, radius):
+    dlat = radius / 111000
+    dlon = radius / (111000 * max(0.2, math.cos(math.radians(lat))))
+    rows = await POOL.fetch("SELECT * FROM mosques WHERE lat BETWEEN $1 AND $2 AND lon BETWEEN $3 AND $4 LIMIT 500",
+                            lat - dlat, lat + dlat, lon - dlon, lon + dlon)
+    return [_mosque_item(r["osm_id"], r["lat"], r["lon"], r["name"], json.loads(r["names"] or "{}")) for r in rows
+            if km(lat, lon, r["lat"], r["lon"]) * 1000 <= radius]
+
+
+async def save_mosques(items):
+    if not items:
+        return
+    try:
+        await POOL.executemany(
+            "INSERT INTO mosques (osm_id, lat, lon, name, names) VALUES ($1, $2, $3, $4, $5) "
+            "ON CONFLICT (osm_id) DO UPDATE SET lat = EXCLUDED.lat, lon = EXCLUDED.lon, name = EXCLUDED.name, "
+            "names = EXCLUDED.names, updated_at = now()",
+            [(i["id"], i["lat"], i["lon"], i["name"], json.dumps(i["names"], ensure_ascii=False)) for i in items])
+    except Exception:  # noqa: BLE001
+        log.exception("could not save mosques")
+
+
+async def find_mosques(lat, lon):
+    """Overpass mirrors → saved mosques → Nominatim; the search widens 3 → 10 → 25 km while nothing is found."""
+    source = "osm"
+    for radius in MOSQUE_RADII:
+        items = []
+        try:
+            items = await mosques_overpass(lat, lon, radius)
+            await save_mosques(items)
+        except Exception:  # noqa: BLE001
+            items = await mosques_saved(lat, lon, radius)
+            source = "saved"
+            if not items:
+                try:
+                    items = await mosques_nominatim(lat, lon, radius)
+                    await save_mosques(items)
+                    source = "nominatim"
+                except Exception:  # noqa: BLE001
+                    log.exception("nominatim mosques failed")
+        if items:
+            return items, radius, source
+    return [], MOSQUE_RADII[-1], source
 
 
 async def api_mosques(request):
@@ -3751,28 +3849,13 @@ async def api_mosques(request):
     hit = MOSQUE_CACHE.get(key)
     if hit and _time.time() - hit[0] < 6 * 3600:
         return web.json_response(hit[1])
-    items, radius = [], 5000
-    try:
-        for radius in (5000, 15000):  # widen the search if nothing is close
-            q = (f'[out:json][timeout:25];nwr["amenity"="place_of_worship"]["religion"="muslim"]'
-                 f'(around:{radius},{lat},{lon});out center 120;')
-            items = []
-            for e in await overpass(q):
-                la, lo = e.get("lat") or (e.get("center") or {}).get("lat"), e.get("lon") or (e.get("center") or {}).get("lon")
-                if la is None or lo is None:
-                    continue
-                tags = e.get("tags") or {}
-                names = {k[5:]: v for k, v in tags.items() if k.startswith("name:") and len(k) == 7}
-                items.append({"lat": la, "lon": lo, "name": tags.get("name") or "", "names": names})
-            if items:
-                break
-    except Exception:  # noqa: BLE001
-        log.exception("mosques lookup failed")
-        return web.json_response({"ok": False}, status=502)
-    out = {"ok": True, "radius": radius, "items": items}
-    if len(MOSQUE_CACHE) > 300:
-        MOSQUE_CACHE.clear()
-    MOSQUE_CACHE[key] = (_time.time(), out)
+    items, radius, source = await find_mosques(lat, lon)
+    out = {"ok": True, "radius": radius, "items": items, "source": source}
+    if items and source == "osm":  # only cache fresh results; after a failure try the servers again next time
+        if len(MOSQUE_CACHE) > 300:
+            MOSQUE_CACHE.clear()
+        MOSQUE_CACHE[key] = (_time.time(), out)
+    log.info("mosques %.2f,%.2f: %d within %d m (%s)", lat, lon, len(items), radius, source)
     return web.json_response(out)
 
 
