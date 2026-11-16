@@ -1031,7 +1031,7 @@ function renderMore() {
   $("moreTitle").textContent = T.t_more;
   const items = [["tracker", "✅", "m_tracker", "m_tracker_d"], ["challenges", "🤝", "m_ch", "m_ch_d"], ["azkar", "🌅", "m_azkar", "m_azkar_d"], ["duas", "🤲", "m_duas", "m_duas_d"],
     ["qada", "🔁", "m_qada", "m_qada_d"], ["dates", "📆", "m_dates", "m_dates_d"], ["ramadan", "🌙", "m_ramadan", "m_ramadan_d"],
-    ["cities", "✈️", "m_cities", "m_cities_d"], ["mosques", "🕌", "m_mosques", "m_mosques_d"], ["names", "📖", "m_names", "m_names_d"], ["invite", "🤲", "m_invite", "m_invite_d"], ["settings", "⚙️", "m_settings", "m_settings_d"]];
+    ["cities", "✈️", "m_cities", "m_cities_d"], ["names", "📖", "m_names", "m_names_d"], ["invite", "🤲", "m_invite", "m_invite_d"], ["settings", "⚙️", "m_settings", "m_settings_d"]];
   let h = items.map(([id, ic, t1, t2]) => `<button class="item" data-sub="${id}"><div class="ico">${ic}</div><div><div class="tt">${tr(t1)}</div><div class="ds">${tr(t2)}</div></div><div class="ch">›</div></button>`).join("");
   if (ver("8.0") && tg.addToHomeScreen) h += `<button class="item" id="homeBtn"><div class="ico">📲</div><div><div class="tt">${tr("m_home")}</div><div class="ds" id="homeDs">${tr("m_home_d")}</div></div></button>`;
   $("moreMenu").innerHTML = h;
@@ -2419,7 +2419,7 @@ async function load(silent) {
       const qs = new URLSearchParams(location.search), want = qs.get("tab"), sub = qs.get("sub"), az = qs.get("az");
       go(["today", "qibla", "cal", "tasbih", "more"].concat(d.is_admin ? ["admin"] : []).includes(want) ? want : "today");
       if (qs.get("share") === "1") setTimeout(() => sharePrayerTimes(true), 300);
-      if (want === "more" && ["tracker", "challenges", "invite", "azkar", "duas", "qada", "dates", "ramadan", "cities", "mosques", "names", "settings"].includes(sub)) {
+      if (want === "more" && ["tracker", "challenges", "invite", "azkar", "duas", "qada", "dates", "ramadan", "cities", "names", "settings"].includes(sub)) {
         if (sub === "azkar" && (az === "m" || az === "e")) AZ_MODE = az;
         openSub(sub);
       }

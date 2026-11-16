@@ -5326,8 +5326,10 @@ async def setup_profile(bot):
             continue
         for code in ([None, lang] if lang == "en" else [lang]):
             try:
-                await bot.set_my_short_description(BOT_ABOUT[lang], language_code=code)
-                await bot.set_my_description(BOT_DESCRIPTION[lang], language_code=code)
+                # The bot's profile description is English for everyone: other languages get an empty one,
+                # so Telegram shows the default (English) text.
+                await bot.set_my_short_description(BOT_ABOUT["en"] if lang == "en" else "", language_code=code)
+                await bot.set_my_description(BOT_DESCRIPTION["en"] if lang == "en" else "", language_code=code)
                 await bot.set_my_commands([BotCommand("start", BOT_COMMAND[lang])], language_code=code)
             except RetryAfter as e:
                 log.warning("profile texts rate-limited, retry in %ss", e.retry_after)
