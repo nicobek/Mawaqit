@@ -43,6 +43,7 @@ from telegram import (
     InputTextMessageContent,
     KeyboardButton,
     MenuButtonCommands,
+    MenuButtonDefault,
     MenuButtonWebApp,
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
@@ -4691,29 +4692,25 @@ async def send_tour(bot, u):
 
 
 async def sync_menu_button(bot, u):
-    """The button next to the message field, in the person's language."""
-    if not WEBAPP_URL or not u or not is_private(u) or not u["lang"]:
-        return
-    try:
-        await bot.set_chat_menu_button(chat_id=u["user_id"],
-                                       menu_button=MenuButtonWebApp(t(u["lang"], "app_menu"), WebAppInfo(url=WEBAPP_URL)))
-    except RetryAfter as e:
-        await asyncio.sleep(e.retry_after + 1)
-        return
-    except Exception:  # noqa: BLE001  (blocked the bot, deleted account…)
-        pass
-    await POOL.execute("UPDATE users SET menu_btn = $2 WHERE user_id = $1", u["user_id"], u["lang"])
+    """The button next to the message field is the same English "🕌 App" for everyone (set once for the whole bot)."""
+    return
 
 
 async def menu_buttons_job(context: ContextTypes.DEFAULT_TYPE):
-    """Little by little gives existing users the menu button in their language."""
+    """Puts back the common "🕌 App" button for chats that got a per-language one earlier."""
     try:
-        rows = await POOL.fetch("SELECT * FROM users WHERE chat_type = 'private' AND lang IS NOT NULL AND NOT blocked "
-                                "AND menu_btn IS DISTINCT FROM lang LIMIT 25")
+        rows = await POOL.fetch("SELECT user_id FROM users WHERE menu_btn IS NOT NULL AND menu_btn <> 'default' LIMIT 25")
     except Exception:  # noqa: BLE001
         return
     for r in rows:
-        await sync_menu_button(context.bot, r)
+        try:
+            await context.bot.set_chat_menu_button(chat_id=r["user_id"], menu_button=MenuButtonDefault())
+        except RetryAfter as e:
+            await asyncio.sleep(e.retry_after + 1)
+            return
+        except Exception:  # noqa: BLE001
+            pass
+        await POOL.execute("UPDATE users SET menu_btn = 'default' WHERE user_id = $1", r["user_id"])
         await asyncio.sleep(0.2)
 
 
