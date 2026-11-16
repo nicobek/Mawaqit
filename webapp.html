@@ -1751,8 +1751,14 @@ async function openPrayerSheet(k) {
     };
   }
 }
-function sharePrayerTimes() {
-  if (DATA.bot && ver("6.7") && tg.switchInlineQuery) { try { tg.switchInlineQuery("", ["users", "groups", "channels"]); return; } catch (e) {} }
+async function sharePrayerTimes(closeAfter) {
+  if (ver("8.0") && tg.shareMessage) {  // ready message: prayer times + bot link at the bottom
+    try {
+      const r = await apiPost("/api/share_prepare", {});
+      tg.shareMessage(r.id, () => { if (closeAfter) { try { tg.close(); } catch (e) {} } else closeSheet(); });
+      return;
+    } catch (e) {}
+  }
   const t = DATA.today.t, link = (DATA.ref && DATA.ref.link) || `https://t.me/${DATA.bot}`;
   const text = tr("ps_text", {city: DATA.profile.city}) + "\n" + PRAYERS.map(k => `${ICONS[k]} ${T.pn[k]} — ${t[k]}`).join("\n");
   const u = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
@@ -2311,6 +2317,7 @@ async function load(silent) {
     if (!silent) {
       const qs = new URLSearchParams(location.search), want = qs.get("tab"), sub = qs.get("sub"), az = qs.get("az");
       go(["today", "qibla", "cal", "tasbih", "more"].concat(d.is_admin ? ["admin"] : []).includes(want) ? want : "today");
+      if (qs.get("share") === "1") setTimeout(() => sharePrayerTimes(true), 300);
       if (want === "more" && ["tracker", "challenges", "invite", "azkar", "duas", "qada", "dates", "ramadan", "cities", "mosques", "names", "settings"].includes(sub)) {
         if (sub === "azkar" && (az === "m" || az === "e")) AZ_MODE = az;
         openSub(sub);

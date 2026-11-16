@@ -3062,7 +3062,8 @@ async def start_web(application=None):
                     web.get("/api/tracker", api_tracker), web.post("/api/tracker", api_tracker_set),
                     web.post("/api/tracker_bulk", api_tracker_bulk), web.get("/api/community", api_community),
                     web.get("/api/challenges", api_challenges), web.post("/api/challenges", api_challenge_new),
-                    web.post("/api/challenges/leave", api_challenge_leave)])
+                    web.post("/api/challenges/leave", api_challenge_leave),
+                    web.post("/api/share_prepare", api_share_prepare)])
     WEB_RUNNER = web.AppRunner(app, access_log=None)
     await WEB_RUNNER.setup()
     port = int(os.getenv("PORT", "8080"))
@@ -3659,24 +3660,7 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             place = INLINE_GEO[key]
         if not place:
             return await iq.answer([], cache_time=5, is_personal=True, button=hint)
-        name, lat, lon, cc = place
-        pu = {"user_id": 0, "chat_type": "private", "lat": lat, "lon": lon, "country": cc, "lang": lang, "city": name,
-              "madhab": (u or {}).get("madhab") or "std", "ramadan": True, "tz": None}
-        first = await get_timings(pu, datetime.utcnow().date())
-        pu["tz"] = first["tz"]
-        day = await get_timings(pu, datetime.now(ZoneInfo(pu["tz"])).date())
-        text, _ = await screen_times(pu, onboarding=True)
-        text = text.rsplit("\n\n", 1)[0]  # "next prayer in …" would be stale for whoever reads it later
-        link = ref_link(iq.from_user.id)
-        text += "\n\n" + t(lang, "share_footer", bot=f'<a href="{link}">@{BOT_USERNAME}</a>')
-        desc = " · ".join(f"{PN[lang][k.lower()]} {day[k]}" for k in EVENTS)
-        open_btn = InlineKeyboardMarkup([[InlineKeyboardButton(t(lang, "in_open"), url=link)]])
-        result = InlineQueryResultArticle(
-            id=hashlib.md5(f"{lat:.3f},{lon:.3f},{lang},{pu['madhab']}".encode()).hexdigest(),
-            title=f"🕌 {name}", description=desc,
-            input_message_content=InputTextMessageContent(text, parse_mode=ParseMode.HTML,
-                                                          link_preview_options=LinkPreviewOptions(is_disabled=True)),
-            reply_markup=open_btn)
+        result = await times_share_result(place, lang, (u or {}).get("madhab"), iq.from_user.id)
         await iq.answer([result], cache_time=120, is_personal=True, button=hint)
     except BadRequest as e:
         log.info("inline answer skipped: %s", e)  # the query expired while the user kept typing
@@ -3945,9 +3929,46 @@ def dev_btn(lang):
 
 
 def share_times_btn(lang):
-    """Opens the chat picker; the chosen chat gets this user's prayer-times card via inline mode."""
+    """Opens the native chat picker (through the mini app) and sends the ready prayer-times message."""
+    if WEBAPP_URL:
+        return InlineKeyboardButton(t(lang, "btn_share"), web_app=WebAppInfo(url=f"{WEBAPP_URL}/?share=1"))
     return InlineKeyboardButton(t(lang, "btn_share"), switch_inline_query_chosen_chat=SwitchInlineQueryChosenChat(
         query="", allow_user_chats=True, allow_bot_chats=False, allow_group_chats=True, allow_channel_chats=True))
+
+
+async def times_share_result(place, lang, madhab, sharer_id):
+    """The message people share: today's prayer times and a link to the bot at the bottom."""
+    name, lat, lon, cc = place
+    pu = {"user_id": 0, "chat_type": "private", "lat": lat, "lon": lon, "country": cc, "lang": lang, "city": name,
+          "madhab": madhab or "std", "ramadan": True, "tz": None}
+    first = await get_timings(pu, datetime.utcnow().date())
+    pu["tz"] = first["tz"]
+    day = await get_timings(pu, datetime.now(ZoneInfo(pu["tz"])).date())
+    text, _ = await screen_times(pu, onboarding=True)
+    text = text.rsplit("\n\n", 1)[0]  # "next prayer in …" would be stale for whoever reads it later
+    text += "\n\n" + t(lang, "share_footer", bot=f'<a href="{ref_link(sharer_id)}">@{BOT_USERNAME}</a>')
+    desc = " · ".join(f"{PN[lang][k.lower()]} {day[k]}" for k in EVENTS)
+    return InlineQueryResultArticle(
+        id=hashlib.md5(f"{lat:.3f},{lon:.3f},{lang},{pu['madhab']},{sharer_id}".encode()).hexdigest(),
+        title=f"🕌 {name}", description=desc,
+        input_message_content=InputTextMessageContent(text, parse_mode=ParseMode.HTML,
+                                                      link_preview_options=LinkPreviewOptions(is_disabled=True)))
+
+
+async def api_share_prepare(request):
+    """Prepares the prayer-times message; the mini app then opens Telegram's share sheet with it."""
+    tg_user, u, lang = await api_auth(request)
+    if not u or not u["city"] or u["lat"] is None:
+        raise web.HTTPBadRequest(text="no city")
+    try:
+        res = await times_share_result((u["city"], u["lat"], u["lon"], u["country"] or ""), u["lang"] or lang,
+                                       u["madhab"], u["user_id"])
+        pm = await request.app["bot"].save_prepared_inline_message(u["user_id"], res, allow_user_chats=True,
+                                                                   allow_group_chats=True, allow_channel_chats=True)
+    except Exception:  # noqa: BLE001
+        log.exception("share prepare failed")
+        return web.json_response({"ok": False}, status=502)
+    return web.json_response({"ok": True, "id": pm.id})
 
 
 def ref_link(uid):
@@ -4324,6 +4345,14 @@ BOT_COMMAND = {"en": "🕌 Menu", "ru": "🕌 Меню", "uz": "🕌 Menyu", "tg
 
 async def setup_profile(bot):
     """Name-independent profile texts in every language. Safe to run on every start."""
+    try:  # first: the button next to the message field opens the app
+        if WEBAPP_URL:
+            await bot.set_chat_menu_button(menu_button=MenuButtonWebApp("🕌 App", WebAppInfo(url=WEBAPP_URL)))
+        else:
+            await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+    except Exception:  # noqa: BLE001
+        log.exception("could not set menu button")
+    log.info("menu button: %s", "mini app" if WEBAPP_URL else "commands")
     for lang in LANGS:
         for code in ([None, lang] if lang == "en" else [lang]):
             try:
@@ -4335,13 +4364,6 @@ async def setup_profile(bot):
                 return
             except Exception:  # noqa: BLE001
                 log.exception("could not set profile texts for %s", code or "default")
-    try:  # the button next to the message field opens the app
-        if WEBAPP_URL:
-            await bot.set_chat_menu_button(menu_button=MenuButtonWebApp("🕌 App", WebAppInfo(url=WEBAPP_URL)))
-        else:
-            await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
-    except Exception:  # noqa: BLE001
-        log.exception("could not set menu button")
 
 
 async def post_init(app: Application):
