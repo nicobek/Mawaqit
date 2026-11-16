@@ -382,6 +382,16 @@ html.lite #sky .b{animation:none;filter:blur(60px)}
 .sheet .hd .ic{width:48px;height:48px;border-radius:15px;display:grid;place-items:center;font-size:24px;background:var(--gold-soft)}
 .sheet .hd b{font-size:19px}
 .sheet .btn{margin-top:8px}
+.ayah .t{font-weight:700;margin-bottom:10px}
+.ayah .ar{font-family:"Amiri","Noto Naskh Arabic","Scheherazade New",serif;font-size:25px;line-height:1.9;direction:rtl;text-align:center}
+.ayah .tr{margin-top:10px;line-height:1.5;text-align:center;opacity:.92}
+.ayah .rf{margin-top:8px;text-align:center;font-size:13px;opacity:.7}
+.ayah .share{margin-top:12px}
+.pic img{width:100%;display:block;border-radius:18px;aspect-ratio:var(--ar,4/5);object-fit:cover;background:rgba(127,127,127,.15)}
+.pic .nav{display:grid;grid-template-columns:44px 1fr 44px;gap:8px;align-items:center;margin-top:10px}
+.pic .nav button{height:40px;border-radius:12px;border:0;font:inherit;color:inherit;background:rgba(127,127,127,.16)}
+.pic .nav span{text-align:center;font-weight:600}
+.pic .busy{opacity:.55;transition:opacity .2s}
 .aichat{display:flex;flex-direction:column;gap:10px;margin:12px 0}
 .aimsg{max-width:88%;padding:11px 14px;border-radius:18px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word}
 .aimsg.me{align-self:flex-end;background:var(--gold);color:var(--on-gold);border-bottom-right-radius:6px}
@@ -411,6 +421,7 @@ html.lite #sky .b{animation:none;filter:blur(60px)}
     <div class="card xt" id="xt" hidden></div>
     <button class="card comm" id="comm" data-sub="tracker" hidden></button>
     <div class="share" id="shareRow"></div>
+    <div class="card ayah" id="ayahCard" hidden></div>
   </section>
 
   <!-- QIBLA -->
@@ -1512,12 +1523,9 @@ for (const l in LX3) Object.assign(LX[l], LX3[l]);
 function renderShare() {
   const box = $("shareRow"); if (!box) return;
   const story = ver("7.8") && tg.shareToStory && DATA.share_url;
-  box.innerHTML = `<button class="btn ghost" id="shChat">${tr("sh_chat")}</button>` + (story ? `<button class="btn" id="shStory">${tr("sh_story")}</button>` : "");
-  $("shChat").onclick = async () => {
-    haptic(); $("shChat").disabled = true;
-    try { await apiPost("/api/share_send", {}); toast(tr("sh_sent")); } catch (e) { toast(tr("sh_err")); }
-    $("shChat").disabled = false;
-  };
+  box.innerHTML = `<button class="btn ghost" id="shChat">${tr("pic_open")}</button>` + (story ? `<button class="btn" id="shStory">${tr("sh_story")}</button>` : "");
+  $("shChat").onclick = () => { haptic(); openPicSheet("t"); };
+  renderAyah();
   if (story) $("shStory").onclick = () => {
     haptic();
     const opts = {text: `🕌 ${DATA.profile.city}`};
@@ -1844,6 +1852,14 @@ function toCyr(x) {
   return x.split(CYR_KEEP).map((p, i) => i % 2 ? p : p.replace(CYR_WORD, cyrWord)).join("");
 }
 const cy = s => LANG === "uzc" ? toCyr(s) : s;
+const LX12 = {
+  en:{ay_title:"📖 Ayah of the day",ay_share:"📤 Share",pic_open:"🖼 Picture",pic_bg:"Background {i}/{n}",pic_share:"📤 Share",pic_save:"💾 Save",pic_saved:"Saved ✓",pic_err:"Couldn't make the picture"},
+  ru:{ay_title:"📖 Аят дня",ay_share:"📤 Поделиться",pic_open:"🖼 Картинка",pic_bg:"Фон {i}/{n}",pic_share:"📤 Поделиться",pic_save:"💾 Сохранить",pic_saved:"Сохранено ✓",pic_err:"Не получилось сделать картинку"},
+  uz:{ay_title:"📖 Kun oyati",ay_share:"📤 Ulashish",pic_open:"🖼 Rasm",pic_bg:"Fon {i}/{n}",pic_share:"📤 Ulashish",pic_save:"💾 Saqlash",pic_saved:"Saqlandi ✓",pic_err:"Rasm yaratib bo'lmadi"},
+  tg:{ay_title:"📖 Ояти рӯз",ay_share:"📤 Фиристодан",pic_open:"🖼 Расм",pic_bg:"Замина {i}/{n}",pic_share:"📤 Фиристодан",pic_save:"💾 Нигоҳ доштан",pic_saved:"Нигоҳ дошта шуд ✓",pic_err:"Расм сохта нашуд"},
+  ar:{ay_title:"📖 آية اليوم",ay_share:"📤 مشاركة",pic_open:"🖼 صورة",pic_bg:"الخلفية {i}/{n}",pic_share:"📤 مشاركة",pic_save:"💾 حفظ",pic_saved:"تم الحفظ ✓",pic_err:"تعذر إنشاء الصورة"}
+};
+for (const l in LX12) Object.assign(LX[l], LX12[l]);
 LX.uzc = toCyr(LX.uz);
 
 /* glass: lighter version for slow phones */
@@ -1919,11 +1935,8 @@ async function openPrayerSheet(k) {
   try { tg.BackButton.show(); } catch (e) {}
   $("psClose").onclick = closeSheet;
   $("psShare").onclick = () => { haptic(); sharePrayerTimes(); };
-  $("psCard").onclick = async () => {
-    haptic(); $("psCard").disabled = true;
-    try { await apiPost("/api/share_send", {}); toast(tr("sh_sent")); closeSheet(); } catch (e) { toast(tr("sh_err")); }
-    $("psCard").disabled = false;
-  };
+  $("psCard").textContent = tr("pic_open");
+  $("psCard").onclick = () => { haptic(); openPicSheet("t"); };
   if ($("psMark")) {
     let mask = "00000";
     try { const r = await api("/api/tracker?from=" + iso); mask = (r.days[iso] || "00000"); } catch (e) {}
@@ -1948,6 +1961,76 @@ async function sharePrayerTimes(closeAfter) {
   const text = tr("ps_text", {city: DATA.profile.city}) + "\n" + PRAYERS.map(k => `${ICONS[k]} ${T.pn[k]} — ${t[k]}`).join("\n");
   const u = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
   try { tg.openTelegramLink(u); } catch (e) { openLink(u); }
+}
+
+/* ayah of the day + picture studio (10 backgrounds, 7 fonts, @bot at the bottom) */
+let AYAH = null;
+async function renderAyah() {
+  const box = $("ayahCard"); if (!box) return;
+  try { if (!AYAH || AYAH.lang !== LANG) { AYAH = await api("/api/ayah"); AYAH.lang = LANG; } } catch (e) { box.hidden = true; return; }
+  if (!AYAH.ok) { box.hidden = true; return; }
+  box.innerHTML = `<div class="t">${esc(tr("ay_title"))}</div><div class="ar">${esc(AYAH.ar)}</div>`
+    + (AYAH.tr ? `<div class="tr" dir="auto">${esc(AYAH.tr)}</div>` : "") + `<div class="rf" dir="auto">— ${esc(AYAH.ref)}</div>`
+    + `<div class="share"><button class="btn ghost" id="ayPic">${esc(tr("pic_open"))}</button><button class="btn" id="ayShare">${esc(tr("ay_share"))}</button></div>`;
+  box.hidden = false;
+  $("ayPic").onclick = () => { haptic(); openPicSheet("a"); };
+  $("ayShare").onclick = () => {
+    haptic();
+    const u = "https://t.me/share/url?url=" + encodeURIComponent(AYAH.share);
+    try { tg.openTelegramLink(u); } catch (e) { openLink(u); }
+  };
+}
+const PIC = {kind: "t", bg: 0, fs: 0, url: null};
+async function loadPic() {
+  const img = $("picImg"); if (!img) return;
+  img.classList.add("busy");
+  $("picBgL").textContent = tr("pic_bg", {i: PIC.bg + 1, n: (DATA.pic && DATA.pic.n_bg) || 10});
+  $("picFsL").textContent = "🔤 " + (((DATA.pic && DATA.pic.fonts) || [])[PIC.fs] || PIC.fs + 1);
+  try {
+    const r = await fetch(`/api/pic?kind=${PIC.kind}&bg=${PIC.bg}&fs=${PIC.fs}`, {headers: {"X-Init-Data": tg?.initData || ""}});
+    if (!r.ok) throw new Error(r.status);
+    if (PIC.url) URL.revokeObjectURL(PIC.url);
+    PIC.url = URL.createObjectURL(await r.blob());
+    img.src = PIC.url;
+    if (DATA.pic) { DATA.pic.bg = PIC.bg; DATA.pic.fs = PIC.fs; }
+  } catch (e) { toast(tr("pic_err")); }
+  img.classList.remove("busy");
+}
+function openPicSheet(kind) {
+  const p = DATA.pic || {bg: 0, fs: 0, n_bg: 10, fonts: []};
+  Object.assign(PIC, {kind, bg: p.bg || 0, fs: p.fs || 0});
+  const nb = p.n_bg || 10, nf = (p.fonts || []).length || 7;
+  $("sheetBox").innerHTML = `<div class="pic"><img id="picImg" alt="" style="--ar:${kind === "a" ? "4/5" : "9/16"};max-height:52vh;object-fit:contain">`
+    + `<div class="nav"><button id="picBgP">◀</button><span id="picBgL"></span><button id="picBgN">▶</button></div>`
+    + `<div class="nav"><button id="picFsP">◀</button><span id="picFsL"></span><button id="picFsN">▶</button></div></div>`
+    + `<button class="btn" id="picShare">${esc(tr("pic_share"))}</button>`
+    + `<button class="btn ghost" id="picSave">${esc(tr("pic_save"))}</button>`
+    + `<button class="btn ghost" id="picClose" style="background:transparent!important;border:0;box-shadow:none">${esc(tr("ps_close"))}</button>`;
+  $("sheet").hidden = false;
+  try { tg.BackButton.show(); } catch (e) {}
+  const step = (k, d, n) => () => { haptic(); PIC[k] = (PIC[k] + d + n) % n; loadPic(); };
+  $("picBgP").onclick = step("bg", -1, nb); $("picBgN").onclick = step("bg", 1, nb);
+  $("picFsP").onclick = step("fs", -1, nf); $("picFsN").onclick = step("fs", 1, nf);
+  $("picClose").onclick = closeSheet;
+  $("picShare").onclick = async () => {
+    haptic(); $("picShare").disabled = true;
+    try {
+      const r = await apiPost("/api/pic_prepare", {kind: PIC.kind, bg: PIC.bg, fs: PIC.fs});
+      if (ver("8.0") && tg.shareMessage && r.id) tg.shareMessage(r.id, () => {});
+      else { await apiPost("/api/share_send", {}); toast(tr("sh_sent")); }
+    } catch (e) { toast(tr("pic_err")); }
+    $("picShare").disabled = false;
+  };
+  $("picSave").onclick = async () => {
+    haptic(); $("picSave").disabled = true;
+    try {
+      const r = await apiPost("/api/pic_prepare", {kind: PIC.kind, bg: PIC.bg, fs: PIC.fs});
+      if (ver("8.0") && tg.downloadFile) tg.downloadFile({url: r.url, file_name: "mawaqit.jpg"}, ok => { if (ok) toast(tr("pic_saved")); });
+      else openLink(r.url);
+    } catch (e) { toast(tr("pic_err")); }
+    $("picSave").disabled = false;
+  };
+  loadPic();
 }
 
 /* developer and invitations */

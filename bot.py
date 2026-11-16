@@ -43,6 +43,7 @@ from telegram import (
     InlineKeyboardMarkup,
     InlineQueryResultArticle,
     InlineQueryResultCachedPhoto,
+    InlineQueryResultPhoto,
     InlineQueryResultsButton,
     InputMediaPhoto,
     InputTextMessageContent,
@@ -3767,6 +3768,8 @@ async def api_me(request):
     return web.json_response({
         "ok": True, "need_setup": False, "bot": BOT_USERNAME, "profile": profile_json(u, lang),
         "share_url": share_url(u["user_id"], now.date().isoformat()), "is_admin": is_admin(u["user_id"]),
+        "pic": {"bg": u["share_bg"] % art.N_BG, "fs": u["share_font"] % art.N_FONT, "n_bg": art.N_BG,
+                "fonts": art.FONT_NAMES.get(u["lang"], art.FONT_NAMES["en"])},
         "admin": {"perms": admin_perms(u["user_id"]), "main": is_main(u["user_id"])} if is_admin(u["user_id"]) else None,
         "ref": {"count": await POOL.fetchval("SELECT count(*) FROM users WHERE referred_by = $1", u["user_id"]),
                 "link": ref_link(u["user_id"])},
@@ -3849,6 +3852,8 @@ async def start_web(application=None):
                     web.get("/api/challenges", api_challenges), web.post("/api/challenges", api_challenge_new),
                     web.post("/api/challenges/leave", api_challenge_leave),
                     web.post("/api/share_prepare", api_share_prepare), web.post("/api/ai", api_ai),
+                    web.get("/api/ayah", api_ayah), web.get("/api/pic", api_pic), web.post("/api/pic_prepare", api_pic_prepare),
+                    web.get("/pic/{kind}/{uid}/{key}/{bg}/{fs}/{sig}.jpg", page_pic),
                     web.post("/api/invoice", api_invoice), web.post("/api/donate/sent", api_donate_sent),
                     web.get("/api/admin/ai", api_admin_ai), web.post("/api/admin/ai", api_admin_ai),
                     web.post("/api/admin/hide", api_admin_hide)])
@@ -4190,7 +4195,12 @@ async def screen_ayah(u, day=None):
     a = await fetch_ayah(aref)
     ar, tr, ref = ayah_parts(a, lang)
     text = f"📖 <b>{t(lang, 'ayah_title')}</b>\n\n{esc(ar)}\n\n" + (f"<i>{esc(tr)}</i>\n\n" if tr else "") + f"— {esc(ref)}"
-    return text, kb([btn(t(lang, "pic_btn"), f"pic:a:new:{aref.replace(':', '.')}")], [btn(t(lang, "btn_menu"), "m:new")])
+    share = InlineKeyboardButton(t(lang, "btn_share"), url="https://t.me/share/url?url=" + quote(ayah_share_text(lang, ar, tr, ref), safe=""))
+    return text, kb([share], [btn(t(lang, "btn_menu"), "m:new")])
+
+
+def ayah_share_text(lang, ar, tr, ref):
+    return f"📖 {t(lang, 'ayah_title')}\n\n{ar}\n\n" + (f"{tr}\n\n" if tr else "") + f"— {ref}\n\n@{BOT_USERNAME}"
 
 
 def times_rows(lang, data):
@@ -4293,6 +4303,98 @@ async def pic_button(update, ctx, parts):
             raise
 
 
+# mini app: ayah of the day and the picture studio
+
+def pic_sig(kind, uid, key, bg, fs):
+    return hmac.new(BOT_TOKEN.encode(), f"pic:{kind}:{uid}:{key}:{bg}:{fs}".encode(), hashlib.sha256).hexdigest()[:20]
+
+
+def pic_args(request, u):
+    """kind, key (ayah ref "94:5-6" or day), background, font from the query/body."""
+    q = request.query
+    kind = q.get("kind") if q.get("kind") in ("a", "t") else "t"
+    try:
+        bg, fs = int(q.get("bg", u["share_bg"])) % art.N_BG, int(q.get("fs", u["share_font"])) % art.N_FONT
+    except ValueError:
+        bg, fs = u["share_bg"] % art.N_BG, u["share_font"] % art.N_FONT
+    return kind, bg, fs
+
+
+async def pic_key(u, kind):
+    day = datetime.now(ZoneInfo(u["tz"])).date()
+    return await today_ayah_ref(dict(u), day) if kind == "a" else day.isoformat()
+
+
+async def api_ayah(request):
+    tg_user, u, lang = await api_auth(request)
+    if not u or not u["tz"]:
+        raise web.HTTPBadRequest(text="no city")
+    ref_id = await pic_key(u, "a")
+    try:
+        ar, tr, ref = ayah_parts(await fetch_ayah(ref_id), u["lang"])
+    except Exception:  # noqa: BLE001
+        log.exception("ayah for the mini app failed")
+        return web.json_response({"ok": False}, status=502)
+    return web.json_response({"ok": True, "ar": ar, "tr": tr, "ref": ref, "share": ayah_share_text(u["lang"], ar, tr, ref)})
+
+
+async def api_pic(request):
+    tg_user, u, lang = await api_auth(request)
+    if not u or not u["tz"] or not u["city"]:
+        raise web.HTTPBadRequest(text="no city")
+    kind, bg, fs = pic_args(request, u)
+    if (bg, fs) != (u["share_bg"], u["share_font"]):
+        await save(u["user_id"], share_bg=bg, share_font=fs)
+    try:
+        jpg = await pic_bytes(u, kind, await pic_key(u, kind), bg, fs)
+    except Exception:  # noqa: BLE001
+        log.exception("picture failed")
+        raise web.HTTPServiceUnavailable()
+    return web.Response(body=jpg, content_type="image/jpeg", headers={"Cache-Control": "private, max-age=600"})
+
+
+async def api_pic_prepare(request):
+    """A ready photo message (@bot under it) for Telegram's share window, and a link to save the picture."""
+    tg_user, u, lang = await api_auth(request)
+    if not u or not u["tz"] or not u["city"]:
+        raise web.HTTPBadRequest(text="no city")
+    body = await read_json(request)
+    kind = body.get("kind") if body.get("kind") in ("a", "t") else "t"
+    bg, fs = int(body.get("bg") or 0) % art.N_BG, int(body.get("fs") or 0) % art.N_FONT
+    key = (await pic_key(u, kind)).replace(":", ".")
+    uid = u["user_id"]
+    url = f"{WEBAPP_URL}/pic/{kind}/{uid}/{key}/{bg}/{fs}/{pic_sig(kind, uid, key, bg, fs)}.jpg"
+    try:
+        await pic_bytes(u, kind, key.replace(".", ":"), bg, fs)  # ready before Telegram comes for it
+        res = InlineQueryResultPhoto(id=hashlib.md5(url.encode()).hexdigest(), photo_url=url, thumbnail_url=url,
+                                     caption=f"@{BOT_USERNAME}")
+        pm = await request.app["bot"].save_prepared_inline_message(uid, res, allow_user_chats=True, allow_bot_chats=True,
+                                                                   allow_group_chats=True, allow_channel_chats=True)
+    except Exception:  # noqa: BLE001
+        log.exception("picture prepare failed")
+        return web.json_response({"ok": False, "url": url}, status=502)
+    return web.json_response({"ok": True, "id": pm.id, "url": url})
+
+
+async def page_pic(request):
+    m = request.match_info
+    try:
+        kind, uid, key, bg, fs = m["kind"], int(m["uid"]), m["key"], int(m["bg"]), int(m["fs"])
+    except ValueError:
+        raise web.HTTPNotFound()
+    if kind not in ("a", "t") or not hmac.compare_digest(pic_sig(kind, uid, key, bg, fs), m["sig"]):
+        raise web.HTTPNotFound()
+    u = await get_user(uid)
+    if not u or not u["city"] or not u["tz"]:
+        raise web.HTTPNotFound()
+    try:
+        jpg = await pic_bytes(u, kind, key.replace(".", ":"), bg % art.N_BG, fs % art.N_FONT)
+    except Exception:  # noqa: BLE001
+        log.exception("picture failed")
+        raise web.HTTPServiceUnavailable()
+    return web.Response(body=jpg, content_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
+
+
 async def page_share(request):
     try:
         uid = int(request.match_info["uid"])
@@ -4321,7 +4423,7 @@ async def api_share_send(request):
     day_iso = datetime.now(ZoneInfo(u["tz"])).date().isoformat()
     try:
         png = await pic_bytes(u, "t", day_iso, u["share_bg"], u["share_font"])
-        await request.app["bot"].send_photo(u["user_id"], png, reply_markup=pic_markup(u["lang"], "t", day_iso, u["share_bg"], u["share_font"]))
+        await request.app["bot"].send_photo(u["user_id"], png, caption=f"@{BOT_USERNAME}")
     except Exception:  # noqa: BLE001
         log.exception("share send failed")
         return web.json_response({"ok": False}, status=502)
@@ -5168,13 +5270,14 @@ async def share_times_text(u):
     d = await get_timings(u, today)
     lines = [f"🕌 {strip_tags(t(lang, 'times_title')).replace('🕌', '').strip()} · {u['city']}", f"📅 {today:%d.%m.%Y}", ""]
     lines += [f"{emoji} {PN[lang][key.lower()]} — {d[key]}" for key, emoji in ROWS]
-    lines += ["", t(lang, "share_footer", bot=ref_link(u["user_id"]))]
+    lines += ["", t(lang, "share_footer", bot=f"@{BOT_USERNAME}")]
     return "\n".join(lines)
 
 
 async def share_times_btn(u):
-    """A picture of today's times (10 backgrounds, 7 fonts) that people forward to as many chats as they like."""
-    return btn(t(u["lang"], "btn_share"), "pic:t:new")
+    """Telegram's own share window: pick a chat, the ready text is put in (with @bot at the bottom). Pictures: in the mini app."""
+    text = await share_times_text(u)
+    return InlineKeyboardButton(t(u["lang"], "btn_share"), url="https://t.me/share/url?url=" + quote(text, safe=""))
 
 
 def strip_tags(x):
@@ -5191,7 +5294,7 @@ async def times_share_result(place, lang, madhab, sharer_id):
     day = await get_timings(pu, datetime.now(ZoneInfo(pu["tz"])).date())
     text, _ = await screen_times(pu, onboarding=True)
     text = text.rsplit("\n\n", 1)[0]  # "next prayer in …" would be stale for whoever reads it later
-    text += "\n\n" + t(lang, "share_footer", bot=f'<a href="{ref_link(sharer_id)}">@{BOT_USERNAME}</a>')
+    text += "\n\n" + t(lang, "share_footer", bot=f"@{BOT_USERNAME}")
     desc = " · ".join(f"{PN[lang][k.lower()]} {day[k]}" for k in EVENTS)
     return InlineQueryResultArticle(
         id=hashlib.md5(f"{lat:.3f},{lon:.3f},{lang},{pu['madhab']},{sharer_id}".encode()).hexdigest(),
