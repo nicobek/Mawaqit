@@ -449,7 +449,7 @@ nav button.on .i{filter:none;opacity:1}
     <div class="card"><div class="lbl" id="stAutoL"></div><div class="chips" id="stAuto"></div></div>
     <div class="card"><div class="lbl" id="stQuietL"></div><div class="chips" id="stQuiet"></div></div>
     <div class="card"><div class="sw" id="stRam"></div></div>
-    <div class="card"><div class="sw" id="stAzr"></div><div class="sw" id="stWk" style="margin-top:14px"></div></div>
+    <div class="card"><div class="sw" id="stWk"></div></div>
   </section>
 
   <section class="view" id="v-azkar">
@@ -1238,7 +1238,6 @@ function renderSettings() {
   chips($("stAuto"), (p.auto_options || [0, 1, 5, 15]).map(n => [n, !n ? tr("st_auto_off") : n === 1 ? tr("st_auto_1") : tr("st_min", {n})]), p.auto, v => saveSetting({auto: +v}));
   chips($("stQuiet"), (p.quiet_options || ["off"]).map(q => [q, q === "off" ? tr("st_quiet_off") : q.split("-").map(h => pad(h) + ":00").join("–")]), p.quiet, v => saveSetting({quiet: v}));
   sw($("stRam"), tr("st_ram"), p.ramadan, v => saveSetting({ramadan: v}));
-  sw($("stAzr"), tr("st_azr"), p.azkar_rem !== false, v => saveSetting({azkar_rem: v}));
   sw($("stWk"), tr("st_wk"), p.weekly !== false, v => saveSetting({weekly: v}));
 }
 /* ───────── AZKAR ───────── */

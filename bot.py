@@ -1176,7 +1176,6 @@ def screen_settings(u):
         lines.append(f"📅 {daily_label(lang, u['daily'])}")
         rows.append([btn(t(lang, "btn_daily"), "s:daily")])
     else:
-        rows.append([btn(t(lang, "btn_azr_on" if u["azkar_rem"] else "btn_azr_off"), "s:azr")])
         rows.append([btn(t(lang, "btn_wk_on" if u["weekly"] else "btn_wk_off"), "s:wk")])
         if ADMINS:
             rows.append([btn(t(lang, "btn_support"), "s:support")])
@@ -1617,9 +1616,8 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             text, markup = screen_daily(u)
         elif sub == "auto":
             text, markup = screen_auto(u)
-        elif sub in ("azr", "wk") and is_private(u):
-            col = "azkar_rem" if sub == "azr" else "weekly"
-            await save(tid, **{col: not u[col]})
+        elif sub == "wk" and is_private(u):
+            await save(tid, weekly=not u["weekly"])
             text, markup = screen_settings(await get_user(tid))
         elif sub == "attime":
             await save(tid, at_time=not u["at_time"])
@@ -1909,24 +1907,6 @@ async def process_user(bot, u):
             text, _ = await screen_times(u, onboarding=True)
             await send_reminder(bot, u, text)
 
-    # morning adhkar after Fajr (before sunrise), evening adhkar after Asr
-    if is_private(u) and u["azkar_rem"]:
-        fh, fm = map(int, data["Fajr"].split(":"))
-        sh, sm = map(int, data["Sunrise"].split(":"))
-        ah, am = map(int, data["Asr"].split(":"))
-        fajr = datetime.combine(d, dtime(fh, fm), tzinfo=tz)
-        sunrise = datetime.combine(d, dtime(sh, sm), tzinfo=tz)
-        plan = (("m", min(fajr + timedelta(minutes=15), sunrise - timedelta(minutes=10))),
-                ("e", datetime.combine(d, dtime(ah, am), tzinfo=tz) + timedelta(minutes=15)))
-        for mode, when in plan:
-            sk = (u["user_id"], d.isoformat(), "az_" + mode)
-            if due(now, when) and sk not in SENT:
-                SENT[sk] = _time.time()
-                if in_quiet(when.hour, u["quiet_start"], u["quiet_end"]):
-                    continue
-                rows = [[webapp_btn(t(lang, "btn_open_azkar"), f"more&sub=azkar&az={mode}")]] if WEBAPP_URL else []
-                await send_reminder(bot, u, t(lang, "az_rem_" + mode), kb(*rows, [btn(t(lang, "btn_menu"), "m:home")]))
-
     if not u["remind"]:
         return
     ramadan = u["ramadan"] and data["hmonth"] == 9
@@ -1962,7 +1942,7 @@ async def process_user(bot, u):
 async def tick(context: ContextTypes.DEFAULT_TYPE):
     try:
         rows = await POOL.fetch(
-            "SELECT * FROM users WHERE (remind OR daily <> 'off' OR (azkar_rem AND chat_type = 'private')) "
+            "SELECT * FROM users WHERE (remind OR daily <> 'off') "
             "AND NOT banned AND NOT blocked "
             "AND lat IS NOT NULL AND tz IS NOT NULL AND lang IS NOT NULL")
     except Exception:  # noqa: BLE001
@@ -2707,7 +2687,7 @@ def profile_json(u, lang):
     return {"lang": lang, "city": u["city"], "lat": u["lat"], "lon": u["lon"], "tz": u["tz"],
             "madhab": u["madhab"], "country": u["country"], "lead": u["lead_min"], "at_time": u["at_time"],
             "remind": u["remind"], "auto": u["auto_mode"], "ramadan": u["ramadan"], "quiet": quiet,
-            "azkar_rem": u["azkar_rem"], "weekly": u["weekly"],
+            "weekly": u["weekly"],
             "lead_options": LEAD_OPTIONS, "auto_options": AUTO_OPTIONS,
             "quiet_options": ["off"] + [f"{a}-{b}" for a, b in QUIET_PRESETS]}
 
@@ -2738,7 +2718,7 @@ async def api_settings(request):
     if isinstance(body.get("auto"), int) and body["auto"] in AUTO_OPTIONS:
         fields["auto_mode"] = body["auto"]
     for key, col in (("at_time", "at_time"), ("remind", "remind"), ("ramadan", "ramadan"),
-                     ("azkar_rem", "azkar_rem"), ("weekly", "weekly")):
+                     ("weekly", "weekly")):
         if isinstance(body.get(key), bool):
             fields[col] = body[key]
     q = body.get("quiet")
