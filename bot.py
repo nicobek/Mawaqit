@@ -6055,6 +6055,17 @@ async def provider_models(p, key=None):
     return model
 
 
+async def check_backup_ai(context):
+    """On start: does each backup provider accept its key, and which model will it use."""
+    for p, v in PROVIDERS.items():
+        if not AI["pkeys"].get(p):
+            continue
+        try:
+            log.info("backup AI %s: key ok, model %s", v["name"], await provider_models(p))
+        except Exception as e:  # noqa: BLE001
+            log.warning("backup AI %s: key check failed: %r", v["name"], e)
+
+
 async def backup_answer(p, msgs, c):
     v = PROVIDERS[p]
     if AI["cool"].get("p:" + p, 0) > _time.time():
@@ -6976,6 +6987,7 @@ def main():
     app.job_queue.run_repeating(cleanup_job, interval=60, first=30)
     app.job_queue.run_repeating(menu_buttons_job, interval=120, first=120)
     app.job_queue.run_once(prefetch_ayahs, 60)
+    app.job_queue.run_once(check_backup_ai, 30)
     app.add_handler(InlineQueryHandler(on_inline), group=1)
     app.add_handler(PreCheckoutQueryHandler(on_precheckout), group=1)
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, on_paid), group=1)
