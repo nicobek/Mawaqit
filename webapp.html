@@ -514,7 +514,7 @@ html.lite #sky .b{animation:none;filter:blur(60px)}
       <button class="btn ghost" id="stCityChange" style="margin-top:10px;background:var(--bg)"></button>
     </div>
     <div class="card"><div class="lbl" id="stThemeL"></div><div class="chips" id="stTheme"></div></div>
-    <div class="card"><div class="lbl" id="stLangL"></div><div class="chips" id="stLang"></div></div>
+    <div class="card"><div class="lbl" id="stLangL"></div><div class="chips" id="stLang"></div><div class="chips" id="stScript" style="margin-top:10px"></div></div>
     <div class="card"><div class="lbl" id="stMadhabL"></div><div class="chips" id="stMadhab"></div></div>
     <div class="card">
       <div class="sw" id="stRemind"></div>
@@ -1309,7 +1309,11 @@ function renderSettings() {
   $("stCityChange").textContent = tr("pl_change"); renderThemePicker();
   $("stLangL").textContent = tr("st_lang"); $("stMadhabL").textContent = tr("st_madhab");
   $("stLeadL").textContent = tr("st_lead"); $("stAutoL").textContent = tr("st_auto"); $("stQuietL").textContent = tr("st_quiet");
-  chips($("stLang"), [["en", "🇬🇧 English"], ["ru", "🇷🇺 Русский"], ["uz", "🇺🇿 Oʻzbekcha"], ["uzc", "🇺🇿 Ўзбекча"], ["tg", "🇹🇯 Тоҷикӣ"], ["ar", "🇸🇦 العربية"]], LANG, v => saveSetting({lang: v}));
+  const uzb = LANG === "uz" || LANG === "uzc";
+  chips($("stLang"), [["en", "🇬🇧 English"], ["ru", "🇷🇺 Русский"], ["uzb", "🇺🇿 Oʻzbekcha / Ўзбекча"], ["tg", "🇹🇯 Тоҷикӣ"], ["ar", "🇸🇦 العربية"]],
+    uzb ? "uzb" : LANG, v => { if (v === "uzb") { if (!uzb) saveSetting({lang: "uz"}); } else saveSetting({lang: v}); });
+  $("stScript").hidden = !uzb;
+  if (uzb) chips($("stScript"), [["uz", "🔤 Lotin"], ["uzc", "🔤 Кирилл"]], LANG, v => { if (v !== LANG) saveSetting({lang: v}); });
   chips($("stMadhab"), [["std", tr("st_std")], ["hanafi", tr("st_hanafi")]], p.madhab, v => saveSetting({madhab: v}));
   sw($("stRemind"), tr("st_remind"), p.remind, v => saveSetting({remind: v}));
   chips($("stLead"), (p.lead_options || [5, 10, 15, 30, 0]).map(n => [n, n ? tr("st_min", {n}) : tr("st_lead_off")]), p.lead, v => saveSetting({lead: +v}));

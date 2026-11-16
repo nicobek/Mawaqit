@@ -992,6 +992,8 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS last_weekly DATE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_summary DATE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by BIGINT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS azan TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_screen_msg BIGINT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS rem_msgs BIGINT[];
 CREATE INDEX IF NOT EXISTS users_referred_by ON users (referred_by);
 CREATE TABLE IF NOT EXISTS nv_months (
     slug       TEXT NOT NULL,
@@ -1196,19 +1198,41 @@ def is_private(u):
     return kind(u) == "private"
 
 
-async def render(update: Update, text, markup=None):
-    """Edit the message in place for button presses, send a new one otherwise."""
+async def render(update: Update, text, markup=None, track=True):
+    """Edit the message in place for button presses, send a new one otherwise.
+    In private chats only one menu/screen message is kept: showing a new one deletes the previous one."""
     q = update.callback_query
+    m = None
     if q:
         try:
             await q.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
-            return q.message
+            m = q.message
         except BadRequest as e:
             if "not modified" in str(e).lower():
-                return q.message
-            log.warning("edit failed (%s), sending new message", e)
-        return await update.effective_chat.send_message(text, parse_mode=ParseMode.HTML, reply_markup=markup)
-    return await update.effective_message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
+                m = q.message
+            else:
+                log.warning("edit failed (%s), sending new message", e)
+        if m is None:
+            m = await update.effective_chat.send_message(text, parse_mode=ParseMode.HTML, reply_markup=markup)
+    else:
+        m = await update.effective_message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
+    if track and m is not None and update.effective_chat and update.effective_chat.type == "private":
+        await swap_screen(update.get_bot(), update.effective_chat.id, m.message_id)
+    return m
+
+
+async def swap_screen(bot, chat_id, msg_id):
+    """Remember msg_id as the chat's menu/screen message and delete the previous one."""
+    try:
+        old = await POOL.fetchval(
+            "UPDATE users u SET last_screen_msg = $2 FROM (SELECT last_screen_msg AS old FROM users WHERE user_id = $1) o "
+            "WHERE u.user_id = $1 RETURNING o.old", chat_id, msg_id)
+        if old and old != msg_id:
+            card = await POOL.fetchval("SELECT msg_id FROM times_cards WHERE chat_id = $1", chat_id)
+            if old != card:
+                await bot.delete_message(chat_id, old)
+    except Exception:  # noqa: BLE001  (older than 48 h or already gone)
+        pass
 
 
 async def ensure_chat(chat, ctype, owner_id=None):
@@ -1261,11 +1285,18 @@ async def can_manage(update: Update, ctx):
 
 def screen_lang(back=False):
     rows = [[btn(LANG_BUTTONS["en"], "lang:en"), btn(LANG_BUTTONS["ru"], "lang:ru")],
-            [btn(LANG_BUTTONS["uz"], "lang:uz"), btn(LANG_BUTTONS["uzc"], "lang:uzc")],
+            [btn("🇺🇿 Oʻzbekcha / Ўзбекча", "lang:uzpick:" + ("1" if back else "0"))],
             [btn(LANG_BUTTONS["tg"], "lang:tg"), btn(LANG_BUTTONS["ar"], "lang:ar")]]
     if back:
         rows.append([btn("⬅️", "s:settings")])
     return LANG_PICK_TEXT, kb(*rows)
+
+
+def screen_uz_script(back):
+    """Uzbek is written in Latin and in Cyrillic: the second step of the language choice."""
+    return ("🇺🇿 <b>Alifboni tanlang · Алифбони танланг</b>",
+            kb([btn("🔤 Lotin — Oʻzbekcha", "lang:uz")], [btn("🔤 Кирилл — Ўзбекча", "lang:uzc")],
+               [btn("⬅️ Orqaga · Орқага", "lang:all:" + ("1" if back else "0"))]))
 
 
 def screen_madhab(u):
@@ -1647,11 +1678,11 @@ async def apply_location(update, ctx, u, name, lat, lon, cc, drop_ids=()):
         await drop_message(update, mid)
     onboarding = not u["onboarded"]
     if onboarding:
-        shown = await render(update, await card_text(u), None)
+        shown = await render(update, await card_text(u), None, track=False)
         if shown is not None:
             await remember_card(update.effective_chat.id, shown.message_id, tid, ctx.bot)
         return await ask_remind(update, u)
-    shown = await render(update, await card_text(u), await card_markup(u))
+    shown = await render(update, await card_text(u), await card_markup(u), track=False)
     if shown is not None:
         await remember_card(update.effective_chat.id, shown.message_id, tid, ctx.bot)
 
@@ -1675,6 +1706,11 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await join_challenge(update, ctx, arg[3:])
     u = await target_for(update, ctx)
     await resume(update, ctx, u)
+    if chat.type == "private":
+        try:  # keep the chat clean: the user's /start disappears
+            await update.message.delete()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -1785,7 +1821,11 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await q.answer()
     tid = u["user_id"]
 
-    # language can always be picked
+    # language can always be picked (Uzbek: first the language, then Latin or Cyrillic)
+    if act == "lang" and len(parts) > 1 and parts[1] in ("uzpick", "all"):
+        back = len(parts) > 2 and parts[2] == "1"
+        text, markup = screen_uz_script(back) if parts[1] == "uzpick" else screen_lang(back=back)
+        return await render(update, text, markup)
     if act == "lang" and len(parts) > 1 and parts[1] in LANGS:
         await save(tid, lang=parts[1])
         u = await get_user(tid)
@@ -1845,7 +1885,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if act == "tc":  # refresh this card now
         try:
             text = await card_text(u)
-            await render(update, text, await card_markup(u))
+            await render(update, text, await card_markup(u), track=False)
             await POOL.execute("UPDATE times_cards SET edited_at = now() WHERE chat_id = $1 AND msg_id = $2",
                                update.effective_chat.id, q.message.message_id)
         except Exception:  # noqa: BLE001
@@ -1863,7 +1903,10 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return
         if sub == "new":
             text, markup = screen_menu(u)
-            return await update.effective_chat.send_message(text, parse_mode=ParseMode.HTML, reply_markup=markup)
+            m = await update.effective_chat.send_message(text, parse_mode=ParseMode.HTML, reply_markup=markup)
+            if update.effective_chat.type == "private":
+                await swap_screen(ctx.bot, update.effective_chat.id, m.message_id)
+            return
         elif sub == "qibla":
             return await send_qibla_image(update, u)
         elif sub == "toggle":
@@ -2154,11 +2197,13 @@ def in_quiet(hour, qs, qe):
 async def send_reminder(bot, u, text, markup=None):
     lang = u["lang"]
     if markup is None:
-        markup = kb([btn(t(lang, "btn_menu"), "m:home")]) if is_private(u) else None
+        markup = kb([btn(t(lang, "btn_menu"), "m:new")]) if is_private(u) else None
     for attempt in range(2):
         try:
-            await bot.send_message(u["user_id"], text, parse_mode=ParseMode.HTML, reply_markup=markup)
+            m = await bot.send_message(u["user_id"], text, parse_mode=ParseMode.HTML, reply_markup=markup)
             await bump("reminders_sent")
+            if is_private(u):
+                await swap_reminders(bot, u["user_id"], m.message_id)
             break
         except Forbidden:  # blocked / removed from the chat (cleared automatically when they come back)
             await POOL.execute("UPDATE users SET blocked = TRUE WHERE user_id = $1", u["user_id"])
@@ -2171,6 +2216,21 @@ async def send_reminder(bot, u, text, markup=None):
             await bump("reminders_failed")
             break
     await asyncio.sleep(0.05)  # stay well under Telegram's broadcast limits
+
+
+async def swap_reminders(bot, uid, msg_id):
+    """Only the latest reminder stays in a private chat: the previous one (and its adhan) is deleted."""
+    try:
+        old = await POOL.fetchval(
+            "UPDATE users u SET rem_msgs = ARRAY[$2::bigint] FROM (SELECT rem_msgs AS old FROM users WHERE user_id = $1) o "
+            "WHERE u.user_id = $1 RETURNING o.old", uid, msg_id)
+        for mid in old or []:
+            try:
+                await bot.delete_message(uid, mid)
+            except Exception:  # noqa: BLE001  (already deleted or older than 48 h)
+                pass
+    except Exception:  # noqa: BLE001
+        log.exception("could not clean old reminders for %s", uid)
 
 
 def due(now, when):
@@ -4173,7 +4233,9 @@ async def send_azan(bot, u):
     if not a:
         return
     try:
-        await send_azan_file(bot, u["user_id"], a, disable_notification=True)
+        m = await send_azan_file(bot, u["user_id"], a, disable_notification=True)
+        await POOL.execute("UPDATE users SET rem_msgs = array_append(rem_msgs, $2::bigint) WHERE user_id = $1",
+                           u["user_id"], m.message_id)
     except Exception:  # noqa: BLE001
         log.exception("adhan send failed for %s", u["user_id"])
 
@@ -4243,7 +4305,7 @@ BADGES = [("s7", "streak", 7), ("s30", "streak", 30), ("s100", "streak", 100),
 
 def prayed_markup(lang, day, idx, done=False):
     first = btn(t(lang, "btn_prayed_done"), "pr:ok") if done else btn(t(lang, "btn_prayed"), f"pr:{day}:{idx}")
-    return kb([first], [btn(t(lang, "btn_menu"), "m:home")])
+    return kb([first], [btn(t(lang, "btn_menu"), "m:new")])
 
 
 async def on_prayed(update, ctx, parts):
