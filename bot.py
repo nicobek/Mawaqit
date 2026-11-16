@@ -1432,6 +1432,19 @@ def place_name(addr):
     return city or country
 
 
+async def relocalize_city(uid, lang):
+    """After a language change: the city and country names in the new language (by the saved coordinates)."""
+    u = await get_user(uid)
+    if not u or u["lat"] is None or u["lon"] is None:
+        return
+    try:
+        name, cc = await reverse_geocode(u["lat"], u["lon"], lang)
+    except Exception:  # noqa: BLE001
+        return
+    if name and not re.match(r"^-?\d+\.\d+, -?\d+\.\d+$", name):
+        await save(uid, city=name, **({"country": cc} if cc and not u["country"] else {}))
+
+
 async def geocode(query, lang):
     data = await nominatim("search", {"q": query, "limit": 1, "accept-language": "uz" if lang == "uzc" else lang})
     if not data:
@@ -2178,7 +2191,10 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         text, markup = screen_uz_script(back) if parts[1] == "uzpick" else screen_lang(back=back)
         return await render(update, text, markup)
     if act == "lang" and len(parts) > 1 and parts[1] in LANGS:
+        changed = u["lang"] != parts[1]
         await save(tid, lang=parts[1])
+        if changed:
+            await relocalize_city(tid, parts[1])
         u = await get_user(tid)
         if is_private(u) and u["onboarded"]:
             await sync_menu_button(ctx.bot, u)
@@ -3563,6 +3579,7 @@ async def api_settings(request):
     tg_user, u, _ = await api_auth(request)
     if not u:
         raise web.HTTPBadRequest(text="no user")
+    old_lang = u["lang"]
     body = await read_json(request)
     fields = {}
     if body.get("lang") in LANGS:
@@ -3603,8 +3620,9 @@ async def api_settings(request):
         fields["onboarded"] = True
     await save(u["user_id"], **fields)
     u = await get_user(u["user_id"])
-    if "lang" in fields and u["onboarded"]:
-        asyncio.get_running_loop().create_task(sync_menu_button(request.app["bot"], u))
+    if "lang" in fields and fields["lang"] != old_lang:
+        await relocalize_city(u["user_id"], fields["lang"])
+        u = await get_user(u["user_id"])
     return web.json_response({"ok": True, "profile": profile_json(u, u["lang"] or "en")})
 
 
