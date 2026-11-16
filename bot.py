@@ -115,6 +115,9 @@ LANG_PICK_TEXT = (
 EVENTS = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]  # prayers that get reminders
 ROWS = [("Fajr", "🌌"), ("Sunrise", "🌅"), ("Dhuhr", "☀️"), ("Asr", "🌤"), ("Maghrib", "🌇"), ("Isha", "🌙")]
 LEAD_OPTIONS = [5, 10, 15, 30, 0]  # 0 = no early reminder
+SUH_OPTS = [-1, 10, 20, 30, 60]    # minutes before Fajr; -1 = off
+IFT_OPTS = [-1, 0, 5, 10, 15, 30]  # minutes before Maghrib; 0 = at Maghrib; -1 = off
+PRAYER_MODES = "sqo"               # s = with sound, q = silent, o = no reminder
 QUIET_PRESETS = [(23, 4), (22, 5), (0, 5)]
 DEFAULT_LEAD = 10
 KAABA = (21.4225, 39.8262)
@@ -844,6 +847,52 @@ EXTRA6 = {"en": {"admin_msg_header": "📩 <b>Message from the administrator:</b
 for _l, _d in EXTRA6.items():
     T[_l].update(_d)
 
+
+EXTRA7 = {
+    "en": {"btn_fast": "🥣 Suhoor & Iftar", "btn_snd": "🔔 Prayer sounds",
+           "fast_title": "🥣 <b>Suhoor & Iftar</b>\n\nToday: suhoor ends at <b>{s}</b>, iftar at <b>{i}</b>.\nReminders arrive every day while they are on.",
+           "fast_show_on": "👁 Show in the times card: ON ✅", "fast_show_off": "👁 Show in the times card: OFF ❌",
+           "fast_suh": "🥣 Suhoor reminder:", "fast_ift": "🍽 Iftar reminder:", "fast_at": "At Maghrib",
+           "fast_snd_on": "🔔 These reminders: with sound", "fast_snd_off": "🔕 These reminders: silent",
+           "snd_title": "🔔 <b>Prayer sounds</b>\n\nTap a prayer to switch: with sound → silent → no reminder.\n<i>Silent: the message arrives without sound or vibration.</i>",
+           "mode_s": "🔔 With sound", "mode_q": "🔕 Silent", "mode_o": "❌ No reminder",
+           "suh_rem": "🥣 <b>Suhoor</b> ends in {n} min · {time}\nFinish your meal 🤍"},
+    "ru": {"btn_fast": "🥣 Сухур и ифтар", "btn_snd": "🔔 Звук намазов",
+           "fast_title": "🥣 <b>Сухур и ифтар</b>\n\nСегодня: сухур до <b>{s}</b>, ифтар в <b>{i}</b>.\nНапоминания приходят каждый день, пока включены.",
+           "fast_show_on": "👁 Показывать в карточке: ВКЛ ✅", "fast_show_off": "👁 Показывать в карточке: ВЫКЛ ❌",
+           "fast_suh": "🥣 Напомнить о конце сухура:", "fast_ift": "🍽 Напомнить об ифтаре:", "fast_at": "В момент Магриба",
+           "fast_snd_on": "🔔 Эти напоминания: со звуком", "fast_snd_off": "🔕 Эти напоминания: без звука",
+           "snd_title": "🔔 <b>Звук намазов</b>\n\nНажмите на намаз, чтобы переключить: со звуком → без звука → не напоминать.\n<i>Без звука — сообщение придёт тихо, без звука и вибрации.</i>",
+           "mode_s": "🔔 Со звуком", "mode_q": "🔕 Без звука", "mode_o": "❌ Не напоминать",
+           "suh_rem": "🥣 <b>Сухур</b> заканчивается через {n} мин · {time}\nУспейте поесть 🤍"},
+    "uz": {"btn_fast": "🥣 Saharlik va iftor", "btn_snd": "🔔 Namozlar ovozi",
+           "fast_title": "🥣 <b>Saharlik va iftor</b>\n\nBugun: saharlik <b>{s}</b> gacha, iftor <b>{i}</b> da.\nEslatmalar yoqilgan ekan, har kuni keladi.",
+           "fast_show_on": "👁 Kartada ko'rsatish: YOQILGAN ✅", "fast_show_off": "👁 Kartada ko'rsatish: O'CHIQ ❌",
+           "fast_suh": "🥣 Saharlik tugashini eslatish:", "fast_ift": "🍽 Iftorni eslatish:", "fast_at": "Shom vaqtida",
+           "fast_snd_on": "🔔 Bu eslatmalar: ovozli", "fast_snd_off": "🔕 Bu eslatmalar: ovozsiz",
+           "snd_title": "🔔 <b>Namozlar ovozi</b>\n\nAlmashtirish uchun namozni bosing: ovozli → ovozsiz → eslatmaslik.\n<i>Ovozsiz — xabar ovoz va tebranishsiz keladi.</i>",
+           "mode_s": "🔔 Ovozli", "mode_q": "🔕 Ovozsiz", "mode_o": "❌ Eslatmaslik",
+           "suh_rem": "🥣 <b>Saharlik</b> tugashiga {n} daqiqa qoldi · {time}\nOvqatlanishga ulguring 🤍"},
+    "tg": {"btn_fast": "🥣 Саҳарӣ ва ифтор", "btn_snd": "🔔 Садои намозҳо",
+           "fast_title": "🥣 <b>Саҳарӣ ва ифтор</b>\n\nИмрӯз: саҳарӣ то <b>{s}</b>, ифтор соати <b>{i}</b>.\nЁдовариҳо то фаъол ҳастанд, ҳар рӯз меоянд.",
+           "fast_show_on": "👁 Дар корт нишон додан: ФАЪОЛ ✅", "fast_show_off": "👁 Дар корт нишон додан: ХОМӮШ ❌",
+           "fast_suh": "🥣 Ёдоварии анҷоми саҳарӣ:", "fast_ift": "🍽 Ёдоварии ифтор:", "fast_at": "Дар вақти Шом",
+           "fast_snd_on": "🔔 Ин ёдовариҳо: бо садо", "fast_snd_off": "🔕 Ин ёдовариҳо: бесадо",
+           "snd_title": "🔔 <b>Садои намозҳо</b>\n\nБарои иваз кардан намозро пахш кунед: бо садо → бесадо → ёдоварӣ нашавад.\n<i>Бесадо — паём бе садо ва ларзиш меояд.</i>",
+           "mode_s": "🔔 Бо садо", "mode_q": "🔕 Бесадо", "mode_o": "❌ Ёдоварӣ нашавад",
+           "suh_rem": "🥣 <b>Саҳарӣ</b> баъди {n} дақиқа анҷом меёбад · {time}\nХӯрокро тамом кунед 🤍"},
+    "ar": {"btn_fast": "🥣 السحور والإفطار", "btn_snd": "🔔 أصوات الصلوات",
+           "fast_title": "🥣 <b>السحور والإفطار</b>\n\nاليوم: السحور حتى <b>{s}</b>، والإفطار الساعة <b>{i}</b>.\nتصل التذكيرات كل يوم ما دامت مفعّلة.",
+           "fast_show_on": "👁 العرض في البطاقة: مفعّل ✅", "fast_show_off": "👁 العرض في البطاقة: متوقف ❌",
+           "fast_suh": "🥣 تذكير بانتهاء السحور:", "fast_ift": "🍽 تذكير بالإفطار:", "fast_at": "عند المغرب",
+           "fast_snd_on": "🔔 هذه التذكيرات: بصوت", "fast_snd_off": "🔕 هذه التذكيرات: بصمت",
+           "snd_title": "🔔 <b>أصوات الصلوات</b>\n\nاضغط على الصلاة للتبديل: بصوت ← بصمت ← بدون تذكير.\n<i>بصمت: تصل الرسالة دون صوت أو اهتزاز.</i>",
+           "mode_s": "🔔 بصوت", "mode_q": "🔕 بصمت", "mode_o": "❌ بدون تذكير",
+           "suh_rem": "🥣 ينتهي <b>السحور</b> بعد {n} دقيقة · {time}\nأكمل طعامك 🤍"},
+}
+for _l, _d in EXTRA7.items():
+    T[_l].update(_d)
+
 # ───────────────────────── Uzbek in Cyrillic ─────────────────────────
 # The Cyrillic Uzbek texts are produced from the Latin ones by the official spelling rules,
 # so both stay in sync. Words that the rules can't get right are listed in CYR_WORDS.
@@ -1002,6 +1051,11 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by BIGINT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS azan TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_screen_msg BIGINT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS rem_msgs BIGINT[];
+ALTER TABLE users ADD COLUMN IF NOT EXISTS fast_show BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS suhoor_rem INT NOT NULL DEFAULT -1;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS iftar_rem INT NOT NULL DEFAULT -1;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS fast_sound BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS prayer_modes TEXT NOT NULL DEFAULT 'sssss';
 CREATE TABLE IF NOT EXISTS admins (
     user_id  BIGINT PRIMARY KEY,
     perms    TEXT[] NOT NULL DEFAULT '{}',
@@ -1482,6 +1536,7 @@ def screen_settings(u):
         if AZANS:
             lines.append(t(lang, "st_azan", v=esc(azan_label(lang, u))))
             rows.append([btn(t(lang, "sb_azan", v=azan_label(lang, u)), "s:azan")])
+        rows.append([btn(t(lang, "btn_fast"), "s:fast"), btn(t(lang, "btn_snd"), "s:snd")])
         rows.append([btn(t(lang, "btn_groups"), "s:groups")])
         if ADMINS:
             rows.append([btn(t(lang, "btn_support"), "s:support")])
@@ -1495,6 +1550,31 @@ def screen_lead(u):
     rows = [opts[i:i + 2] for i in range(0, len(opts), 2)]
     rows.append([btn(t(lang, "btn_back"), "s:settings")])
     return t(lang, "lead_title"), kb(*rows)
+
+
+async def screen_fast(u):
+    lang = u["lang"]
+    d = await get_timings(u, datetime.now(ZoneInfo(u["tz"])).date())
+    def opt(v, cur, cb, label):
+        return btn(("✅ " if v == cur else "") + label, cb)
+    off = t(lang, "off").capitalize()
+    suh = [opt(v, u["suhoor_rem"], f"set:suh:{v}", off if v < 0 else f"{v}′") for v in SUH_OPTS]
+    ift = [opt(v, u["iftar_rem"], f"set:ift:{v}", off if v < 0 else (t(lang, "fast_at") if v == 0 else f"{v}′")) for v in IFT_OPTS]
+    rows = [[btn(t(lang, "fast_show_on" if u["fast_show"] else "fast_show_off"), "s:fs")],
+            [btn(t(lang, "fast_suh"), "s:fast")], suh,
+            [btn(t(lang, "fast_ift"), "s:fast")], ift[:3], ift[3:],
+            [btn(t(lang, "fast_snd_on" if u["fast_sound"] else "fast_snd_off"), "s:fsnd")],
+            [btn(t(lang, "btn_back"), "s:settings")]]
+    return t(lang, "fast_title", s=d["Fajr"], i=d["Maghrib"]), kb(*rows)
+
+
+def screen_sound(u):
+    lang = u["lang"]
+    modes = (u["prayer_modes"] or "sssss").ljust(5, "s")
+    icons = dict(ROWS)
+    rows = [[btn(f"{icons[k]} {PN[lang][k.lower()]} — {t(lang, 'mode_' + modes[i])}", f"set:pm:{i}")] for i, k in enumerate(EVENTS)]
+    rows.append([btn(t(lang, "btn_back"), "s:settings")])
+    return t(lang, "snd_title"), kb(*rows)
 
 
 def screen_quiet(u):
@@ -1533,7 +1613,7 @@ async def screen_times(u, onboarding=False):
     lines.append("")
     for key, emoji in ROWS:
         lines.append(f"{emoji} {names[key.lower()]} — <b>{d[key]}</b>")
-    if ram:
+    if ram or (u.get("fast_show") if hasattr(u, "get") else False):
         lines += ["", f"🥣 {t(lang, 'suhoor')} — <b>{d['Fajr']}</b>", f"🍽 {t(lang, 'iftar')} — <b>{d['Maghrib']}</b>"]
 
     nxt = None
@@ -1586,9 +1666,9 @@ async def card_markup(u):
             share = await share_times_btn(u)
         except Exception:  # noqa: BLE001
             log.exception("share button failed")
-        rows = [[qibla_btn(u), btn("🔄", "tc:refresh")]] + ([[share]] if share else []) + [[btn(t(lang, "btn_menu"), "m:new")]]
+        rows = ([[share]] if share else []) + [[btn(t(lang, "btn_menu"), "m:new")]]
         return kb(*rows)
-    return kb([qibla_btn(u), btn("🔄", "tc:refresh")], [btn(t(lang, "btn_menu"), "m:new")])
+    return kb([btn(t(lang, "btn_menu"), "m:new")])
 
 
 async def card_text(u):
@@ -1625,7 +1705,7 @@ async def send_times_card(update, ctx, u):
     except BadRequest:  # just in case Telegram refuses the share link: send the card without it
         log.exception("card with share link refused")
         m = await chat.send_message(text, parse_mode=ParseMode.HTML, reply_markup=kb(
-            [qibla_btn(u), btn("🔄", "tc:refresh")], [btn(t(u["lang"], "btn_menu"), "m:new")]))
+            [btn(t(u["lang"], "btn_menu"), "m:new")]))
     await remember_card(chat.id, m.message_id, u["user_id"], ctx.bot)
 
 
@@ -1975,6 +2055,14 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             text, markup = screen_daily(u)
         elif sub == "auto":
             text, markup = screen_auto(u)
+        elif sub == "fast" and is_private(u):
+            text, markup = await screen_fast(u)
+        elif sub in ("fs", "fsnd") and is_private(u):
+            col = "fast_show" if sub == "fs" else "fast_sound"
+            await save(tid, **{col: not u[col]})
+            text, markup = await screen_fast(await get_user(tid))
+        elif sub == "snd" and is_private(u):
+            text, markup = screen_sound(u)
         elif sub == "groups" and is_private(u):
             text, markup = screen_groups(u)
         elif sub == "azan" and is_private(u):
@@ -1990,6 +2078,21 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             text, markup = screen_settings(await get_user(tid))
         else:
             text, markup = screen_settings(u)
+        return await render(update, text, markup)
+
+    if act == "set" and parts[1] in ("suh", "ift", "pm") and len(parts) > 2 and is_private(u):
+        v = int(parts[2]) if parts[2].lstrip("-").isdigit() else None
+        if parts[1] == "suh" and v in SUH_OPTS:
+            await save(tid, suhoor_rem=v)
+        elif parts[1] == "ift" and v in IFT_OPTS:
+            await save(tid, iftar_rem=v)
+        elif parts[1] == "pm" and v is not None and 0 <= v < 5:
+            modes = list((u["prayer_modes"] or "sssss").ljust(5, "s"))
+            modes[v] = PRAYER_MODES[(PRAYER_MODES.index(modes[v]) + 1) % 3]
+            await save(tid, prayer_modes="".join(modes))
+            text, markup = screen_sound(await get_user(tid))
+            return await render(update, text, markup)
+        text, markup = await screen_fast(await get_user(tid))
         return await render(update, text, markup)
 
     if act == "set":
@@ -2235,13 +2338,14 @@ def in_quiet(hour, qs, qe):
     return (qs <= hour < qe) if qs <= qe else (hour >= qs or hour < qe)
 
 
-async def send_reminder(bot, u, text, markup=None):
+async def send_reminder(bot, u, text, markup=None, silent=False):
     lang = u["lang"]
     if markup is None:
         markup = kb([btn(t(lang, "btn_menu"), "m:new")]) if is_private(u) else None
     for attempt in range(2):
         try:
-            m = await bot.send_message(u["user_id"], text, parse_mode=ParseMode.HTML, reply_markup=markup)
+            m = await bot.send_message(u["user_id"], text, parse_mode=ParseMode.HTML, reply_markup=markup,
+                                       disable_notification=silent)
             await bump("reminders_sent")
             if is_private(u):
                 await swap_reminders(bot, u["user_id"], m.message_id)
@@ -2295,10 +2399,17 @@ async def process_user(bot, u):
             text, _ = await screen_times(u, onboarding=True)
             await send_reminder(bot, u, text)
 
+    ramadan = u["ramadan"] and data["hmonth"] == 9
+    modes = ((u.get("prayer_modes") if hasattr(u, "get") else None) or "sssss").ljust(5, "s")
+    if is_private(u) and (u["suhoor_rem"] >= 0 or u["iftar_rem"] >= 0):
+        await fasting_reminders(bot, u, data, now, d, tz, ramadan, modes)
+
     if not u["remind"]:
         return
-    ramadan = u["ramadan"] and data["hmonth"] == 9
     for key in EVENTS:
+        mode = modes[EVENTS.index(key)] if is_private(u) else "s"
+        if mode == "o":
+            continue
         hh, mm = map(int, data[key].split(":"))
         event_time = datetime.combine(d, dtime(hh, mm), tzinfo=tz)
         plan = []  # two reminders: "b" = before, "n" = now
@@ -2327,15 +2438,46 @@ async def process_user(bot, u):
             markup = None
             if is_private(u) and (suffix == "n" or not u["at_time"]):
                 markup = prayed_markup(lang, d.isoformat(), EVENTS.index(key))
-            await send_reminder(bot, u, text, markup)
+            await send_reminder(bot, u, text, markup, silent=mode == "q")
             if suffix == "n" and is_private(u) and u["azan"]:
                 await send_azan(bot, u)
+
+
+async def fasting_reminders(bot, u, data, now, d, tz, ramadan, modes):
+    """Suhoor (before Fajr) and iftar (before / at Maghrib) reminders chosen in the settings."""
+    lang = u["lang"]
+    plan = []
+    if u["suhoor_rem"] > 0:
+        plan.append(("suh", "Fajr", u["suhoor_rem"]))
+    if u["iftar_rem"] >= 0:
+        plan.append(("ift", "Maghrib", u["iftar_rem"]))
+    for tag, key, n in plan:
+        hh, mm = map(int, data[key].split(":"))
+        when = datetime.combine(d, dtime(hh, mm), tzinfo=tz) - timedelta(minutes=n)
+        if not due(now, when):
+            continue
+        sk = (u["user_id"], d.isoformat(), tag)
+        if sk in SENT:
+            continue
+        SENT[sk] = _time.time()
+        if in_quiet(when.hour, u["quiet_start"], u["quiet_end"]):
+            continue
+        # in Ramadan the prayer reminder already says this at the same moment: don't send it twice
+        idx = EVENTS.index(key)
+        same = u["remind"] and modes[idx] != "o" and ((n > 0 and n == u["lead_min"]) or (n == 0 and u["at_time"]))
+        if ramadan and same:
+            continue
+        if tag == "suh":
+            text = t(lang, "suh_rem", n=n, time=data[key])
+        else:
+            text = t(lang, "rem_iftar_n" if n == 0 else "rem_iftar_b", n=n, time=data[key])
+        await send_reminder(bot, u, text, silent=not u["fast_sound"])
 
 
 async def tick(context: ContextTypes.DEFAULT_TYPE):
     try:
         rows = await POOL.fetch(
-            "SELECT * FROM users WHERE (remind OR daily <> 'off') "
+            "SELECT * FROM users WHERE (remind OR daily <> 'off' OR suhoor_rem >= 0 OR iftar_rem >= 0) "
             "AND NOT banned AND NOT blocked "
             "AND lat IS NOT NULL AND tz IS NOT NULL AND lang IS NOT NULL")
     except Exception:  # noqa: BLE001
@@ -3125,6 +3267,9 @@ def profile_json(u, lang):
             "madhab": u["madhab"], "country": u["country"], "lead": u["lead_min"], "at_time": u["at_time"],
             "remind": u["remind"], "auto": u["auto_mode"], "ramadan": u["ramadan"], "quiet": quiet,
             "weekly": u["weekly"], "azan": u["azan"] if azan_by_id(u["azan"]) else "off",
+            "fast_show": u["fast_show"], "suhoor_rem": u["suhoor_rem"], "iftar_rem": u["iftar_rem"],
+            "fast_sound": u["fast_sound"], "modes": (u["prayer_modes"] or "sssss").ljust(5, "s"),
+            "suh_options": SUH_OPTS, "ift_options": IFT_OPTS,
             "azan_options": [[str(a["id"]), a["name"]] for a in AZANS],
             "lead_options": LEAD_OPTIONS, "auto_options": AUTO_OPTIONS,
             "quiet_options": ["off"] + [f"{a}-{b}" for a, b in QUIET_PRESETS]}
@@ -3156,9 +3301,16 @@ async def api_settings(request):
     if isinstance(body.get("auto"), int) and body["auto"] in AUTO_OPTIONS:
         fields["auto_mode"] = body["auto"]
     for key, col in (("at_time", "at_time"), ("remind", "remind"), ("ramadan", "ramadan"),
-                     ("weekly", "weekly")):
+                     ("weekly", "weekly"), ("fast_show", "fast_show"), ("fast_sound", "fast_sound")):
         if isinstance(body.get(key), bool):
             fields[col] = body[key]
+    if body.get("suhoor_rem") in SUH_OPTS:
+        fields["suhoor_rem"] = body["suhoor_rem"]
+    if body.get("iftar_rem") in IFT_OPTS:
+        fields["iftar_rem"] = body["iftar_rem"]
+    pm = body.get("modes")
+    if isinstance(pm, str) and len(pm) == 5 and set(pm) <= set(PRAYER_MODES):
+        fields["prayer_modes"] = pm
     az = body.get("azan")
     if az == "off" or (az is not None and azan_by_id(az)):
         fields["azan"] = None if az == "off" else str(az)

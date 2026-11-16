@@ -526,6 +526,11 @@ html.lite #sky .b{animation:none;filter:blur(60px)}
     <div class="card"><div class="sw" id="stRam"></div></div>
     <div class="card"><div class="sw" id="stWk"></div></div>
     <div class="card" id="stAzanCard" hidden><div class="lbl" id="stAzanL"></div><div class="sub" id="stAzanH" style="margin:2px 0 8px"></div><div class="chips" id="stAzan"></div></div>
+    <div class="card"><div class="lbl" id="fsT" style="font-weight:700;margin-bottom:8px"></div><div class="sw" id="fsShow"></div>
+      <div class="lbl sub" id="fsSuhL" style="margin:12px 0 6px"></div><div class="chips" id="fsSuh"></div>
+      <div class="lbl sub" id="fsIftL" style="margin:12px 0 6px"></div><div class="chips" id="fsIft"></div>
+      <div class="sw" id="fsSnd" style="margin-top:12px"></div></div>
+    <div class="card"><div class="lbl" id="sdT" style="font-weight:700"></div><div class="sub" id="sdH" style="margin:2px 0 8px"></div><div id="sdList"></div></div>
     <div class="card"><div class="sw" id="stSky"></div></div>
   </section>
 
@@ -1300,6 +1305,7 @@ async function saveSetting(patch) {
     toast(tr("st_saved"));
     if (patch.lang) { LANG = patch.lang; applyLang(); renderToday(); renderQibla(); renderMore(); }
     if (patch.madhab) { await load(true); }
+    if ("fast_show" in patch) renderExtra();
     renderSettings();
   } catch (e) { toast(tr("st_err")); renderSettings(); }
 }
@@ -1328,6 +1334,16 @@ function renderSettings() {
     $("stAzanL").textContent = tr("st_azan"); $("stAzanH").textContent = tr("st_azan_h");
     chips($("stAzan"), [["off", tr("st_azan_off")]].concat(az.map(([id, n]) => [id, "🔊 " + n])), p.azan || "off", v => saveSetting({azan: v}));
   }
+  $("fsT").textContent = tr("fs_title"); $("fsSuhL").textContent = tr("fs_suh"); $("fsIftL").textContent = tr("fs_ift");
+  sw($("fsShow"), tr("fs_show"), !!p.fast_show, v => saveSetting({fast_show: v}));
+  chips($("fsSuh"), (p.suh_options || [-1, 10, 20, 30, 60]).map(n => [n, n < 0 ? tr("fs_off") : tr("fs_min", {n})]), p.suhoor_rem ?? -1, v => saveSetting({suhoor_rem: +v}));
+  chips($("fsIft"), (p.ift_options || [-1, 0, 5, 10, 15, 30]).map(n => [n, n < 0 ? tr("fs_off") : n === 0 ? tr("fs_at") : tr("fs_min", {n})]), p.iftar_rem ?? -1, v => saveSetting({iftar_rem: +v}));
+  sw($("fsSnd"), tr("fs_sound"), p.fast_sound !== false, v => saveSetting({fast_sound: v}));
+  $("sdT").textContent = tr("snd_title"); $("sdH").textContent = tr("snd_hint");
+  const modes = (p.modes || "sssss").split("");
+  $("sdList").innerHTML = FARD.map((k, i) => `<div class="row between" style="padding:6px 0"><span>${ICONS[k]} <b>${esc(T.pn[k])}</b></span><div class="chips" data-pm="${i}" style="flex:none"></div></div>`).join("");
+  document.querySelectorAll("#sdList [data-pm]").forEach(el => { const i = +el.dataset.pm;
+    chips(el, [["s", "🔔"], ["q", "🔕"], ["o", "❌"]], modes[i], v => { const m = modes.slice(); m[i] = v; saveSetting({modes: m.join("")}); }); });
   sw($("stSky"), tr("st_sky"), SKY_ON, v => { SKY_ON = v; store.set("app_sky", v ? "1" : "0"); updateSky(true); renderSettings(); });
 }
 /* ───────── AZKAR ───────── */
@@ -1662,6 +1678,21 @@ const LX6 = {
 };
 for (const l in LX6) Object.assign(LX[l], LX6[l]);
 
+/* ═══════════ stage 6: suhoor & iftar, prayer sounds ═══════════ */
+const LX8 = {
+ en:{fs_title:"🥣 Suhoor & Iftar",fs_show:"Show in the times card and here",fs_suh:"Suhoor reminder (before Fajr)",fs_ift:"Iftar reminder (before Maghrib)",fs_off:"Off",fs_at:"At Maghrib",fs_min:"{n} min",fs_sound:"These reminders with sound",
+  snd_title:"🔔 Prayer sounds",snd_hint:"With sound, silent (no sound or vibration) or no reminder",x_suh:"🥣 Suhoor until",x_ift:"🍽 Iftar"},
+ ru:{fs_title:"🥣 Сухур и ифтар",fs_show:"Показывать в карточке и здесь",fs_suh:"Напомнить о конце сухура (до Фаджра)",fs_ift:"Напомнить об ифтаре (до Магриба)",fs_off:"Выкл",fs_at:"В момент Магриба",fs_min:"{n} мин",fs_sound:"Эти напоминания со звуком",
+  snd_title:"🔔 Звук намазов",snd_hint:"Со звуком, без звука (тихо, без вибрации) или не напоминать",x_suh:"🥣 Сухур до",x_ift:"🍽 Ифтар"},
+ uz:{fs_title:"🥣 Saharlik va iftor",fs_show:"Kartada va shu yerda ko'rsatish",fs_suh:"Saharlik tugashini eslatish (Bomdoddan oldin)",fs_ift:"Iftorni eslatish (Shomdan oldin)",fs_off:"O'chiq",fs_at:"Shom vaqtida",fs_min:"{n} daq",fs_sound:"Bu eslatmalar ovozli",
+  snd_title:"🔔 Namozlar ovozi",snd_hint:"Ovozli, ovozsiz (tebranishsiz) yoki eslatmaslik",x_suh:"🥣 Saharlik",x_ift:"🍽 Iftor"},
+ tg:{fs_title:"🥣 Саҳарӣ ва ифтор",fs_show:"Дар корт ва дар ин ҷо нишон додан",fs_suh:"Ёдоварии анҷоми саҳарӣ (пеш аз Бомдод)",fs_ift:"Ёдоварии ифтор (пеш аз Шом)",fs_off:"Хомӯш",fs_at:"Дар вақти Шом",fs_min:"{n} дақ",fs_sound:"Ин ёдовариҳо бо садо",
+  snd_title:"🔔 Садои намозҳо",snd_hint:"Бо садо, бесадо (бе ларзиш) ё ёдоварӣ нашавад",x_suh:"🥣 Саҳарӣ то",x_ift:"🍽 Ифтор"},
+ ar:{fs_title:"🥣 السحور والإفطار",fs_show:"العرض في البطاقة وهنا",fs_suh:"تذكير بانتهاء السحور (قبل الفجر)",fs_ift:"تذكير بالإفطار (قبل المغرب)",fs_off:"متوقف",fs_at:"عند المغرب",fs_min:"{n} د",fs_sound:"هذه التذكيرات بصوت",
+  snd_title:"🔔 أصوات الصلوات",snd_hint:"بصوت، بصمت (دون اهتزاز) أو بدون تذكير",x_suh:"🥣 السحور حتى",x_ift:"🍽 الإفطار"}
+};
+for (const l in LX8) Object.assign(LX[l], LX8[l]);
+
 /* ═══════════ Uzbek in Cyrillic: made from the Latin texts by the spelling rules (same as the bot) ═══════════ */
 const CYR_APOS = "'ʻʼ’‘`";
 const CYR_1 = {a:"а",b:"б",c:"ц",d:"д",e:"е",f:"ф",g:"г",h:"ҳ",i:"и",j:"ж",k:"к",l:"л",m:"м",n:"н",o:"о",p:"п",q:"қ",r:"р",s:"с",t:"т",u:"у",v:"в",w:"в",x:"х",y:"й",z:"з"};
@@ -1749,7 +1780,8 @@ async function renderExtra() {
   const duha = wall(iso, t.Sunrise) + 20 * 60e3;
   const mg = wall(iso, t.Maghrib), fj = wall(addDays(iso, 1), DATA.tomorrow.t.Fajr);
   const third = mg + (fj - mg) * 2 / 3;
-  const rows = [[tr("x_duha"), tr("x_from", {t: hhmm(duha)})], [tr("x_third"), tr("x_from", {t: hhmm(third)})]];
+  const rows = (DATA.profile.fast_show ? [[tr("x_suh"), t.Fajr], [tr("x_ift"), t.Maghrib]] : [])
+    .concat([[tr("x_duha"), tr("x_from", {t: hhmm(duha)})], [tr("x_third"), tr("x_from", {t: hhmm(third)})]]);
   if (DATA.today.hmonth === 9) rows.push([tr("x_ram_now", {d: DATA.today.hday}), ""]);
   else {
     if (RAM_START === undefined) {
