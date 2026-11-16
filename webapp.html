@@ -150,6 +150,58 @@ h2{font-size:17px;margin:20px 0 10px}
 .names .tr{font-weight:700;font-size:13px}
 .names .mn{color:var(--hint);font-size:12px;margin-top:2px}
 
+
+/* settings */
+.lbl{color:var(--hint);font-size:13px;font-weight:600;margin-bottom:8px}
+.cur{font-weight:700;font-size:16px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:8px 14px;border-radius:999px;background:var(--bg);font-weight:600;font-size:14px;border:1px solid var(--line)}
+.chip.on{background:var(--gold);color:#1b1404;border-color:var(--gold)}
+.sw{display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:600;cursor:pointer}
+.sw .tg{width:50px;height:30px;border-radius:999px;background:var(--line);position:relative;flex:none;transition:.2s}
+.sw .tg::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sw.on .tg{background:var(--green)}
+.sw.on .tg::after{inset-inline-start:23px}
+.found{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--gold-soft)}
+.toast{position:fixed;left:50%;bottom:calc(var(--nav-h) + var(--safe-bottom) + 16px);transform:translate(-50%,20px);opacity:0;background:var(--text);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:700;font-size:14px;z-index:20;transition:.25s;pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* azkar & duas */
+.seg{display:flex;background:var(--card);border-radius:14px;padding:4px;gap:4px;margin-top:10px}
+.seg button{flex:1;padding:9px;border-radius:11px;font-weight:700;color:var(--hint)}
+.seg button.on{background:var(--gold);color:#1b1404}
+.prog{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin:4px 0 10px}
+.prog div{height:100%;width:0;background:var(--green);transition:width .3s}
+.zk{display:block;width:100%;text-align:start;background:var(--card);border-radius:18px;padding:14px 16px;margin:10px 0;border:2px solid transparent;transition:.2s}
+.zk.done{border-color:var(--green);opacity:.75}
+.zk .ar,.du .ar{font-family:"Noto Naskh Arabic","Amiri","Geeza Pro",serif;font-size:22px;line-height:1.9;direction:rtl;text-align:right}
+.zk .tl,.du .tl{color:var(--gold);font-style:italic;font-size:13px;margin-top:6px}
+.zk .mn,.du .mn{font-size:14px;margin-top:6px}
+.zk .ft,.du .ft{display:flex;justify-content:space-between;align-items:center;margin-top:10px;color:var(--hint);font-size:12px}
+.zk .cnt{font-weight:800;font-size:14px;color:var(--text);background:var(--gold-soft);padding:4px 12px;border-radius:999px}
+.zk.done .cnt{background:var(--green);color:#fff}
+.du{background:var(--card);border-radius:18px;padding:14px 16px;margin:10px 0}
+.du .tt{font-weight:800;margin-bottom:4px}
+
+/* qada */
+.qd .r{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line)}
+.qd .r:last-child{border-bottom:0}
+.qd .nm{flex:1;font-weight:600}
+.qd .n{min-width:52px;text-align:center;font-weight:800;font-size:18px;font-variant-numeric:tabular-nums}
+.qd .pm{width:40px;height:40px;border-radius:12px;background:var(--bg);font-size:20px;font-weight:800;border:1px solid var(--line)}
+.qd .pm.ok{background:var(--green);color:#fff;border-color:var(--green)}
+
+/* islamic dates */
+.ev .e{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--line)}
+.ev .e:last-child{border-bottom:0}
+.ev .ic{width:40px;height:40px;border-radius:12px;background:var(--gold-soft);display:grid;place-items:center;font-size:20px;flex:none}
+.ev .nm{flex:1;min-width:0}
+.ev .nm b{display:block}
+.ev .left{font-weight:800;color:var(--gold);white-space:nowrap}
+.ev .e.today .left{color:var(--green)}
+.cvres{margin-top:12px;font-size:18px;font-weight:800;text-align:center;min-height:26px}
+select.search{appearance:none;-webkit-appearance:none}
+
 /* nav */
 nav{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:6px 6px calc(6px + var(--safe-bottom));border-top:1px solid var(--line);z-index:10}
 nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:12px;color:var(--hint);font-size:11px;font-weight:600}
@@ -238,6 +290,70 @@ nav button.on .i{filter:none;opacity:1}
     <h1 id="nTitle"></h1>
     <input class="search" id="nSearch" type="search" autocomplete="off">
     <div class="names" id="nList"></div>
+  </section>
+
+  <section class="view" id="v-settings">
+    <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
+    <h1 id="stTitle"></h1>
+    <div class="card">
+      <div class="lbl" id="stCityL"></div>
+      <div class="cur" id="stCity"></div>
+      <div class="row" style="margin-top:10px"><input class="search" id="stCityQ" style="margin:0" autocomplete="off"><button class="chip on" id="stCityFind" style="flex:none"></button></div>
+      <div id="stCityRes"></div>
+    </div>
+    <div class="card"><div class="lbl" id="stLangL"></div><div class="chips" id="stLang"></div></div>
+    <div class="card"><div class="lbl" id="stMadhabL"></div><div class="chips" id="stMadhab"></div></div>
+    <div class="card">
+      <div class="sw" id="stRemind"></div>
+      <div class="lbl" id="stLeadL" style="margin-top:12px"></div><div class="chips" id="stLead"></div>
+      <div class="sw" id="stAt" style="margin-top:12px"></div>
+    </div>
+    <div class="card"><div class="lbl" id="stAutoL"></div><div class="chips" id="stAuto"></div></div>
+    <div class="card"><div class="lbl" id="stQuietL"></div><div class="chips" id="stQuiet"></div></div>
+    <div class="card"><div class="sw" id="stRam"></div></div>
+  </section>
+
+  <section class="view" id="v-azkar">
+    <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
+    <h1 id="azTitle"></h1>
+    <div class="seg" id="azSeg"><button data-az="m"></button><button data-az="e"></button></div>
+    <div class="sub" id="azHint" style="margin:8px 2px"></div>
+    <div class="prog"><div id="azBar"></div></div>
+    <div id="azList"></div>
+    <button class="btn ghost" id="azReset" style="margin-top:6px"></button>
+    <div class="sub center" style="margin-top:12px" id="azNote"></div>
+  </section>
+
+  <section class="view" id="v-duas">
+    <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
+    <h1 id="duTitle"></h1>
+    <div id="duList"></div>
+    <div class="sub center" style="margin-top:12px" id="duNote"></div>
+  </section>
+
+  <section class="view" id="v-qada">
+    <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
+    <h1 id="qdTitle"></h1><div class="sub" id="qdHint"></div>
+    <div class="card center"><div class="sub" id="qdTotalL"></div><div class="count" id="qdTotal">0</div></div>
+    <div class="card qd" id="qdList"></div>
+    <div class="card"><div class="lbl" id="qdAddL"></div>
+      <div class="row" style="margin-top:8px"><input class="search" id="qdDays" type="number" min="1" max="36500" inputmode="numeric" style="margin:0"><button class="chip on" id="qdAdd" style="flex:none"></button></div>
+      <div class="sub" id="qdAddHint" style="margin-top:6px"></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-dates">
+    <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
+    <h1 id="dtTitle"></h1><div class="sub" id="dtToday"></div>
+    <div class="card ev" id="dtList"></div>
+    <div class="sub" id="dtNote" style="margin:4px 4px 0"></div>
+    <h2 id="cvTitle"></h2>
+    <div class="seg" id="cvSeg"><button data-cv="g"></button><button data-cv="h"></button></div>
+    <div class="card">
+      <div id="cvG"><input class="search" id="cvDate" type="date" style="margin:0"></div>
+      <div id="cvH" hidden><div class="row"><input class="search" id="cvHd" type="number" min="1" max="30" inputmode="numeric" style="margin:0;width:70px"><select class="search" id="cvHm" style="margin:0"></select><input class="search" id="cvHy" type="number" min="1300" max="1600" inputmode="numeric" style="margin:0;width:90px"></div></div>
+      <div class="cvres" id="cvRes"></div>
+    </div>
   </section>
 </div>
 
@@ -503,7 +619,8 @@ function go(tab) {
 function openSub(name) {
   SUB = name; show(name);
   try { tg?.BackButton?.show(); } catch (e) {}
-  ({tracker: renderTracker, ramadan: renderRamadan, mosques: openMosques, names: renderNames})[name]?.();
+  ({tracker: renderTracker, ramadan: renderRamadan, mosques: openMosques, names: renderNames, settings: renderSettings,
+    azkar: renderAzkar, duas: renderDuas, qada: renderQada, dates: renderDates})[name]?.();
 }
 function back() { if (SUB) go("more"); }
 
@@ -694,7 +811,9 @@ function tapBead() {
 /* ───────── MORE ───────── */
 function renderMore() {
   $("moreTitle").textContent = T.t_more;
-  const items = [["tracker", "✅", "m_tracker", "m_tracker_d"], ["ramadan", "🌙", "m_ramadan", "m_ramadan_d"], ["mosques", "🕌", "m_mosques", "m_mosques_d"], ["names", "📖", "m_names", "m_names_d"]];
+  const items = [["tracker", "✅", "m_tracker", "m_tracker_d"], ["azkar", "🌅", "m_azkar", "m_azkar_d"], ["duas", "🤲", "m_duas", "m_duas_d"],
+    ["qada", "🔁", "m_qada", "m_qada_d"], ["dates", "📆", "m_dates", "m_dates_d"], ["ramadan", "🌙", "m_ramadan", "m_ramadan_d"],
+    ["mosques", "🕌", "m_mosques", "m_mosques_d"], ["names", "📖", "m_names", "m_names_d"], ["settings", "⚙️", "m_settings", "m_settings_d"]];
   let h = items.map(([id, ic, t1, t2]) => `<button class="item" data-sub="${id}"><div class="ico">${ic}</div><div><div class="tt">${tr(t1)}</div><div class="ds">${tr(t2)}</div></div><div class="ch">›</div></button>`).join("");
   if (ver("8.0") && tg.addToHomeScreen) h += `<button class="item" id="homeBtn"><div class="ico">📲</div><div><div class="tt">${tr("m_home")}</div><div class="ds" id="homeDs">${tr("m_home_d")}</div></div></button>`;
   $("moreMenu").innerHTML = h;
@@ -834,6 +953,297 @@ function renderNames(filter = "") {
     `<div class="nm"><div class="no">${i + 1}</div><div class="ar">${n[0]}</div><div class="tr">${esc(n[1])}</div>${col ? `<div class="mn">${esc(n[col])}</div>` : ""}</div>`).join("");
 }
 
+
+/* ═══════════ stage 1: settings, azkar, duas, qada, islamic dates ═══════════ */
+const LX2 = {
+ en:{m_settings:"Settings",m_settings_d:"City, language, reminders",m_azkar:"Morning & evening adhkar",m_azkar_d:"With counters, from Hisnul Muslim",m_duas:"Duas for every day",m_duas_d:"Food, travel, mosque, sleep…",m_qada:"Missed prayers (qada)",m_qada_d:"Count and make up missed prayers",m_dates:"Islamic dates",m_dates_d:"Holidays and date converter",
+  st_city:"City",st_find:"Find",st_city_ph:"City name",st_use:"Choose",st_nf:"Nothing found. Try «city, country».",st_lang:"Language",st_madhab:"Madhab (changes Asr time)",st_std:"Shafi'i · Maliki · Hanbali",st_hanafi:"Hanafi",st_remind:"🔔 Prayer reminders",st_lead:"Remind in advance",st_lead_off:"Not in advance",st_min:"{n} min",st_at:"🕌 At prayer time",st_auto:"🔄 Auto-update of the times card",st_auto_off:"Off",st_auto_1:"1 min",st_quiet:"🔕 Quiet hours (no reminders)",st_quiet_off:"Off",st_ram:"🌙 Ramadan mode (suhoor & iftar)",st_saved:"Saved ✓",st_err:"Could not save",
+  az_m:"🌅 Morning",az_e:"🌙 Evening",az_hint:"Tap a card each time you say it",az_reset:"↺ Start again",az_note:"Texts from «Hisnul Muslim». Morning adhkar: after Fajr; evening: after Asr.",
+  du_note:"Texts from «Hisnul Muslim».",
+  qd_hint:"Count your missed prayers and mark each one you make up",qd_total:"Left to make up",qd_add:"Add missed days",qd_btn:"Add",qd_add_hint:"Adds the entered number of days to every prayer",witr:"Witr",
+  dt_today:"Today: {d}",dt_in:"in {n} d",dt_now:"today",dt_tomorrow:"tomorrow",dt_note:"📌 Dates are calculated in advance and may differ by 1–2 days: the start of a month depends on the sighting of the moon and on your country's official announcement.",
+  ev_ny:"Islamic New Year",ev_ash:"Day of Ashura",ev_ram:"Start of Ramadan",ev_qadr:"Laylat al-Qadr (night)",ev_fitr:"Eid al-Fitr",ev_arafa:"Day of Arafah",ev_adha:"Eid al-Adha",
+  cv_title:"🔄 Date converter",cv_g:"Gregorian → Hijri",cv_h:"Hijri → Gregorian",cv_bad:"There is no such date"},
+ ru:{m_settings:"Настройки",m_settings_d:"Город, язык, напоминания",m_azkar:"Азкары утра и вечера",m_azkar_d:"Со счётчиками, по «Хиснуль-муслим»",m_duas:"Дуа на каждый день",m_duas_d:"Еда, дорога, мечеть, сон…",m_qada:"Пропущенные намазы (када)",m_qada_d:"Считайте и восполняйте пропущенное",m_dates:"Исламские даты",m_dates_d:"Праздники и конвертер дат",
+  st_city:"Город",st_find:"Найти",st_city_ph:"Название города",st_use:"Выбрать",st_nf:"Ничего не найдено. Попробуйте «город, страна».",st_lang:"Язык",st_madhab:"Мазхаб (влияет на время Аср)",st_std:"Шафиитский · Маликитский · Ханбалитский",st_hanafi:"Ханафитский",st_remind:"🔔 Напоминания о намазе",st_lead:"Напоминать заранее",st_lead_off:"Не заранее",st_min:"{n} мин",st_at:"🕌 В момент намаза",st_auto:"🔄 Автообновление карточки времени",st_auto_off:"Выкл",st_auto_1:"1 мин",st_quiet:"🔕 Тихие часы (без напоминаний)",st_quiet_off:"Выкл",st_ram:"🌙 Режим Рамадана (сухур и ифтар)",st_saved:"Сохранено ✓",st_err:"Не удалось сохранить",
+  az_m:"🌅 Утро",az_e:"🌙 Вечер",az_hint:"Нажимайте на карточку каждый раз, когда прочитали",az_reset:"↺ Начать заново",az_note:"Тексты по сборнику «Хиснуль-муслим». Утренние азкары — после Фаджра, вечерние — после Асра.",
+  du_note:"Тексты по сборнику «Хиснуль-муслим».",
+  qd_hint:"Посчитайте пропущенные намазы и отмечайте каждый восполненный",qd_total:"Осталось восполнить",qd_add:"Добавить пропущенные дни",qd_btn:"Добавить",qd_add_hint:"Добавит указанное число дней к каждому намазу",witr:"Витр",
+  dt_today:"Сегодня: {d}",dt_in:"через {n} дн.",dt_now:"сегодня",dt_tomorrow:"завтра",dt_note:"📌 Даты рассчитаны заранее и могут отличаться на 1–2 дня: точное начало месяца зависит от наблюдения луны и решения муфтията вашей страны.",
+  ev_ny:"Новый год по хиджре",ev_ash:"День Ашура",ev_ram:"Начало Рамадана",ev_qadr:"Ляйлят аль-Кадр (ночь)",ev_fitr:"Ид аль-Фитр (Ураза-байрам)",ev_arafa:"День Арафа",ev_adha:"Ид аль-Адха (Курбан-байрам)",
+  cv_title:"🔄 Конвертер дат",cv_g:"Григорианская → Хиджра",cv_h:"Хиджра → Григорианская",cv_bad:"Такой даты нет"},
+ uz:{m_settings:"Sozlamalar",m_settings_d:"Shahar, til, eslatmalar",m_azkar:"Tong va kech zikrlari",m_azkar_d:"Hisoblagich bilan, «Hisnul muslim» asosida",m_duas:"Har kunlik duolar",m_duas_d:"Ovqat, safar, masjid, uyqu…",m_qada:"Qazo namozlar",m_qada_d:"Qazolarni sanang va ado eting",m_dates:"Islomiy sanalar",m_dates_d:"Bayramlar va sana o'giruvchi",
+  st_city:"Shahar",st_find:"Topish",st_city_ph:"Shahar nomi",st_use:"Tanlash",st_nf:"Hech narsa topilmadi. «shahar, davlat» deb yozib ko'ring.",st_lang:"Til",st_madhab:"Mazhab (Asr vaqtiga ta'sir qiladi)",st_std:"Shofiiy · Molikiy · Hanbaliy",st_hanafi:"Hanafiy",st_remind:"🔔 Namoz eslatmalari",st_lead:"Oldindan eslatish",st_lead_off:"Oldindan emas",st_min:"{n} daq",st_at:"🕌 Namoz vaqtida",st_auto:"🔄 Vaqtlar kartasini avtoyangilash",st_auto_off:"O'chiq",st_auto_1:"1 daq",st_quiet:"🔕 Tinch soatlar (eslatmasiz)",st_quiet_off:"O'chiq",st_ram:"🌙 Ramazon rejimi (saharlik va iftor)",st_saved:"Saqlandi ✓",st_err:"Saqlab bo'lmadi",
+  az_m:"🌅 Tong",az_e:"🌙 Kech",az_hint:"Har safar o'qiganingizda kartani bosing",az_reset:"↺ Qaytadan boshlash",az_note:"Matnlar «Hisnul muslim» to'plamidan. Tong zikrlari — Bomdoddan keyin, kech zikrlari — Asrdan keyin.",
+  du_note:"Matnlar «Hisnul muslim» to'plamidan.",
+  qd_hint:"Qazo namozlaringizni sanang va har bir ado etilganini belgilang",qd_total:"Ado etish qoldi",qd_add:"Qazo kunlarini qo'shish",qd_btn:"Qo'shish",qd_add_hint:"Kiritilgan kunlar sonini har bir namozga qo'shadi",witr:"Vitr",
+  dt_today:"Bugun: {d}",dt_in:"{n} kundan keyin",dt_now:"bugun",dt_tomorrow:"ertaga",dt_note:"📌 Sanalar oldindan hisoblangan va 1–2 kunga farq qilishi mumkin: oy boshlanishi hilolni ko'rishga va yurtingiz muftiyatining qaroriga bog'liq.",
+  ev_ny:"Hijriy yangi yil",ev_ash:"Ashuro kuni",ev_ram:"Ramazon boshlanishi",ev_qadr:"Laylatul Qadr (kecha)",ev_fitr:"Ramazon hayiti",ev_arafa:"Arafa kuni",ev_adha:"Qurbon hayiti",
+  cv_title:"🔄 Sana o'giruvchi",cv_g:"Melodiy → Hijriy",cv_h:"Hijriy → Melodiy",cv_bad:"Bunday sana yo'q"},
+ tg:{m_settings:"Танзимот",m_settings_d:"Шаҳр, забон, ёдовариҳо",m_azkar:"Зикрҳои субҳу шом",m_azkar_d:"Бо ҳисобкунак, аз «Ҳиснул-муслим»",m_duas:"Дуоҳои ҳаррӯза",m_duas_d:"Хӯрок, сафар, масҷид, хоб…",m_qada:"Намозҳои қазо",m_qada_d:"Қазоҳоро шумореду адо кунед",m_dates:"Санаҳои исломӣ",m_dates_d:"Идҳо ва табдилдиҳандаи сана",
+  st_city:"Шаҳр",st_find:"Ёфтан",st_city_ph:"Номи шаҳр",st_use:"Интихоб",st_nf:"Чизе ёфт нашуд. «шаҳр, кишвар» нависед.",st_lang:"Забон",st_madhab:"Мазҳаб (ба вақти Аср таъсир дорад)",st_std:"Шофеӣ · Моликӣ · Ҳанбалӣ",st_hanafi:"Ҳанафӣ",st_remind:"🔔 Ёдовариҳои намоз",st_lead:"Пешакӣ ёдрас кардан",st_lead_off:"На пешакӣ",st_min:"{n} дақ",st_at:"🕌 Дар вақти намоз",st_auto:"🔄 Навсозии худкори корти вақт",st_auto_off:"Хомӯш",st_auto_1:"1 дақ",st_quiet:"🔕 Соатҳои оромӣ (бе ёдоварӣ)",st_quiet_off:"Хомӯш",st_ram:"🌙 Ҳолати Рамазон (саҳарӣ ва ифтор)",st_saved:"Захира шуд ✓",st_err:"Захира нашуд",
+  az_m:"🌅 Субҳ",az_e:"🌙 Шом",az_hint:"Ҳар дафъа хондед, кортро пахш кунед",az_reset:"↺ Аз нав",az_note:"Матнҳо аз маҷмӯаи «Ҳиснул-муслим». Зикрҳои субҳ — пас аз Бомдод, шом — пас аз Аср.",
+  du_note:"Матнҳо аз маҷмӯаи «Ҳиснул-муслим».",
+  qd_hint:"Намозҳои қазоро шумореду ҳар адошударо қайд кунед",qd_total:"Боқимонда барои адо",qd_add:"Илова кардани рӯзҳои қазо",qd_btn:"Илова",qd_add_hint:"Шумораи рӯзҳоро ба ҳар намоз илова мекунад",witr:"Витр",
+  dt_today:"Имрӯз: {d}",dt_in:"баъди {n} рӯз",dt_now:"имрӯз",dt_tomorrow:"фардо",dt_note:"📌 Санаҳо пешакӣ ҳисоб шудаанд ва метавонанд 1–2 рӯз фарқ кунанд: оғози моҳ ба дидани ҳилол ва қарори муфтияти кишвари шумо вобаста аст.",
+  ev_ny:"Соли нави ҳиҷрӣ",ev_ash:"Рӯзи Ошуро",ev_ram:"Оғози Рамазон",ev_qadr:"Лайлатул-Қадр (шаб)",ev_fitr:"Иди Рамазон",ev_arafa:"Рӯзи Арафа",ev_adha:"Иди Қурбон",
+  cv_title:"🔄 Табдилдиҳандаи сана",cv_g:"Мелодӣ → Ҳиҷрӣ",cv_h:"Ҳиҷрӣ → Мелодӣ",cv_bad:"Чунин сана нест"},
+ ar:{m_settings:"الإعدادات",m_settings_d:"المدينة واللغة والتذكيرات",m_azkar:"أذكار الصباح والمساء",m_azkar_d:"مع العدّاد، من «حصن المسلم»",m_duas:"أدعية يومية",m_duas_d:"الطعام، السفر، المسجد، النوم…",m_qada:"قضاء الصلوات الفائتة",m_qada_d:"احسب الفوائت واقضِها",m_dates:"التواريخ الإسلامية",m_dates_d:"المناسبات ومحوّل التاريخ",
+  st_city:"المدينة",st_find:"بحث",st_city_ph:"اسم المدينة",st_use:"اختيار",st_nf:"لم يتم العثور على شيء. جرّب «المدينة، الدولة».",st_lang:"اللغة",st_madhab:"المذهب (يؤثر على وقت العصر)",st_std:"شافعي · مالكي · حنبلي",st_hanafi:"حنفي",st_remind:"🔔 تذكيرات الصلاة",st_lead:"التذكير المسبق",st_lead_off:"بدون تذكير مسبق",st_min:"{n} د",st_at:"🕌 عند دخول الوقت",st_auto:"🔄 التحديث التلقائي لبطاقة المواقيت",st_auto_off:"متوقف",st_auto_1:"1 د",st_quiet:"🔕 ساعات الهدوء (بدون تذكير)",st_quiet_off:"متوقف",st_ram:"🌙 وضع رمضان (السحور والإفطار)",st_saved:"تم الحفظ ✓",st_err:"تعذر الحفظ",
+  az_m:"🌅 الصباح",az_e:"🌙 المساء",az_hint:"اضغط على البطاقة في كل مرة تقرأ فيها",az_reset:"↺ البدء من جديد",az_note:"النصوص من «حصن المسلم». أذكار الصباح بعد الفجر، وأذكار المساء بعد العصر.",
+  du_note:"النصوص من «حصن المسلم».",
+  qd_hint:"احسب صلواتك الفائتة وضع علامة على كل صلاة تقضيها",qd_total:"المتبقي للقضاء",qd_add:"إضافة أيام فائتة",qd_btn:"إضافة",qd_add_hint:"يضيف عدد الأيام المدخل إلى كل صلاة",witr:"الوتر",
+  dt_today:"اليوم: {d}",dt_in:"بعد {n} يوم",dt_now:"اليوم",dt_tomorrow:"غداً",dt_note:"📌 التواريخ محسوبة مسبقاً وقد تختلف بيوم أو يومين: بداية الشهر تعتمد على رؤية الهلال وإعلان الجهة الرسمية في بلدك.",
+  ev_ny:"رأس السنة الهجرية",ev_ash:"يوم عاشوراء",ev_ram:"بداية رمضان",ev_qadr:"ليلة القدر",ev_fitr:"عيد الفطر",ev_arafa:"يوم عرفة",ev_adha:"عيد الأضحى",
+  cv_title:"🔄 محوّل التاريخ",cv_g:"ميلادي ← هجري",cv_h:"هجري ← ميلادي",cv_bad:"لا يوجد مثل هذا التاريخ"}
+};
+for (const l in LX2) Object.assign(LX[l], LX2[l]);
+
+const SRC = {bukhari:["Bukhari","Бухари","Buxoriy","Бухорӣ","البخاري"],muslim:["Muslim","Муслим","Muslim","Муслим","مسلم"],abudawud:["Abu Dawud","Абу Дауд","Abu Dovud","Абудовуд","أبو داود"],tirmidhi:["at-Tirmidhi","ат-Тирмизи","Termiziy","Тирмизӣ","الترمذي"],nasai:["an-Nasa'i","ан-Насаи","Nasoiy","Насоӣ","النسائي"],hakim:["al-Hakim","аль-Хаким","Hokim","Ҳоким","الحاكم"],quran:["Qur'an","Коран","Qur'on","Қуръон","القرآن"]};
+const LI = () => ({en:0, ru:1, uz:2, tg:3, ar:4})[LANG] ?? 0;
+const srcText = list => list.map(s => { const [k, ref] = s.split(" "); return (SRC[k] ? SRC[k][LI()] : k) + (ref ? " " + ref : ""); }).join(", ");
+const mean = o => o ? (o[LANG] || o.en || "") : "";
+
+/* id, when (m = morning, e = evening, b = both), count, arabic, transliteration, meaning, sources */
+const AZKAR = [
+ {id:"kursi",w:"b",n:1,ar:"اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ۚ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ ۚ لَّهُ مَا فِي السَّمَاوَاتِ وَمَا فِي الْأَرْضِ ۗ مَن ذَا الَّذِي يَشْفَعُ عِندَهُ إِلَّا بِإِذْنِهِ ۚ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ ۖ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ ۚ وَسِعَ كُرْسِيُّهُ السَّمَاوَاتِ وَالْأَرْضَ ۖ وَلَا يَئُودُهُ حِفْظُهُمَا ۚ وَهُوَ الْعَلِيُّ الْعَظِيمُ",
+  m:{en:"Ayat al-Kursi (Qur'an 2:255)",ru:"Аят аль-Курси (Коран 2:255)",uz:"Oyatal Kursiy (Qur'on 2:255)",tg:"Оятулкурсӣ (Қуръон 2:255)"},s:["nasai"]},
+ {id:"quls",w:"b",n:3,ar:"قُلْ هُوَ اللَّهُ أَحَدٌ • اللَّهُ الصَّمَدُ • لَمْ يَلِدْ وَلَمْ يُولَدْ • وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ\nقُلْ أَعُوذُ بِرَبِّ الْفَلَقِ • مِن شَرِّ مَا خَلَقَ • وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ • وَمِن شَرِّ النَّفَّاثَاتِ فِي الْعُقَدِ • وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ\nقُلْ أَعُوذُ بِرَبِّ النَّاسِ • مَلِكِ النَّاسِ • إِلَٰهِ النَّاسِ • مِن شَرِّ الْوَسْوَاسِ الْخَنَّاسِ • الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ • مِنَ الْجِنَّةِ وَالنَّاسِ",
+  m:{en:"Surahs Al-Ikhlas, Al-Falaq and An-Nas",ru:"Суры аль-Ихлас, аль-Фаляк и ан-Нас",uz:"Ixlos, Falaq va Nos suralari",tg:"Сураҳои Ихлос, Фалақ ва Нос"},s:["abudawud","tirmidhi"]},
+ {id:"bika_m",w:"m",n:1,ar:"اللَّهُمَّ بِكَ أَصْبَحْنَا، وَبِكَ أَمْسَيْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ، وَإِلَيْكَ النُّشُورُ",tl:"Allahumma bika asbahna, wa bika amsayna, wa bika nahya, wa bika namutu, wa ilaykan-nushur",
+  m:{en:"O Allah, by You we enter the morning and by You we enter the evening; by You we live and by You we die, and to You is the resurrection.",ru:"О Аллах, благодаря Тебе мы встретили утро и благодаря Тебе встречаем вечер, благодаря Тебе живём и умираем, и к Тебе — воскрешение.",uz:"Allohim, Sen bilan tong ottirdik va Sen bilan kech kirgizamiz, Sen bilan yashaymiz va Sen bilan o'lamiz, qayta tirilish ham Sengadir.",tg:"Худоё, ба Ту субҳ кардем ва ба Ту шом мекунем, ба Ту зиндагӣ мекунем ва ба Ту мемирем ва барангехтан ба сӯи Туст."},s:["tirmidhi"]},
+ {id:"bika_e",w:"e",n:1,ar:"اللَّهُمَّ بِكَ أَمْسَيْنَا، وَبِكَ أَصْبَحْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ، وَإِلَيْكَ الْمَصِيرُ",tl:"Allahumma bika amsayna, wa bika asbahna, wa bika nahya, wa bika namutu, wa ilaykal-masir",
+  m:{en:"O Allah, by You we enter the evening and by You we enter the morning; by You we live and by You we die, and to You is the final return.",ru:"О Аллах, благодаря Тебе мы встретили вечер и благодаря Тебе встречаем утро, благодаря Тебе живём и умираем, и к Тебе — возвращение.",uz:"Allohim, Sen bilan kech kirgizdik va Sen bilan tong ottiramiz, Sen bilan yashaymiz va Sen bilan o'lamiz, qaytish ham Sengadir.",tg:"Худоё, ба Ту шом кардем ва ба Ту субҳ мекунем, ба Ту зиндагӣ мекунем ва ба Ту мемирем ва бозгашт ба сӯи Туст."},s:["tirmidhi"]},
+ {id:"sayyid",w:"b",n:1,ar:"اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ بِذَنْبِي، فَاغْفِرْ لِي فَإِنَّهُ لَا يَغْفِرُ الذُّنُوبَ إِلَّا أَنْتَ",
+  tl:"Allahumma anta rabbi, la ilaha illa ant, khalaqtani wa ana 'abduk, wa ana 'ala 'ahdika wa wa'dika mastata't, a'udhu bika min sharri ma sana't, abu'u laka bini'matika 'alayya, wa abu'u bidhanbi, faghfir li, fa innahu la yaghfirudh-dhunuba illa ant",
+  m:{en:"O Allah, You are my Lord, there is no god but You. You created me and I am Your servant, and I keep Your covenant and promise as much as I can. I seek refuge in You from the evil of what I have done. I acknowledge Your favour upon me and I acknowledge my sin, so forgive me, for none forgives sins but You.",ru:"О Аллах, Ты — мой Господь, нет божества, кроме Тебя. Ты сотворил меня, а я — Твой раб, и я храню верность договору с Тобой и обещанию Тебе, насколько могу. Прибегаю к Тебе от зла того, что я совершил. Признаю милость Твою ко мне и признаю свой грех. Прости же меня, ведь никто не прощает грехи, кроме Тебя.",uz:"Allohim, Sen mening Robbimsan, Sendan o'zga iloh yo'q. Sen meni yaratding, men Sening bandangman. Qodir bo'lganimcha Senga bergan ahdim va va'dam ustidaman. Qilgan ishlarimning yomonligidan Senga panoh so'rayman. Menga bergan ne'matingni e'tirof etaman va gunohimni ham e'tirof etaman. Meni kechir, chunki gunohlarni Sendan boshqa hech kim kechirmaydi.",tg:"Худоё, Ту Парвардигори манӣ, ҷуз Ту маъбуде нест. Маро офаридӣ ва ман бандаи Тую. Ба аҳду ваъдаи Ту то ҷое ки тавонам, устуворам. Аз шарри он чи кардаам, ба Ту паноҳ мебарам. Ба неъмати Ту бар худ иқрор мекунам ва ба гуноҳи худ иқрор мекунам, пас маро биомурз, зеро ҷуз Ту касе гуноҳҳоро намеомурзад."},s:["bukhari"]},
+ {id:"bismillah",w:"b",n:3,ar:"بِسْمِ اللَّهِ الَّذِي لَا يَضُرُّ مَعَ اسْمِهِ شَيْءٌ فِي الْأَرْضِ وَلَا فِي السَّمَاءِ وَهُوَ السَّمِيعُ الْعَلِيمُ",tl:"Bismillahil-ladhi la yadurru ma'asmihi shay'un fil-ardi wa la fis-sama'i wa huwas-sami'ul-'alim",
+  m:{en:"In the name of Allah, with whose name nothing on earth or in heaven can cause harm, and He is the All-Hearing, the All-Knowing.",ru:"С именем Аллаха, с именем Которого ничто не причинит вреда ни на земле, ни на небе, и Он — Слышащий, Знающий.",uz:"Ismi bilan yerda ham, osmonda ham hech narsa zarar yetkaza olmaydigan Allohning ismi bilan. U eshituvchi va biluvchidir.",tg:"Ба номи Аллоҳ, ки бо номи Ӯ ҳеҷ чиз дар замин ва дар осмон зарар намерасонад, ва Ӯ Шунавою Доност."},s:["abudawud","tirmidhi"]},
+ {id:"raditu",w:"b",n:3,ar:"رَضِيتُ بِاللَّهِ رَبًّا، وَبِالْإِسْلَامِ دِينًا، وَبِمُحَمَّدٍ صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ نَبِيًّا",tl:"Raditu billahi rabba, wa bil-Islami dina, wa bi Muhammadin sallallahu 'alayhi wa sallama nabiyya",
+  m:{en:"I am pleased with Allah as my Lord, with Islam as my religion and with Muhammad ﷺ as my Prophet.",ru:"Я доволен Аллахом как Господом, исламом как религией и Мухаммадом ﷺ как пророком.",uz:"Allohni Robb, Islomni din va Muhammad ﷺni payg'ambar deb rozi bo'ldim.",tg:"Ба Аллоҳ ҳамчун Парвардигор, ба Ислом ҳамчун дин ва ба Муҳаммад ﷺ ҳамчун паёмбар розӣ шудам."},s:["abudawud","tirmidhi"]},
+ {id:"hasbi",w:"b",n:7,ar:"حَسْبِيَ اللَّهُ لَا إِلَهَ إِلَّا هُوَ، عَلَيْهِ تَوَكَّلْتُ، وَهُوَ رَبُّ الْعَرْشِ الْعَظِيمِ",tl:"Hasbiyallahu la ilaha illa huwa, 'alayhi tawakkaltu, wa huwa rabbul-'arshil-'azim",
+  m:{en:"Allah is sufficient for me; there is no god but Him. In Him I put my trust, and He is the Lord of the Mighty Throne.",ru:"Достаточно мне Аллаха, нет божества, кроме Него. На Него я уповаю, и Он — Господь великого Трона.",uz:"Menga Alloh kifoya, Undan o'zga iloh yo'q. Unga tavakkul qildim va U ulug' Arshning Robbidir.",tg:"Аллоҳ маро басанда аст, ҷуз Ӯ маъбуде нест. Бар Ӯ таваккал кардам ва Ӯ Парвардигори Арши бузург аст."},s:["abudawud"]},
+ {id:"hayy",w:"b",n:1,ar:"يَا حَيُّ يَا قَيُّومُ، بِرَحْمَتِكَ أَسْتَغِيثُ، أَصْلِحْ لِي شَأْنِي كُلَّهُ، وَلَا تَكِلْنِي إِلَى نَفْسِي طَرْفَةَ عَيْنٍ",tl:"Ya Hayyu ya Qayyum, bi rahmatika astaghith, aslih li sha'ni kullahu, wa la takilni ila nafsi tarfata 'ayn",
+  m:{en:"O Ever-Living, O Sustainer, by Your mercy I seek help. Set right all my affairs and do not leave me to myself even for the blink of an eye.",ru:"О Живой, о Вседержитель, к милости Твоей взываю о помощи: приведи в порядок все мои дела и не оставляй меня наедине с собой ни на мгновение.",uz:"Ey Tirik, ey Qoyim, rahmating bilan yordam so'rayman. Barcha ishlarimni isloh qil va meni bir lahza ham o'z nafsimga topshirib qo'yma.",tg:"Эй Зинда, эй Пойдор, ба раҳмати Ту мадад металабам. Ҳамаи корҳоямро ислоҳ кун ва маро як лаҳза ҳам ба нафсам вомагузор."},s:["nasai","hakim"]},
+ {id:"afini",w:"b",n:3,ar:"اللَّهُمَّ عَافِنِي فِي بَدَنِي، اللَّهُمَّ عَافِنِي فِي سَمْعِي، اللَّهُمَّ عَافِنِي فِي بَصَرِي، لَا إِلَهَ إِلَّا أَنْتَ",tl:"Allahumma 'afini fi badani, Allahumma 'afini fi sam'i, Allahumma 'afini fi basari, la ilaha illa ant",
+  m:{en:"O Allah, grant me well-being in my body, in my hearing and in my sight. There is no god but You.",ru:"О Аллах, даруй здоровье моему телу, моему слуху и моему зрению. Нет божества, кроме Тебя.",uz:"Allohim, tanimga, qulog'imga va ko'zimga salomatlik ber. Sendan o'zga iloh yo'q.",tg:"Худоё, ба баданам, ба гӯшам ва ба чашмам саломатӣ ато кун. Ҷуз Ту маъбуде нест."},s:["abudawud"]},
+ {id:"kalimat",w:"e",n:3,ar:"أَعُوذُ بِكَلِمَاتِ اللَّهِ التَّامَّاتِ مِنْ شَرِّ مَا خَلَقَ",tl:"A'udhu bi kalimatillahit-tammati min sharri ma khalaq",
+  m:{en:"I seek refuge in the perfect words of Allah from the evil of what He has created.",ru:"Прибегаю к совершенным словам Аллаха от зла того, что Он сотворил.",uz:"Allohning mukammal kalimalari bilan U yaratgan narsalarning yomonligidan panoh so'rayman.",tg:"Ба суханони комили Аллоҳ аз шарри он чи офаридааст, паноҳ мебарам."},s:["muslim"]},
+ {id:"tahlil",w:"b",n:10,ar:"لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ",tl:"La ilaha illallahu wahdahu la sharika lah, lahul-mulku wa lahul-hamd, wa huwa 'ala kulli shay'in qadir",
+  m:{en:"There is no god but Allah alone, without partner. His is the dominion and His is the praise, and He has power over all things.",ru:"Нет божества, кроме одного лишь Аллаха, у Которого нет сотоварища. Ему принадлежит власть, Ему хвала, и Он над всем мощен.",uz:"Yolg'iz Allohdan o'zga iloh yo'q, Uning sherigi yo'q. Mulk ham, hamd ham Unikidir va U har narsaga qodirdir.",tg:"Маъбуде ҷуз Аллоҳи ягона нест, шарике надорад. Подшоҳӣ ва ситоиш аз они Ӯст ва Ӯ бар ҳар чиз қодир аст."},s:["nasai"]},
+ {id:"subhan",w:"b",n:100,ar:"سُبْحَانَ اللَّهِ وَبِحَمْدِهِ",tl:"SubhanAllahi wa bihamdih",
+  m:{en:"Glory be to Allah and praise be to Him.",ru:"Пречист Аллах, и хвала Ему.",uz:"Allohni poklab, Unga hamd aytaman.",tg:"Аллоҳ пок аст ва ситоиш Ӯрост."},s:["muslim"]},
+ {id:"istighfar",w:"m",n:100,ar:"أَسْتَغْفِرُ اللَّهَ وَأَتُوبُ إِلَيْهِ",tl:"Astaghfirullaha wa atubu ilayh",
+  m:{en:"I seek Allah's forgiveness and I repent to Him.",ru:"Прошу прощения у Аллаха и каюсь перед Ним.",uz:"Allohdan mag'firat so'rayman va Unga tavba qilaman.",tg:"Аз Аллоҳ омурзиш металабам ва ба сӯи Ӯ тавба мекунам."},s:["bukhari","muslim"]}
+];
+
+/* title (en, ru, uz, tg, ar), arabic, transliteration, meaning, sources */
+const DUAS = [
+ {t:["🍽 Before eating","🍽 Перед едой","🍽 Ovqatdan oldin","🍽 Пеш аз хӯрок","🍽 قبل الطعام"],ar:"بِسْمِ اللَّهِ",tl:"Bismillah",
+  m:{en:"In the name of Allah. If you forgot at the start: «Bismillahi awwalahu wa akhirah» — in the name of Allah at its beginning and its end.",ru:"С именем Аллаха. Если забыли в начале: «Бисмилляхи аввалаху ва ахирах» — с именем Аллаха в начале и в конце.",uz:"Allohning ismi bilan. Boshida unutgan bo'lsangiz: «Bismillahi avvalahu va oxirahu» — boshida ham, oxirida ham Allohning ismi bilan.",tg:"Ба номи Аллоҳ. Агар дар аввал фаромӯш кардед: «Бисмиллоҳи аввалаҳу ва охираҳу» — ба номи Аллоҳ дар аввал ва охираш."},s:["abudawud","tirmidhi"]},
+ {t:["🤲 After eating","🤲 После еды","🤲 Ovqatdan keyin","🤲 Баъд аз хӯрок","🤲 بعد الطعام"],ar:"الْحَمْدُ لِلَّهِ الَّذِي أَطْعَمَنِي هَذَا، وَرَزَقَنِيهِ، مِنْ غَيْرِ حَوْلٍ مِنِّي وَلَا قُوَّةٍ",tl:"Alhamdu lillahil-ladhi at'amani hadha, wa razaqanihi min ghayri hawlin minni wa la quwwah",
+  m:{en:"Praise be to Allah who fed me this and provided it for me without any might or power on my part.",ru:"Хвала Аллаху, Который накормил меня этим и наделил меня этим без всякой силы и мощи с моей стороны.",uz:"Meni bu bilan to'ydirgan va mening hech qanday kuch-quvvatimsiz rizq qilib bergan Allohga hamd bo'lsin.",tg:"Ситоиш Аллоҳро, ки маро инро хӯронд ва бе ҳеҷ тавону қуввате аз ҷониби ман ризқ дод."},s:["abudawud","tirmidhi"]},
+ {t:["🚪 Leaving home","🚪 Выходя из дома","🚪 Uydan chiqishda","🚪 Ҳангоми баромадан аз хона","🚪 عند الخروج من المنزل"],ar:"بِسْمِ اللَّهِ، تَوَكَّلْتُ عَلَى اللَّهِ، وَلَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ",tl:"Bismillah, tawakkaltu 'alallah, wa la hawla wa la quwwata illa billah",
+  m:{en:"In the name of Allah, I rely on Allah; there is no might nor power except with Allah.",ru:"С именем Аллаха, уповаю на Аллаха, нет мощи и силы ни у кого, кроме Аллаха.",uz:"Allohning ismi bilan, Allohga tavakkul qildim, kuch-quvvat faqat Alloh bilandir.",tg:"Ба номи Аллоҳ, бар Аллоҳ таваккал кардам, ҳеҷ тавону қуввате нест, магар ба Аллоҳ."},s:["abudawud","tirmidhi"]},
+ {t:["🕌 Entering the mosque","🕌 Входя в мечеть","🕌 Masjidga kirishda","🕌 Ҳангоми даромадан ба масҷид","🕌 عند دخول المسجد"],ar:"اللَّهُمَّ افْتَحْ لِي أَبْوَابَ رَحْمَتِكَ",tl:"Allahummaftah li abwaba rahmatik",
+  m:{en:"O Allah, open for me the gates of Your mercy.",ru:"О Аллах, открой мне врата Твоей милости.",uz:"Allohim, menga rahmating eshiklarini och.",tg:"Худоё, барои ман дарҳои раҳмататро боз кун."},s:["muslim"]},
+ {t:["🕌 Leaving the mosque","🕌 Выходя из мечети","🕌 Masjiddan chiqishda","🕌 Ҳангоми баромадан аз масҷид","🕌 عند الخروج من المسجد"],ar:"اللَّهُمَّ إِنِّي أَسْأَلُكَ مِنْ فَضْلِكَ",tl:"Allahumma inni as'aluka min fadlik",
+  m:{en:"O Allah, I ask You of Your bounty.",ru:"О Аллах, прошу Тебя о Твоей щедрости.",uz:"Allohim, Sendan fazlingni so'rayman.",tg:"Худоё, аз Ту фазли Туро металабам."},s:["muslim"]},
+ {t:["🚗 Travel and getting into a vehicle","🚗 В дорогу (сев в транспорт)","🚗 Safarda (ulovga minganda)","🚗 Дар сафар (ҳангоми савор шудан)","🚗 دعاء الركوب والسفر"],ar:"سُبْحَانَ الَّذِي سَخَّرَ لَنَا هَذَا وَمَا كُنَّا لَهُ مُقْرِنِينَ، وَإِنَّا إِلَى رَبِّنَا لَمُنْقَلِبُونَ",tl:"Subhanal-ladhi sakhkhara lana hadha wa ma kunna lahu muqrinin, wa inna ila rabbina lamunqalibun",
+  m:{en:"Glory be to Him who has subjected this to us, and we could not have done it ourselves; and surely to our Lord we shall return.",ru:"Пречист Тот, Кто подчинил нам это, ведь сами мы не смогли бы этого сделать, и, поистине, к нашему Господу мы вернёмся.",uz:"Buni bizga bo'ysundirib qo'ygan Zot pokdir, biz bunga qodir emas edik. Albatta, biz Robbimizga qaytuvchimiz.",tg:"Пок аст Он, ки инро барои мо ром кард, дар ҳоле ки мо ба он тавоно набудем, ва албатта мо ба сӯи Парвардигорамон бозмегардем."},s:["quran 43:13–14","muslim"]},
+ {t:["🌙 Before sleep","🌙 Перед сном","🌙 Uxlashdan oldin","🌙 Пеш аз хоб","🌙 قبل النوم"],ar:"بِاسْمِكَ اللَّهُمَّ أَمُوتُ وَأَحْيَا",tl:"Bismika Allahumma amutu wa ahya",
+  m:{en:"In Your name, O Allah, I die and I live.",ru:"С Твоим именем, о Аллах, я умираю и оживаю.",uz:"Allohim, Sening isming bilan o'laman va tirilaman.",tg:"Худоё, ба номи Ту мемирам ва зинда мешавам."},s:["bukhari"]},
+ {t:["☀️ On waking up","☀️ После пробуждения","☀️ Uyg'onganda","☀️ Ҳангоми бедор шудан","☀️ عند الاستيقاظ"],ar:"الْحَمْدُ لِلَّهِ الَّذِي أَحْيَانَا بَعْدَ مَا أَمَاتَنَا وَإِلَيْهِ النُّشُورُ",tl:"Alhamdu lillahil-ladhi ahyana ba'da ma amatana wa ilayhin-nushur",
+  m:{en:"Praise be to Allah who gave us life after He had caused us to die, and to Him is the resurrection.",ru:"Хвала Аллаху, Который оживил нас после того, как умертвил, и к Нему — воскрешение.",uz:"Bizni o'ldirganidan keyin tiriltirgan Allohga hamd bo'lsin, qayta tirilish ham Ungadir.",tg:"Ситоиш Аллоҳро, ки моро пас аз миронданамон зинда кард ва бозгашт ба сӯи Ӯст."},s:["bukhari"]},
+ {t:["🚿 Entering the toilet","🚿 Входя в туалет","🚿 Hojatxonaga kirishda","🚿 Ҳангоми даромадан ба ҳоҷатхона","🚿 عند دخول الخلاء"],ar:"بِسْمِ اللَّهِ، اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْخُبُثِ وَالْخَبَائِثِ",tl:"Bismillah. Allahumma inni a'udhu bika minal-khubuthi wal-khaba'ith",
+  m:{en:"In the name of Allah. O Allah, I seek refuge in You from the male and female devils.",ru:"С именем Аллаха. О Аллах, прибегаю к Тебе от шайтанов мужского и женского пола.",uz:"Allohning ismi bilan. Allohim, erkak va urg'ochi shaytonlardan Senga panoh so'rayman.",tg:"Ба номи Аллоҳ. Худоё, аз шайтонҳои нару мода ба Ту паноҳ мебарам."},s:["bukhari","muslim"]},
+ {t:["🚿 Leaving the toilet","🚿 Выходя из туалета","🚿 Hojatxonadan chiqishda","🚿 Ҳангоми баромадан аз ҳоҷатхона","🚿 عند الخروج من الخلاء"],ar:"غُفْرَانَكَ",tl:"Ghufranak",
+  m:{en:"I seek Your forgiveness.",ru:"Прошу Твоего прощения.",uz:"Mag'firatingni so'rayman.",tg:"Омурзиши Туро металабам."},s:["abudawud","tirmidhi"]},
+ {t:["🌇 Breaking the fast","🌇 При разговении","🌇 Iftorda","🌇 Ҳангоми ифтор","🌇 عند الإفطار"],ar:"ذَهَبَ الظَّمَأُ وَابْتَلَّتِ الْعُرُوقُ، وَثَبَتَ الْأَجْرُ إِنْ شَاءَ اللَّهُ",tl:"Dhahabaz-zama'u wabtallatil-'uruq, wa thabatal-ajru in sha' Allah",
+  m:{en:"The thirst is gone, the veins are moistened, and the reward is certain, if Allah wills.",ru:"Ушла жажда, увлажнились жилы, и награда утвердилась, если пожелает Аллах.",uz:"Chanqoq ketdi, tomirlar namlandi va inshaalloh, ajr sobit bo'ldi.",tg:"Ташнагӣ рафт, рагҳо тар шуданд ва агар Аллоҳ хоҳад, подош собит шуд."},s:["abudawud"]},
+ {t:["💔 In hardship","💔 В трудности","💔 Qiyinchilikda","💔 Дар душворӣ","💔 عند الكرب"],ar:"لَا إِلَهَ إِلَّا أَنْتَ سُبْحَانَكَ إِنِّي كُنْتُ مِنَ الظَّالِمِينَ",tl:"La ilaha illa anta subhanaka inni kuntu minaz-zalimin",
+  m:{en:"There is no god but You, glory be to You; truly I have been among the wrongdoers.",ru:"Нет божества, кроме Тебя, пречист Ты, поистине, я был из числа несправедливых.",uz:"Sendan o'zga iloh yo'q, Sen poksan, albatta men zolimlardan bo'ldim.",tg:"Ҷуз Ту маъбуде нест, Ту поки, ҳароина ман аз ситамкорон будам."},s:["quran 21:87","tirmidhi"]},
+ {t:["👨‍👩‍👧 For parents","👨‍👩‍👧 За родителей","👨‍👩‍👧 Ota-ona uchun","👨‍👩‍👧 Барои падару модар","👨‍👩‍👧 للوالدين"],ar:"رَبِّ ارْحَمْهُمَا كَمَا رَبَّيَانِي صَغِيرًا",tl:"Rabbirhamhuma kama rabbayani saghira",
+  m:{en:"My Lord, have mercy on them as they raised me when I was small.",ru:"Господь мой, помилуй их, как они растили меня маленьким.",uz:"Robbim, ular meni kichikligimda tarbiyalaganlaridek, Sen ham ularga rahm qil.",tg:"Парвардигоро, ба онҳо раҳм кун, чунон ки маро дар хурдӣ тарбия карданд."},s:["quran 17:24"]},
+ {t:["🤧 Sneezing","🤧 При чихании","🤧 Aksa urganda","🤧 Ҳангоми атса задан","🤧 عند العطاس"],ar:"الْحَمْدُ لِلَّهِ",tl:"Alhamdulillah",
+  m:{en:"Praise be to Allah. The listener replies «Yarhamukallah» (may Allah have mercy on you), and the one who sneezed answers «Yahdikumullahu wa yuslihu balakum» (may Allah guide you and set your affairs right).",ru:"Хвала Аллаху. Услышавший отвечает: «Ярхамукаллах» (да помилует тебя Аллах), а чихнувший говорит: «Яхдикумуллаху ва юслиху балакум» (да наставит вас Аллах и приведёт в порядок ваши дела).",uz:"Allohga hamd bo'lsin. Eshitgan kishi «Yarhamukalloh» (Alloh senga rahm qilsin) deydi, aksa urgan esa «Yahdikumullohu va yuslihu balakum» (Alloh sizni hidoyat qilsin va ishlaringizni isloh qilsin) deb javob beradi.",tg:"Ситоиш Аллоҳро. Шунаванда мегӯяд: «Ярҳамукаллоҳ» (Аллоҳ ба ту раҳм кунад), ва атсазананда ҷавоб медиҳад: «Яҳдикумуллоҳу ва юслиҳу болакум» (Аллоҳ шуморо ҳидоят кунад ва корҳоятонро ислоҳ намояд)."},s:["bukhari"]}
+];
+
+/* ───────── toast & POST ───────── */
+let toastT = null;
+function toast(text) {
+  let el = $("toast"); if (!el) { el = document.createElement("div"); el.id = "toast"; el.className = "toast"; document.body.appendChild(el); }
+  el.textContent = text; el.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("on"), 1600);
+}
+async function apiPost(path, body) {
+  const r = await fetch(path, {method: "POST", headers: {"X-Init-Data": tg?.initData || "", "Content-Type": "application/json"}, body: JSON.stringify(body)});
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+/* ───────── SETTINGS ───────── */
+function chips(el, opts, cur, onPick) {
+  el.innerHTML = opts.map(([v, label]) => `<button class="chip ${String(v) === String(cur) ? "on" : ""}" data-v="${esc(v)}">${esc(label)}</button>`).join("");
+  el.querySelectorAll("button").forEach(b => b.onclick = () => { haptic(); onPick(b.dataset.v); });
+}
+function sw(el, label, on, onToggle) {
+  el.className = "sw" + (on ? " on" : ""); el.innerHTML = `<span>${esc(label)}</span><span class="tg"></span>`;
+  el.onclick = () => { haptic(); onToggle(!el.classList.contains("on")); };
+}
+async function saveSetting(patch) {
+  try {
+    const r = await apiPost("/api/settings", patch);
+    DATA.profile = Object.assign(DATA.profile, r.profile);
+    toast(tr("st_saved"));
+    if (patch.lang) { LANG = patch.lang; applyLang(); renderToday(); renderQibla(); renderMore(); }
+    if (patch.madhab) { await load(true); }
+    renderSettings();
+  } catch (e) { toast(tr("st_err")); renderSettings(); }
+}
+function renderSettings() {
+  const p = DATA.profile;
+  $("stTitle").textContent = tr("m_settings"); $("stCityL").textContent = tr("st_city"); $("stCity").textContent = "📍 " + p.city;
+  $("stCityQ").placeholder = tr("st_city_ph"); $("stCityFind").textContent = tr("st_find");
+  $("stLangL").textContent = tr("st_lang"); $("stMadhabL").textContent = tr("st_madhab");
+  $("stLeadL").textContent = tr("st_lead"); $("stAutoL").textContent = tr("st_auto"); $("stQuietL").textContent = tr("st_quiet");
+  chips($("stLang"), [["en", "🇬🇧 English"], ["ru", "🇷🇺 Русский"], ["uz", "🇺🇿 Oʻzbekcha"], ["tg", "🇹🇯 Тоҷикӣ"], ["ar", "🇸🇦 العربية"]], LANG, v => saveSetting({lang: v}));
+  chips($("stMadhab"), [["std", tr("st_std")], ["hanafi", tr("st_hanafi")]], p.madhab, v => saveSetting({madhab: v}));
+  sw($("stRemind"), tr("st_remind"), p.remind, v => saveSetting({remind: v}));
+  chips($("stLead"), (p.lead_options || [5, 10, 15, 30, 0]).map(n => [n, n ? tr("st_min", {n}) : tr("st_lead_off")]), p.lead, v => saveSetting({lead: +v}));
+  sw($("stAt"), tr("st_at"), p.at_time, v => saveSetting({at_time: v}));
+  chips($("stAuto"), (p.auto_options || [0, 1, 5, 15]).map(n => [n, !n ? tr("st_auto_off") : n === 1 ? tr("st_auto_1") : tr("st_min", {n})]), p.auto, v => saveSetting({auto: +v}));
+  chips($("stQuiet"), (p.quiet_options || ["off"]).map(q => [q, q === "off" ? tr("st_quiet_off") : q.split("-").map(h => pad(h) + ":00").join("–")]), p.quiet, v => saveSetting({quiet: v}));
+  sw($("stRam"), tr("st_ram"), p.ramadan, v => saveSetting({ramadan: v}));
+}
+async function findCity() {
+  const q = $("stCityQ").value.trim(); if (q.length < 2) return;
+  haptic(); $("stCityRes").innerHTML = `<div class="sub" style="margin-top:10px">${tr("loading")}</div>`;
+  try {
+    const r = await api("/api/geocode?q=" + encodeURIComponent(q));
+    if (!r.found) { $("stCityRes").innerHTML = `<div class="sub" style="margin-top:10px">${tr("st_nf")}</div>`; return; }
+    $("stCityRes").innerHTML = `<div class="found"><b>📍 ${esc(r.name)} ${r.flag}</b><button class="chip on" id="stCityUse">${tr("st_use")}</button></div>`;
+    $("stCityUse").onclick = async () => {
+      haptic();
+      try { await apiPost("/api/city", {name: r.name, lat: r.lat, lon: r.lon, cc: r.cc}); RAM = null; await load(true); $("stCityQ").value = ""; $("stCityRes").innerHTML = ""; toast(tr("st_saved")); renderSettings(); }
+      catch (e) { toast(tr("st_err")); }
+    };
+  } catch (e) { $("stCityRes").innerHTML = `<div class="sub" style="margin-top:10px">${tr("err")}</div>`; }
+}
+
+/* ───────── AZKAR ───────── */
+let AZ_MODE = null, AZ = {};
+const azKey = () => `az_${AZ_MODE}_${todayISO().replace(/-/g, "")}`;
+async function renderAzkar() {
+  if (!AZ_MODE) { const h = +new Intl.DateTimeFormat("en-GB", {timeZone: TZ, hour: "numeric", hourCycle: "h23"}).format(new Date()); AZ_MODE = h >= 15 || h < 3 ? "e" : "m"; }
+  $("azTitle").textContent = tr("m_azkar"); $("azHint").textContent = tr("az_hint"); $("azReset").textContent = tr("az_reset"); $("azNote").textContent = tr("az_note");
+  document.querySelectorAll("#azSeg button").forEach(b => { b.textContent = tr("az_" + b.dataset.az); b.classList.toggle("on", b.dataset.az === AZ_MODE); });
+  const v = (await store.get([azKey()]))[azKey()]; try { AZ = v ? JSON.parse(v) : {}; } catch (e) { AZ = {}; }
+  drawAzkar();
+}
+function azList() { return AZKAR.filter(z => z.w === "b" || z.w === AZ_MODE); }
+function drawAzkar() {
+  const list = azList(); let done = 0;
+  $("azList").innerHTML = list.map(z => {
+    const c = Math.min(AZ[z.id] || 0, z.n), ok = c >= z.n; if (ok) done++;
+    return `<button class="zk ${ok ? "done" : ""}" data-z="${z.id}"><div class="ar">${esc(z.ar).replace(/\n/g, "<br><br>")}</div>${z.tl && LANG !== "ar" ? `<div class="tl">${esc(z.tl)}</div>` : ""}${LANG !== "ar" ? `<div class="mn">${esc(mean(z.m))}</div>` : ""}<div class="ft"><span>📚 ${esc(srcText(z.s))}</span><span class="cnt">${ok ? "✓ " : ""}${c} / ${z.n}</span></div></button>`;
+  }).join("");
+  $("azBar").style.width = (100 * done / list.length) + "%";
+}
+let azSaveT = null;
+function tapZikr(id) {
+  const z = AZKAR.find(x => x.id === id); if (!z) return;
+  const c = AZ[id] || 0; if (c >= z.n) return;
+  AZ[id] = c + 1;
+  if (AZ[id] === z.n) { try { tg?.HapticFeedback?.notificationOccurred("success"); } catch (e) {} } else haptic();
+  drawAzkar(); clearTimeout(azSaveT); azSaveT = setTimeout(() => store.set(azKey(), JSON.stringify(AZ)), 500);
+  if (azList().every(x => (AZ[x.id] || 0) >= x.n)) toast("🤍");
+}
+
+/* ───────── DUAS ───────── */
+function renderDuas() {
+  $("duTitle").textContent = tr("m_duas"); $("duNote").textContent = tr("du_note");
+  $("duList").innerHTML = DUAS.map(d => `<div class="du"><div class="tt">${esc(d.t[LI()])}</div><div class="ar">${esc(d.ar)}</div>${LANG !== "ar" ? `<div class="tl">${esc(d.tl)}</div><div class="mn">${esc(mean(d.m))}</div>` : ""}<div class="ft"><span>📚 ${esc(srcText(d.s))}</span></div></div>`).join("");
+}
+
+/* ───────── QADA ───────── */
+let QD = {};
+const qdKeys = () => FARD.concat(DATA.profile.madhab === "hanafi" ? ["Witr"] : []);
+async function renderQada() {
+  $("qdTitle").textContent = tr("m_qada"); $("qdHint").textContent = tr("qd_hint"); $("qdTotalL").textContent = tr("qd_total");
+  $("qdAddL").textContent = tr("qd_add"); $("qdAdd").textContent = tr("qd_btn"); $("qdAddHint").textContent = tr("qd_add_hint"); $("qdDays").placeholder = "30";
+  const v = (await store.get(["qada"])).qada; try { QD = v ? JSON.parse(v) : {}; } catch (e) { QD = {}; }
+  drawQada();
+}
+function drawQada() {
+  const keys = qdKeys();
+  $("qdList").innerHTML = keys.map(k => { const n = QD[k] || 0; return `<div class="r"><div class="nm">${k === "Witr" ? "✨ " + tr("witr") : ICONS[k] + " " + esc(T.pn[k])}</div><button class="pm" data-q="${k}" data-d="1">+</button><div class="n">${n}</div><button class="pm ${n ? "" : "ok"}" data-q="${k}" data-d="-1">${n ? "−" : "✓"}</button></div>`; }).join("");
+  $("qdTotal").textContent = keys.reduce((s, k) => s + (QD[k] || 0), 0).toLocaleString();
+}
+function qdChange(k, d) {
+  const n = Math.max(0, (QD[k] || 0) + d); if (n === (QD[k] || 0)) return;
+  QD[k] = n; haptic(d < 0 ? "medium" : "light"); if (d < 0 && n === 0) { try { tg?.HapticFeedback?.notificationOccurred("success"); } catch (e) {} }
+  store.set("qada", JSON.stringify(QD)); drawQada();
+}
+function qdAddDays() {
+  const n = Math.min(36500, Math.max(0, parseInt($("qdDays").value, 10) || 0)); if (!n) return;
+  qdKeys().forEach(k => QD[k] = (QD[k] || 0) + n); $("qdDays").value = ""; haptic("medium"); store.set("qada", JSON.stringify(QD)); drawQada();
+}
+
+/* ───────── ISLAMIC DATES & CONVERTER ───────── */
+const HFMT = (() => { try { return new Intl.DateTimeFormat("en-u-ca-islamic-umalqura", {day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC"}); } catch (e) { return null; } })();
+function hij(iso) {  // Intl's Hijri date of a Gregorian day
+  const p = Object.fromEntries(HFMT.formatToParts(new Date(iso + "T12:00:00Z")).map(x => [x.type, x.value]));
+  return {d: +p.day, m: +p.month, y: parseInt(p.year, 10)};
+}
+let HSHIFT = null;  // days between Intl's calendar and the bot's (Aladhan) calendar
+function hShift() {
+  if (HSHIFT != null) return HSHIFT;
+  HSHIFT = 0;
+  if (!HFMT) return 0;
+  const t = todayISO();
+  for (const k of [0, 1, -1, 2, -2]) { const h = hij(addDays(t, k)); if (h.d === DATA.today.hday && h.m === DATA.today.hmonth) { HSHIFT = k; break; } }
+  return HSHIFT;
+}
+const hijOf = iso => hij(addDays(iso, hShift()));                     // bot-aligned Hijri of a Gregorian day
+function gregOf(d, m, y) {                                             // Gregorian day of a Hijri date, or null
+  const t = todayISO(), now = DATA.today;
+  const approx = Math.round((y - now.hyear) * 354.367 + (m - now.hmonth) * 29.53 + (d - now.hday));
+  for (let i = 0; i <= 40; i++) for (const sgn of i ? [1, -1] : [1]) {
+    const iso = addDays(t, approx + sgn * i), h = hijOf(iso);
+    if (h.d === d && h.m === m && h.y === y) return iso;
+  }
+  return null;
+}
+const EVENTS = [["ev_ny", 1, 1, "🌙"], ["ev_ash", 10, 1, "🕊"], ["ev_ram", 1, 9, "🌙"], ["ev_qadr", 27, 9, "✨"], ["ev_fitr", 1, 10, "🎉"], ["ev_arafa", 9, 12, "⛰"], ["ev_adha", 10, 12, "🐑"]];
+function fmtG(iso) { const [y, m, d] = iso.split("-").map(Number), wd = (new Date(iso + "T12:00:00Z").getUTCDay() + 6) % 7; return `${T.wd[wd]}, ${d} ${T.gm[m - 1]} ${y}`; }
+function fmtH(h) { return `${h.d} ${T.hm[h.m - 1]} ${h.y}`; }
+function renderDates() {
+  $("dtTitle").textContent = tr("m_dates"); $("dtNote").textContent = tr("dt_note"); $("cvTitle").textContent = tr("cv_title");
+  $("dtToday").textContent = tr("dt_today", {d: fmtH({d: DATA.today.hday, m: DATA.today.hmonth, y: DATA.today.hyear})});
+  const t = todayISO(), list = [];
+  if (HFMT) for (const [key, d, m, ic] of EVENTS) {
+    let y = DATA.today.hyear, iso = gregOf(d, m, y);
+    if (!iso || iso < t) { y += 1; iso = gregOf(d, m, y); }
+    if (iso) list.push({key, ic, iso, n: Math.round((new Date(iso + "T12:00:00Z") - new Date(t + "T12:00:00Z")) / 864e5), h: {d, m, y}});
+  }
+  list.sort((a, b) => a.n - b.n);
+  $("dtList").innerHTML = list.map(e => `<div class="e ${e.n === 0 ? "today" : ""}"><div class="ic">${e.ic}</div><div class="nm"><b>${tr(e.key)}</b><span class="sub">${fmtG(e.iso)} · ${fmtH(e.h)}</span></div><div class="left">${e.n === 0 ? tr("dt_now") : e.n === 1 ? tr("dt_tomorrow") : tr("dt_in", {n: e.n})}</div></div>`).join("") || `<div class="muted">${tr("err")}</div>`;
+  document.querySelectorAll("#cvSeg button").forEach(b => b.textContent = tr("cv_" + b.dataset.cv));
+  $("cvHm").innerHTML = T.hm.map((n, i) => `<option value="${i + 1}">${esc(n)}</option>`).join("");
+  if (!$("cvDate").value) { $("cvDate").value = t; $("cvHd").value = DATA.today.hday; $("cvHm").value = DATA.today.hmonth; $("cvHy").value = DATA.today.hyear; }
+  setCv(document.querySelector("#cvSeg button.on")?.dataset.cv || "g");
+}
+function setCv(mode) {
+  document.querySelectorAll("#cvSeg button").forEach(b => b.classList.toggle("on", b.dataset.cv === mode));
+  $("cvG").hidden = mode !== "g"; $("cvH").hidden = mode !== "h"; convert();
+}
+function convert() {
+  if (!HFMT) return;
+  const mode = document.querySelector("#cvSeg button.on")?.dataset.cv || "g";
+  if (mode === "g") { const v = $("cvDate").value; $("cvRes").textContent = v ? "🗓 " + fmtH(hijOf(v)) : ""; }
+  else { const iso = gregOf(+$("cvHd").value, +$("cvHm").value, +$("cvHy").value); $("cvRes").textContent = iso ? "📅 " + fmtG(iso) : tr("cv_bad"); }
+}
+
 /* ───────── boot ───────── */
 function applyLang() {
   T = LX[LANG] || LX.en;
@@ -876,12 +1286,21 @@ function init() {
     if (e.target.closest("[data-back]")) { back(); return; }
     const g = e.target.closest("#goals button"); if (g) { TS.goal = +g.dataset.g; TS.c = 0; haptic(); renderTasbih(); saveTasbih(); return; }
     const c = e.target.closest("#trChecks .c"); if (c) { toggleTrack(+c.dataset.i); return; }
+    const z = e.target.closest(".zk"); if (z) { tapZikr(z.dataset.z); return; }
+    const az = e.target.closest("#azSeg button"); if (az) { AZ_MODE = az.dataset.az; haptic(); renderAzkar(); return; }
+    const qb = e.target.closest("#qdList .pm"); if (qb) { qdChange(qb.dataset.q, +qb.dataset.d); return; }
+    const cv = e.target.closest("#cvSeg button"); if (cv) { haptic(); setCv(cv.dataset.cv); return; }
   });
   $("bead").onclick = tapBead;
   $("tReset").onclick = () => { TS.c = 0; haptic("medium"); renderTasbih(); saveTasbih(); };
   $("calPrev").onclick = () => shiftMonth(-1); $("calNext").onclick = () => shiftMonth(1);
   $("moNear").onclick = nearMe;
   $("nSearch").oninput = e => renderNames(e.target.value);
+  $("stCityFind").onclick = findCity;
+  $("stCityQ").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); findCity(); } };
+  $("azReset").onclick = () => { AZ = {}; store.set(azKey(), "{}"); haptic("medium"); drawAzkar(); };
+  $("qdAdd").onclick = qdAddDays;
+  ["cvDate", "cvHd", "cvHm", "cvHy"].forEach(id => $(id).addEventListener("input", convert));
   loadTasbih();
   load();
   setInterval(() => { if (TAB === "today" && !SUB) tick(); }, 1000);

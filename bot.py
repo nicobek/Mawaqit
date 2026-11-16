@@ -2547,8 +2547,99 @@ async def fetch_hijri_month(u, hy, hm):
 
 
 def profile_json(u, lang):
+    quiet = "off" if u["quiet_start"] is None else f"{u['quiet_start']}-{u['quiet_end']}"
     return {"lang": lang, "city": u["city"], "lat": u["lat"], "lon": u["lon"], "tz": u["tz"],
-            "madhab": u["madhab"], "country": u["country"], "lead": u["lead_min"], "at_time": u["at_time"]}
+            "madhab": u["madhab"], "country": u["country"], "lead": u["lead_min"], "at_time": u["at_time"],
+            "remind": u["remind"], "auto": u["auto_mode"], "ramadan": u["ramadan"], "quiet": quiet,
+            "lead_options": LEAD_OPTIONS, "auto_options": AUTO_OPTIONS,
+            "quiet_options": ["off"] + [f"{a}-{b}" for a, b in QUIET_PRESETS]}
+
+
+async def read_json(request):
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001
+        raise web.HTTPBadRequest(text="bad json")
+    if not isinstance(body, dict):
+        raise web.HTTPBadRequest(text="bad json")
+    return body
+
+
+async def api_settings(request):
+    """Change the user's settings from the mini app. Only known fields with allowed values are accepted."""
+    tg_user, u, _ = await api_auth(request)
+    if not u:
+        raise web.HTTPBadRequest(text="no user")
+    body = await read_json(request)
+    fields = {}
+    if body.get("lang") in LANGS:
+        fields["lang"] = body["lang"]
+    if body.get("madhab") in ("std", "hanafi"):
+        fields["madhab"] = body["madhab"]
+    if isinstance(body.get("lead"), int) and body["lead"] in LEAD_OPTIONS:
+        fields["lead_min"] = body["lead"]
+    if isinstance(body.get("auto"), int) and body["auto"] in AUTO_OPTIONS:
+        fields["auto_mode"] = body["auto"]
+    for key, col in (("at_time", "at_time"), ("remind", "remind"), ("ramadan", "ramadan")):
+        if isinstance(body.get(key), bool):
+            fields[col] = body[key]
+    q = body.get("quiet")
+    if q == "off":
+        fields["quiet_start"], fields["quiet_end"] = None, None
+    elif isinstance(q, str) and "-" in q:
+        try:
+            a, b = (int(x) for x in q.split("-"))
+            if (a, b) in QUIET_PRESETS:
+                fields["quiet_start"], fields["quiet_end"] = a, b
+        except ValueError:
+            pass
+    if not fields:
+        raise web.HTTPBadRequest(text="nothing to change")
+    if "remind" in fields:
+        fields["onboarded"] = True
+    await save(u["user_id"], **fields)
+    u = await get_user(u["user_id"])
+    return web.json_response({"ok": True, "profile": profile_json(u, u["lang"] or "en")})
+
+
+async def api_geocode(request):
+    _, u, lang = await api_auth(request)
+    q = (request.query.get("q") or "").strip()[:100]
+    if len(q) < 2:
+        raise web.HTTPBadRequest(text="short query")
+    try:
+        res = await geocode(q, lang)
+    except Exception:  # noqa: BLE001
+        log.exception("api geocode failed")
+        return web.json_response({"ok": False}, status=502)
+    if not res:
+        return web.json_response({"ok": True, "found": False})
+    name, lat, lon, cc = res
+    return web.json_response({"ok": True, "found": True, "name": name, "lat": lat, "lon": lon, "cc": cc,
+                              "flag": flag(cc) if cc else ""})
+
+
+async def api_city(request):
+    tg_user, u, _ = await api_auth(request)
+    if not u:
+        raise web.HTTPBadRequest(text="no user")
+    body = await read_json(request)
+    try:
+        name = str(body["name"])[:120]
+        lat, lon = float(body["lat"]), float(body["lon"])
+        cc = str(body.get("cc") or "")[:2].lower()
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180) or not name:
+            raise ValueError
+    except (KeyError, ValueError, TypeError):
+        raise web.HTTPBadRequest(text="bad city")
+    school = 1 if u["madhab"] == "hanafi" else 0
+    try:
+        data = await fetch_timings(lat, lon, datetime.utcnow().date(), method_for(cc), school)
+    except Exception:  # noqa: BLE001
+        log.exception("api city timings failed")
+        return web.json_response({"ok": False}, status=502)
+    await save(u["user_id"], city=name, lat=lat, lon=lon, country=cc, tz=data["tz"], awaiting_city=False)
+    return web.json_response({"ok": True})
 
 
 async def api_me(request):
@@ -2622,7 +2713,8 @@ async def start_web():
     app = web.Application()
     app.add_routes([web.get("/", page_index), web.get("/health", page_health),
                     web.get("/api/me", api_me), web.get("/api/month", api_month),
-                    web.get("/api/ramadan", api_ramadan)])
+                    web.get("/api/ramadan", api_ramadan), web.post("/api/settings", api_settings),
+                    web.get("/api/geocode", api_geocode), web.post("/api/city", api_city)])
     WEB_RUNNER = web.AppRunner(app, access_log=None)
     await WEB_RUNNER.setup()
     port = int(os.getenv("PORT", "8080"))
