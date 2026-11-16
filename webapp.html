@@ -480,6 +480,15 @@ html.lite #sky .b{animation:none;filter:blur(60px)}
     <button class="btn ghost" id="aiNew" style="margin-top:10px"></button>
   </section>
 
+  <section class="view" id="v-support">
+    <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
+    <h1 id="supTitle"></h1><div class="sub" id="supText" style="margin-top:4px"></div>
+    <div class="card"><div class="lbl" id="supStarsL" style="font-weight:700;margin-bottom:8px"></div><div class="chips" id="supAmounts"></div>
+      <div class="row" style="gap:8px;margin-top:10px"><input class="search" id="supCustom" type="number" min="1" max="100000" inputmode="numeric" style="margin:0;background:var(--bg)"><button class="btn" id="supCustomGo" style="width:auto;flex:none"></button></div></div>
+    <div class="card"><div class="lbl" id="supCardsL" style="font-weight:700"></div><div id="supCards"></div>
+      <button class="btn ghost" id="supSent" style="margin-top:12px;background:var(--bg)"></button></div>
+  </section>
+
   <section class="view" id="v-invite">
     <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
     <h1 id="invTitle"></h1>
@@ -615,7 +624,7 @@ html.lite #sky .b{animation:none;filter:blur(60px)}
 
   <section class="view" id="v-admin">
     <h1>🛠 Админка</h1>
-    <div class="seg adseg" id="adSeg"><button data-ad="dash">📊 Обзор</button><button data-ad="users">👥 Люди</button><button data-ad="chats">📢 Чаты</button><button data-ad="bc">📣 Рассылка</button><button data-ad="sys">🩺 Система</button><button data-ad="adm" hidden>👮 Админы</button></div>
+    <div class="seg adseg" id="adSeg"><button data-ad="dash">📊 Обзор</button><button data-ad="users">👥 Люди</button><button data-ad="chats">📢 Чаты</button><button data-ad="bc">📣 Рассылка</button><button data-ad="sys">🩺 Система</button><button data-ad="ai" hidden>🤖 ИИ</button><button data-ad="adm" hidden>👮 Админы</button></div>
     <div id="adBody" style="margin-top:10px"></div>
   </section>
 
@@ -891,7 +900,7 @@ function openSub(name) {
   SUB = name; show(name);
   try { tg?.BackButton?.show(); } catch (e) {}
   ({tracker: renderTracker, ramadan: renderRamadan, mosques: openMosques, names: renderNames, settings: renderSettings,
-    azkar: renderAzkar, duas: renderDuas, challenges: renderChallenges, invite: renderInvite, ai: renderAi, qada: renderQada, dates: renderDates, cities: renderCities})[name]?.();
+    azkar: renderAzkar, duas: renderDuas, challenges: renderChallenges, invite: renderInvite, ai: renderAi, support: renderSupport, qada: renderQada, dates: renderDates, cities: renderCities})[name]?.();
 }
 function back() { if (!$("sheet").hidden) return closeSheet(); if (SUB === "place") return returnFromPlace(); if (SUB === "admuser") return go("admin"); if (SUB === "challenges" && CH_FROM === "tracker") { CH_FROM = null; return openSub("tracker"); } if (SUB) go("more"); }
 
@@ -1048,7 +1057,7 @@ function renderMore() {
   $("moreTitle").textContent = T.t_more;
   const items = [["tracker", "✅", "m_tracker", "m_tracker_d"], ["challenges", "🤝", "m_ch", "m_ch_d"], ["azkar", "🌅", "m_azkar", "m_azkar_d"], ["duas", "🤲", "m_duas", "m_duas_d"],
     ["qada", "🔁", "m_qada", "m_qada_d"], ["dates", "📆", "m_dates", "m_dates_d"], ["ramadan", "🌙", "m_ramadan", "m_ramadan_d"],
-    ["cities", "✈️", "m_cities", "m_cities_d"], ["names", "📖", "m_names", "m_names_d"], ["invite", "🤲", "m_invite", "m_invite_d"], ["settings", "⚙️", "m_settings", "m_settings_d"]];
+    ["cities", "✈️", "m_cities", "m_cities_d"], ["names", "📖", "m_names", "m_names_d"], ["invite", "🤲", "m_invite", "m_invite_d"], ["support", "🤍", "m_sup", "m_sup_d"], ["settings", "⚙️", "m_settings", "m_settings_d"]];
   if (DATA && DATA.ai && DATA.ai.enabled) items.unshift(["ai", "🤖", "m_ai", "m_ai_d"]);
   let h = items.map(([id, ic, t1, t2]) => `<button class="item" data-sub="${id}"><div class="ico">${ic}</div><div><div class="tt">${tr(t1)}</div><div class="ds">${tr(t2)}</div></div><div class="ch">›</div></button>`).join("");
   if (ver("8.0") && tg.addToHomeScreen) h += `<button class="item" id="homeBtn"><div class="ico">📲</div><div><div class="tt">${tr("m_home")}</div><div class="ds" id="homeDs">${tr("m_home_d")}</div></div></button>`;
@@ -1722,14 +1731,26 @@ const LX9 = {
 for (const l in LX9) Object.assign(LX[l], LX9[l]);
 
 /* AI chat (shares the conversation with the bot) */
+const LX10 = {
+ en:{m_sup:"Support the project",m_sup_d:"Stars or a bank card — sadaqah jariyah",sup_title:"🤍 Support the project",sup_text:"Mawaqit is free. If you'd like to support its work, it will be a sadaqah jariyah. May Allah reward you 🤍",sup_stars:"⭐ With Telegram Stars",sup_custom:"Other amount",sup_send:"Send",sup_cards:"💳 To a bank card",sup_owner:"Card holder: {n}",sup_copy:"📋 Copy",sup_copied:"Copied ✓",sup_sent:"✅ I've sent it",sup_sent_ok:"Thank you! May Allah reward you 🤍",sup_thanks:"Thank you for your support! May Allah reward you 🤍",ai_buy:"Get more questions",ai_paid:"Payment received ✓ Questions added"},
+ ru:{m_sup:"Поддержать проект",m_sup_d:"Звёздами или на карту — садака джария",sup_title:"🤍 Поддержать проект",sup_text:"Mawaqit бесплатный. Если хотите поддержать его работу — это будет садака джария. Да вознаградит вас Аллах 🤍",sup_stars:"⭐ Звёздами Telegram",sup_custom:"Своя сумма",sup_send:"Отправить",sup_cards:"💳 На карту",sup_owner:"Владелец: {n}",sup_copy:"📋 Скопировать",sup_copied:"Скопировано ✓",sup_sent:"✅ Я отправил(а)",sup_sent_ok:"Спасибо! Да вознаградит вас Аллах 🤍",sup_thanks:"Спасибо за поддержку! Да вознаградит вас Аллах 🤍",ai_buy:"Получить ещё вопросы",ai_paid:"Оплата прошла ✓ Вопросы начислены"},
+ uz:{m_sup:"Loyihani qo'llab-quvvatlash",m_sup_d:"Yulduzlar yoki karta orqali — sadaqai joriya",sup_title:"🤍 Loyihani qo'llab-quvvatlash",sup_text:"Mawaqit bepul. Uning ishini qo'llab-quvvatlamoqchi bo'lsangiz — bu sadaqai joriya bo'ladi. Alloh sizni mukofotlasin 🤍",sup_stars:"⭐ Telegram yulduzlari bilan",sup_custom:"Boshqa summa",sup_send:"Yuborish",sup_cards:"💳 Kartaga",sup_owner:"Karta egasi: {n}",sup_copy:"📋 Nusxa olish",sup_copied:"Nusxa olindi ✓",sup_sent:"✅ Yubordim",sup_sent_ok:"Rahmat! Alloh sizni mukofotlasin 🤍",sup_thanks:"Qo'llab-quvvatlaganingiz uchun rahmat! Alloh sizni mukofotlasin 🤍",ai_buy:"Yana savollar olish",ai_paid:"To'lov qabul qilindi ✓ Savollar qo'shildi"},
+ tg:{m_sup:"Дастгирии лоиҳа",m_sup_d:"Бо ситораҳо ё ба корт — садақаи ҷория",sup_title:"🤍 Дастгирии лоиҳа",sup_text:"Mawaqit ройгон аст. Агар хоҳед кори онро дастгирӣ кунед — ин садақаи ҷория мешавад. Аллоҳ шуморо подош диҳад 🤍",sup_stars:"⭐ Бо ситораҳои Telegram",sup_custom:"Маблағи дигар",sup_send:"Фиристодан",sup_cards:"💳 Ба корт",sup_owner:"Соҳиби корт: {n}",sup_copy:"📋 Нусха",sup_copied:"Нусха шуд ✓",sup_sent:"✅ Фиристодам",sup_sent_ok:"Ташаккур! Аллоҳ шуморо подош диҳад 🤍",sup_thanks:"Ташаккур барои дастгирӣ! Аллоҳ шуморо подош диҳад 🤍",ai_buy:"Гирифтани саволҳои бештар",ai_paid:"Пардохт қабул шуд ✓ Саволҳо илова шуданд"},
+ ar:{m_sup:"ادعم المشروع",m_sup_d:"بالنجوم أو إلى بطاقة — صدقة جارية",sup_title:"🤍 ادعم المشروع",sup_text:"مواقيت مجاني. إن أردت دعم عمله فستكون صدقة جارية. جزاك الله خيراً 🤍",sup_stars:"⭐ بنجوم تيليجرام",sup_custom:"مبلغ آخر",sup_send:"إرسال",sup_cards:"💳 إلى بطاقة",sup_owner:"صاحب البطاقة: {n}",sup_copy:"📋 نسخ",sup_copied:"تم النسخ ✓",sup_sent:"✅ أرسلت",sup_sent_ok:"شكراً! جزاك الله خيراً 🤍",sup_thanks:"شكراً لدعمك! جزاك الله خيراً 🤍",ai_buy:"احصل على مزيد من الأسئلة",ai_paid:"تم الدفع ✓ أضيفت الأسئلة"}
+};
+for (const l in LX10) Object.assign(LX[l], LX10[l]);
+
 let AI_LOG = [];
 function aiSub() {
   const a = DATA.ai || {};
-  $("aiSub").textContent = a.unlimited ? tr("ai_unl") : tr("ai_left", {n: a.left ?? 0});
+  $("aiSub").innerHTML = a.unlimited ? esc(tr("ai_unl")) : (a.status || "").replace(/\n/g, " · ");
 }
 function aiDraw() {
   $("aiChat").innerHTML = `<div class="aimsg bot">${esc(tr("ai_hello"))}</div>` + AI_LOG.map(m =>
-    m.me ? `<div class="aimsg me">${esc(m.text)}</div>` : `<div class="aimsg bot ${m.typing ? "typing" : ""}">${m.html}${m.typing ? "" : `<span class="ds">${esc(tr("ai_disc"))}</span>`}</div>`).join("");
+    m.me ? `<div class="aimsg me">${esc(m.text)}</div>`
+      : m.buy ? `<div class="aimsg bot">${esc(m.text)}<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">${((DATA.money || {}).packs || []).map(p => `<button class="btn" data-buy="${esc(p.id)}">${esc(p.label)}</button>`).join("")}</div></div>`
+      : `<div class="aimsg bot ${m.typing ? "typing" : ""}">${m.html}${m.typing || !m.disc ? "" : `<span class="ds">${esc(m.disc)}</span>`}</div>`).join("");
+  $("aiChat").querySelectorAll("[data-buy]").forEach(b => b.onclick = () => payInvoice({pack: b.dataset.buy}, "ai_paid"));
 }
 function renderAi() {
   $("aiTitle").textContent = "🤖 " + tr("m_ai"); $("aiIn").placeholder = tr("ai_ph"); $("aiNew").textContent = tr("ai_new");
@@ -1744,14 +1765,46 @@ async function aiSend() {
   try {
     const r = await apiPost("/api/ai", {text});
     AI_LOG.pop();
-    if (r.ok) { AI_LOG.push({html: r.html}); DATA.ai.left = r.left; }
-    else AI_LOG.push({html: esc(tr(r.error === "limit" ? "ai_limit" : "ai_err"))});
+    if (r.ok) AI_LOG.push({html: r.html, disc: r.disc});
+    else if (r.error === "limit") AI_LOG.push({buy: true, text: tr("ai_limit")});
+    else AI_LOG.push({html: esc(tr("ai_err"))});
+    if (r.status !== undefined) DATA.ai.status = r.status;
   } catch (e) { AI_LOG.pop(); AI_LOG.push({html: esc(tr("ai_err"))}); }
   $("aiSend").disabled = false; aiSub(); aiDraw();
   window.scrollTo(0, document.body.scrollHeight);
 }
-async function aiReset() { haptic(); AI_LOG = []; aiDraw(); try { await apiPost("/api/ai", {reset: true}); } catch (e) {} }
+async function aiReset() { haptic(); AI_LOG = []; aiDraw(); try { const r = await apiPost("/api/ai", {reset: true}); if (r.status !== undefined) { DATA.ai.status = r.status; aiSub(); } } catch (e) {} }
 
+/* payments: Telegram Stars invoices opened inside the mini app */
+async function payInvoice(body, okKey) {
+  haptic();
+  try {
+    const r = await apiPost("/api/invoice", body);
+    tg.openInvoice(r.link, async status => {
+      if (status !== "paid") return;
+      try { tg.HapticFeedback.notificationOccurred("success"); } catch (e) {}
+      toast(tr(okKey));
+      try { const d = await api("/api/me"); DATA.ai = d.ai; if (SUB === "ai") { aiSub(); AI_LOG = AI_LOG.filter(m => !m.buy); aiDraw(); } } catch (e) {}
+    });
+  } catch (e) { toast(tr("st_err")); }
+}
+
+/* support the project: stars or a bank card */
+function renderSupport() {
+  const m = DATA.money || {cards: {cards: []}}, cards = (m.cards && m.cards.cards) || [];
+  $("supTitle").textContent = tr("sup_title"); $("supText").textContent = tr("sup_text");
+  $("supStarsL").textContent = tr("sup_stars"); $("supCardsL").textContent = tr("sup_cards");
+  $("supAmounts").innerHTML = [50, 100, 250, 500].map(n => `<button class="chip" data-don="${n}">⭐ ${n}</button>`).join("");
+  $("supCustom").placeholder = tr("sup_custom"); $("supCustomGo").textContent = tr("sup_send");
+  $("supCards").innerHTML = cards.map(c => `<div class="row between" style="padding:8px 0;border-bottom:1px solid var(--line)"><div><div class="sub">${esc(c.label)}</div><b dir="ltr" style="font-variant-numeric:tabular-nums">${esc(c.number)}</b></div><button class="chip" data-copy="${esc(c.number.replace(/\s/g, ""))}">${esc(tr("sup_copy"))}</button></div>`).join("")
+    + (m.cards && m.cards.owner ? `<div class="sub" style="margin-top:8px">${esc(tr("sup_owner", {n: m.cards.owner}))}</div>` : "");
+  $("supSent").textContent = tr("sup_sent");
+  $("supAmounts").querySelectorAll("[data-don]").forEach(b => b.onclick = () => payInvoice({donate: +b.dataset.don}, "sup_thanks"));
+  $("supCards").querySelectorAll("[data-copy]").forEach(b => b.onclick = async () => {
+    haptic(); try { await navigator.clipboard.writeText(b.dataset.copy); } catch (e) { const i = document.createElement("textarea"); i.value = b.dataset.copy; document.body.appendChild(i); i.select(); try { document.execCommand("copy"); } catch (e2) {} i.remove(); }
+    toast(tr("sup_copied"));
+  });
+}
 /* ═══════════ Uzbek in Cyrillic: made from the Latin texts by the spelling rules (same as the bot) ═══════════ */
 const CYR_APOS = "'ʻʼ’‘`";
 const CYR_1 = {a:"а",b:"б",c:"ц",d:"д",e:"е",f:"ф",g:"г",h:"ҳ",i:"и",j:"ж",k:"к",l:"л",m:"м",n:"н",o:"о",p:"п",q:"қ",r:"р",s:"с",t:"т",u:"у",v:"в",w:"в",x:"х",y:"й",z:"з"};
@@ -2227,14 +2280,50 @@ const shortD = d => d.slice(8, 10) + "." + d.slice(5, 7);
 async function apiAdmin(path, body) {
   return body === undefined ? api(path) : apiPost(path, body);
 }
-const AD_NEED = {dash: "stats", users: "users", chats: "users", bc: "bc", sys: ["health", "export"], adm: "main"};
+const AD_NEED = {dash: "stats", users: "users", chats: "users", bc: "bc", sys: ["health", "export"], ai: "ai", adm: "main"};
 const canAd = p => { const a = (DATA && DATA.admin) || {perms: [], main: false}; return [].concat(p).some(x => x === "main" ? a.main : a.perms.includes(x)); };
 function renderAdmin() {
   const tabs = [...document.querySelectorAll("#adSeg button")];
   tabs.forEach(b => b.hidden = !canAd(AD_NEED[b.dataset.ad]));
   if (!canAd(AD_NEED[AD_TAB])) { const first = tabs.find(b => !b.hidden); if (!first) return adBody(`<div class="muted" style="padding:24px 4px">🔒 Нет доступных разделов. Попросите главного админа включить права.</div>`); AD_TAB = first.dataset.ad; }
   tabs.forEach(b => b.classList.toggle("on", b.dataset.ad === AD_TAB));
-  ({dash: adDash, users: () => adPeople("users"), chats: () => adPeople("chats"), bc: adBc, sys: adSys, adm: adAdmins})[AD_TAB]();
+  ({dash: adDash, users: () => adPeople("users"), chats: () => adPeople("chats"), bc: adBc, sys: adSys, ai: adAi, adm: adAdmins})[AD_TAB]();
+}
+
+/* ── AI helper settings ── */
+async function adAi(data) {
+  if (!data) { adLoading(); try { data = await apiAdmin("/api/admin/ai"); } catch (e) { return adBody(`<div class="muted">Не удалось загрузить</div>`); } }
+  const c = data.cfg, o = data.options, st = data.stats;
+  const chipRow = (id, opts, cur) => `<div class="chips" id="${id}">${opts.map(([v, l]) => `<button class="chip ${String(v) === String(cur) ? "on" : ""}" data-v="${esc(v)}">${esc(l)}</button>`).join("")}</div>`;
+  const stat = k => `<div class="card"><div class="sub">${k === "1" ? "Сегодня" : k + " дн."}</div><b>${st[k].q}</b><div class="sub">бесплатных ${st[k].free} · купленных ${st[k].paid}<br>квота ${st[k].quota} · ошибок ${st[k].err}<br>⭐ ${st[k].stars_pack} продажи · ${st[k].stars_don} пожертв.</div></div>`;
+  adBody(`<div class="adgrid">${["1", "7", "30"].map(stat).join("")}</div>
+    <div class="card"><div class="sw ${c.enabled ? "on" : ""}" id="aiEn"><span>Помощник включён</span><span class="tg"></span></div>
+      <div class="lbl sub" style="margin:12px 0 6px">Кому доступен</div>${chipRow("aiAcc", [["admins", "🔒 Админы"], ["all", "✅ Все"], ["selected", "👥 Избранные"]], c.access)}
+      <div class="sub" style="margin-top:6px">Избранные: ${c.selected.length} · в бане: ${c.banned.length} (списки — в админке бота)</div></div>
+    <div class="card"><div class="lbl sub" style="margin-bottom:6px">Бесплатно в день на человека</div>${chipRow("aiDf", o.daily_free.map(v => [v, v || "∞"]), c.daily_free)}
+      <div class="lbl sub" style="margin:12px 0 6px">Бесплатно в день на всех</div>${chipRow("aiGf", o.global_free.map(v => [v, v || "∞"]), c.global_free)}</div>
+    <div class="card"><div class="lbl sub" style="margin-bottom:6px">Модель</div>${chipRow("aiMod", [["auto", "🪄 Авто"]].concat(data.models.slice(0, 8).map(m => [m, m])), c.model)}
+      <div class="lbl sub" style="margin:12px 0 6px">Длина ответов</div>${chipRow("aiLen", [["short", "Коротко"], ["medium", "Средне"], ["long", "Подробно"]], c.length)}
+      <div class="lbl sub" style="margin:12px 0 6px">Память диалога (сообщений)</div>${chipRow("aiMem", o.memory.map(v => [v, v]), c.memory)}</div>
+    <div class="card"><b>✍️ Свои инструкции</b><textarea class="search" id="aiExtra" rows="4" style="margin-top:8px;background:var(--bg)" placeholder="Например: опирайся на позицию Духовного управления мусульман Узбекистана">${esc(c.extra)}</textarea>
+      <div class="sw ${c.disc_on ? "on" : ""}" id="aiDiscOn" style="margin-top:6px"><span>Пометка под ответом</span><span class="tg"></span></div>
+      <input class="search" id="aiDisc" style="background:var(--bg)" placeholder="Свой текст пометки (пусто — стандартный)" value="${esc(c.disc)}">
+      <button class="btn" id="aiSave">Сохранить тексты</button></div>
+    <div class="card"><b>🧪 Тест</b><textarea class="search" id="aiTestQ" rows="2" style="margin-top:8px;background:var(--bg)" placeholder="Вопрос с текущими настройками"></textarea><button class="btn ghost" id="aiTestGo" style="background:var(--bg)">Спросить</button><div id="aiTestA" style="margin-top:10px"></div></div>
+    <h2>📜 Журнал вопросов</h2>${data.log.map(l => `<div class="card"><div class="sub">👤 ${esc(l.name)}${l.username ? " @" + esc(l.username) : ""} · ${fdate(l.at)} · ${esc(l.model || "")}</div><div style="margin:6px 0"><b>❓ ${esc(l.q)}</b></div><div class="sub" style="white-space:pre-wrap">${esc(l.a)}</div></div>`).join("") || `<div class="muted">Пока пусто</div>`}
+    <div class="sub" style="margin:10px 2px">Пакеты, карты, ключ Gemini, продажи и возвраты — в админке бота: 🛠 → 🤖 ИИ-помощник.</div>`);
+  const post = async patch => { try { adAi(await apiAdmin("/api/admin/ai", patch)); haptic(); } catch (e) { toast("Ошибка"); } };
+  const bind = (id, key, num) => document.querySelectorAll(`#${id} .chip`).forEach(b => b.onclick = () => post({[key]: num ? +b.dataset.v : b.dataset.v}));
+  bind("aiAcc", "access"); bind("aiDf", "daily_free", 1); bind("aiGf", "global_free", 1); bind("aiMod", "model"); bind("aiLen", "length"); bind("aiMem", "memory", 1);
+  $("aiEn").onclick = () => post({enabled: !c.enabled});
+  $("aiDiscOn").onclick = () => post({disc_on: !c.disc_on});
+  $("aiSave").onclick = () => { post({extra: $("aiExtra").value, disc: $("aiDisc").value}); toast("Сохранено ✓"); };
+  $("aiTestGo").onclick = async () => {
+    const q = $("aiTestQ").value.trim(); if (!q) return;
+    $("aiTestA").innerHTML = `<div class="muted">Думаю…</div>`;
+    try { const r = await apiAdmin("/api/admin/ai", {test: q}); $("aiTestA").innerHTML = r.ok ? `<div style="white-space:pre-wrap">${r.html}</div><div class="sub" style="margin-top:6px">🧪 ${esc(r.model)}</div>` : `<div class="muted">Ошибка: ${esc(r.error || "")}</div>`; }
+    catch (e) { $("aiTestA").innerHTML = `<div class="muted">Ошибка</div>`; }
+  };
 }
 
 /* ── admins and their rights (main admin only) ── */
@@ -2335,7 +2424,7 @@ async function openAdmUser(id) {
       ["🔕 Тихие часы", p.quiet], ["🔄 Автообновление", p.auto], ["🌙 Рамадан", p.ramadan ? "вкл" : "выкл"]])
     .concat(priv ? [["📢 Добавил каналов", p.owned_channels], ["👥 Добавил групп", p.owned_groups]] : [])
     .concat([["📅 С нами с", fdate(p.created)], ["👁 Был(а)", `${fdate(p.last_seen)} (${ago(p.last_seen)})`]]);
-  const badges = [p.is_admin ? `<span class="badge g">🛠 Админ</span>` : "", p.banned ? `<span class="badge r">🚫 В бане</span>` : "", p.blocked ? `<span class="badge r">🧱 ${priv ? "Заблокировал бота" : "Бот удалён"}</span>` : "", !p.banned && !p.blocked ? `<span class="badge g">✅ Активен</span>` : ""].join("");
+  const badges = [p.hidden ? `<span class="badge">🙈 Скрыт</span>` : "", p.is_admin ? `<span class="badge g">🛠 Админ</span>` : "", p.banned ? `<span class="badge r">🚫 В бане</span>` : "", p.blocked ? `<span class="badge r">🧱 ${priv ? "Заблокировал бота" : "Бот удалён"}</span>` : "", !p.banned && !p.blocked ? `<span class="badge g">✅ Активен</span>` : ""].join("");
   $("auBody").innerHTML = `<div class="card center"><div class="av big">${priv ? esc((p.name || "?").charAt(0).toUpperCase()) : (p.type === "group" ? "👥" : "📢")}</div>
       <h1 style="margin:8px 0 2px">${esc(priv ? (p.name || "Без имени") : (p.title || "—"))}</h1>
       <div class="sub">${p.username ? "@" + esc(p.username) + " · " : ""}ID <span dir="ltr">${p.id}</span></div><div style="margin-top:8px">${badges}</div></div>
@@ -2344,7 +2433,9 @@ async function openAdmUser(id) {
     ${priv && !p.is_admin && canAd("support") ? `<div class="card"><b>✉️ Написать</b><textarea class="search" id="auMsg" rows="3" placeholder="Сообщение придёт от бота. **жирный**, __курсив__" style="margin-top:8px"></textarea>
       <button class="btn" id="auSend">Отправить</button></div>` : ""}
     ${priv && !p.is_admin && canAd("bans") ? `<button class="btn ghost" id="auBan" style="margin-top:10px">${p.banned ? "✅ Разбанить" : "🚫 Забанить"}</button>` : ""}
-    ${p.username ? `<button class="btn ghost" id="auOpen" style="margin-top:10px">💬 Открыть в Telegram</button>` : ""}`;
+    ${p.username ? `<button class="btn ghost" id="auOpen" style="margin-top:10px">💬 Открыть в Telegram</button>` : ""}
+    ${p.can_hide ? `<button class="btn ghost" id="auHide" style="margin-top:10px">${p.hidden ? "👁 Показать всем админам" : "🙈 Скрыть от других админов"}</button>` : ""}`;
+  if ($("auHide")) $("auHide").onclick = async () => { haptic(); try { await apiAdmin("/api/admin/hide", {id: p.id}); openAdmUser(p.id); } catch (e) { toast("Ошибка"); } };
   if ($("auSend")) $("auSend").onclick = async () => {
     const text = $("auMsg").value.trim(); if (!text) return;
     haptic(); $("auSend").disabled = true;
@@ -2478,7 +2569,7 @@ async function load(silent) {
       const qs = new URLSearchParams(location.search), want = qs.get("tab"), sub = qs.get("sub"), az = qs.get("az");
       go(["today", "qibla", "cal", "tasbih", "more"].concat(d.is_admin ? ["admin"] : []).includes(want) ? want : "today");
       if (qs.get("share") === "1") setTimeout(() => sharePrayerTimes(true), 300);
-      if (want === "more" && ["tracker", "challenges", "invite", "azkar", "duas", "qada", "dates", "ramadan", "cities", "names", "settings", "ai"].includes(sub)) {
+      if (want === "more" && ["tracker", "challenges", "invite", "azkar", "duas", "qada", "dates", "ramadan", "cities", "names", "settings", "ai", "support"].includes(sub)) {
         if (sub === "azkar" && (az === "m" || az === "e")) AZ_MODE = az;
         openSub(sub);
       }
@@ -2535,6 +2626,8 @@ function init() {
   $("ciQ").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); findOther(); } };
   $("chCreate").onclick = createChallenge;
   $("aiSend").onclick = aiSend; $("aiNew").onclick = aiReset;
+  $("supCustomGo").onclick = () => { const n = parseInt($("supCustom").value, 10); if (n >= 1 && n <= 100000) payInvoice({donate: n}, "sup_thanks"); };
+  $("supSent").onclick = async () => { haptic(); try { await apiPost("/api/donate/sent", {}); } catch (e) {} toast(tr("sup_sent_ok")); };
   $("aiIn").addEventListener("input", e => { e.target.style.height = "auto"; e.target.style.height = Math.min(140, e.target.scrollHeight) + "px"; });
   $("aiIn").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !/Android|iPhone|iPad/i.test(navigator.userAgent)) { e.preventDefault(); aiSend(); } });
   $("invShare").onclick = shareInvite; $("invCopy").onclick = copyInvite;

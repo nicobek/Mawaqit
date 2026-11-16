@@ -35,6 +35,7 @@ import httpx
 from aiohttp import web
 from telegram import (
     BotCommand,
+    CopyTextButton,
     ForceReply,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -42,6 +43,7 @@ from telegram import (
     InlineQueryResultsButton,
     InputTextMessageContent,
     KeyboardButton,
+    LabeledPrice,
     MenuButtonCommands,
     MenuButtonDefault,
     MenuButtonWebApp,
@@ -61,6 +63,7 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
     InlineQueryHandler,
+    PreCheckoutQueryHandler,
     MessageHandler,
     TypeHandler,
     filters,
@@ -966,6 +969,97 @@ EXTRA9 = {
 for _l, _d in EXTRA9.items():
     T[_l].update(_d)
 
+
+EXTRA10 = {
+    "en": {"ai_intro2": "🤖 <b>Questions about Islam</b>\n\nWrite your question — about prayer, fasting, adhkar, the Qur'an, manners. You can ask follow-up questions.\n\n<i>Answers are written by AI and may contain mistakes. For important matters, ask an imam. Admins may read questions to improve the answers.</i>",
+           "ai_status_free": "🎁 Free questions today: <b>{n}</b>", "ai_status_cred": "💎 Purchased questions: <b>{n}</b>", "ai_status_unl": "♾ Unlimited until <b>{d}</b>",
+           "ai_limit2": "⏳ Your free questions for today are used up. You can get more questions for ⭐ or come back tomorrow 🤍",
+           "ai_global": "⏳ Today's free questions are used up for everyone — too many people asked. You can get questions for ⭐ or come back tomorrow 🤍",
+           "pack_q": "{q} questions — {s} ⭐", "pack_unl": "♾ Unlimited for {d} days — {s} ⭐",
+           "inv_q_title": "{q} AI questions", "inv_unl_title": "Unlimited AI questions for {d} days",
+           "inv_desc": "Questions about Islam to the AI helper in the Mawaqit bot",
+           "paid_ok": "✅ Payment received! Added: {what}. Thank you 🤍",
+           "don_btn": "⭐ Support the project",
+           "don_title": "🤍 <b>Support the project</b>\n\nMawaqit is free. If you'd like to support its work, it will be a sadaqah jariyah. May Allah reward you 🤍",
+           "don_custom": "✏️ Other amount", "don_card": "💳 To a bank card",
+           "don_custom_ask": "Write how many ⭐ you'd like to send (from 1 to 100000):", "don_bad": "Please send a number from 1 to 100000.",
+           "don_inv_title": "Support Mawaqit", "don_inv_desc": "A voluntary donation for the bot's work",
+           "don_thanks": "🤍 Thank you for your support! May Allah reward you.",
+           "don_cards_title": "💳 <b>Transfer to a card</b>\n\nTap a number to copy it:", "don_owner": "👤 Card holder: {name}",
+           "don_sent": "✅ I've sent it", "don_sent_ok": "🤍 Thank you! May Allah reward you.",
+           "ai_granted": "🎁 You've been given {n} questions to the AI helper. Enjoy 🤍"},
+    "ru": {"ai_intro2": "🤖 <b>Вопросы об исламе</b>\n\nНапишите вопрос — о намазе, посте, азкарах, Коране, этике. Можно задавать уточняющие вопросы.\n\n<i>Ответы пишет ИИ, он может ошибаться. По важным вопросам обращайтесь к имаму. Вопросы могут просматривать администраторы для улучшения ответов.</i>",
+           "ai_status_free": "🎁 Бесплатных вопросов сегодня: <b>{n}</b>", "ai_status_cred": "💎 Купленных вопросов: <b>{n}</b>", "ai_status_unl": "♾ Безлимит до <b>{d}</b>",
+           "ai_limit2": "⏳ Бесплатные вопросы на сегодня закончились. Можно получить вопросы за ⭐ или вернуться завтра 🤍",
+           "ai_global": "⏳ Сегодня бесплатные вопросы закончились у всех — слишком много желающих. Можно получить вопросы за ⭐ или вернуться завтра 🤍",
+           "pack_q": "{q} вопросов — {s} ⭐", "pack_unl": "♾ Безлимит на {d} дн. — {s} ⭐",
+           "inv_q_title": "{q} вопросов к ИИ", "inv_unl_title": "Безлимит вопросов к ИИ на {d} дн.",
+           "inv_desc": "Вопросы об исламе к ИИ-помощнику в боте Mawaqit",
+           "paid_ok": "✅ Оплата прошла! Начислено: {what}. Спасибо 🤍",
+           "don_btn": "⭐ Поддержать проект",
+           "don_title": "🤍 <b>Поддержать проект</b>\n\nMawaqit бесплатный. Если хотите поддержать его работу — это будет садака джария. Да вознаградит вас Аллах 🤍",
+           "don_custom": "✏️ Своя сумма", "don_card": "💳 На карту",
+           "don_custom_ask": "Напишите, сколько ⭐ хотите отправить (от 1 до 100000):", "don_bad": "Пришлите число от 1 до 100000.",
+           "don_inv_title": "Поддержка Mawaqit", "don_inv_desc": "Добровольное пожертвование на работу бота",
+           "don_thanks": "🤍 Спасибо за поддержку! Да вознаградит вас Аллах.",
+           "don_cards_title": "💳 <b>Перевод на карту</b>\n\nНажмите на номер, чтобы скопировать:", "don_owner": "👤 Владелец: {name}",
+           "don_sent": "✅ Я отправил(а)", "don_sent_ok": "🤍 Спасибо! Да вознаградит вас Аллах.",
+           "ai_granted": "🎁 Вам начислено вопросов к ИИ-помощнику: {n}. Пользуйтесь на здоровье 🤍"},
+    "uz": {"ai_intro2": "🤖 <b>Islom haqida savollar</b>\n\nSavolingizni yozing — namoz, ro'za, zikrlar, Qur'on, odob haqida. Qo'shimcha savollar ham berishingiz mumkin.\n\n<i>Javoblarni sun'iy intellekt yozadi, u xato qilishi mumkin. Muhim masalalarda imomga murojaat qiling. Javoblarni yaxshilash uchun savollarni administratorlar ko'rishi mumkin.</i>",
+           "ai_status_free": "🎁 Bugungi bepul savollar: <b>{n}</b>", "ai_status_cred": "💎 Sotib olingan savollar: <b>{n}</b>", "ai_status_unl": "♾ <b>{d}</b> gacha cheksiz",
+           "ai_limit2": "⏳ Bugungi bepul savollaringiz tugadi. ⭐ evaziga savollar olishingiz yoki ertaga qaytishingiz mumkin 🤍",
+           "ai_global": "⏳ Bugun bepul savollar hamma uchun tugadi — so'raganlar juda ko'p. ⭐ evaziga savollar olishingiz yoki ertaga qaytishingiz mumkin 🤍",
+           "pack_q": "{q} ta savol — {s} ⭐", "pack_unl": "♾ {d} kunga cheksiz — {s} ⭐",
+           "inv_q_title": "Sun'iy intellektga {q} ta savol", "inv_unl_title": "{d} kunga cheksiz savollar",
+           "inv_desc": "Mawaqit botidagi sun'iy intellekt yordamchisiga Islom haqida savollar",
+           "paid_ok": "✅ To'lov qabul qilindi! Qo'shildi: {what}. Rahmat 🤍",
+           "don_btn": "⭐ Loyihani qo'llab-quvvatlash",
+           "don_title": "🤍 <b>Loyihani qo'llab-quvvatlash</b>\n\nMawaqit bepul. Uning ishini qo'llab-quvvatlamoqchi bo'lsangiz — bu sadaqai joriya bo'ladi. Alloh sizni mukofotlasin 🤍",
+           "don_custom": "✏️ Boshqa summa", "don_card": "💳 Kartaga",
+           "don_custom_ask": "Qancha ⭐ yubormoqchisiz, yozing (1 dan 100000 gacha):", "don_bad": "1 dan 100000 gacha son yuboring.",
+           "don_inv_title": "Mawaqit'ni qo'llab-quvvatlash", "don_inv_desc": "Bot ishi uchun ixtiyoriy xayriya",
+           "don_thanks": "🤍 Qo'llab-quvvatlaganingiz uchun rahmat! Alloh sizni mukofotlasin.",
+           "don_cards_title": "💳 <b>Kartaga o'tkazish</b>\n\nNusxa olish uchun raqamni bosing:", "don_owner": "👤 Karta egasi: {name}",
+           "don_sent": "✅ Yubordim", "don_sent_ok": "🤍 Rahmat! Alloh sizni mukofotlasin.",
+           "ai_granted": "🎁 Sizga sun'iy intellekt yordamchisiga {n} ta savol berildi. Foydalaning 🤍"},
+    "tg": {"ai_intro2": "🤖 <b>Саволҳо дар бораи ислом</b>\n\nСаволи худро нависед — дар бораи намоз, рӯза, зикрҳо, Қуръон, одоб. Саволҳои иловагӣ ҳам додан мумкин.\n\n<i>Ҷавобҳоро зеҳни сунъӣ менависад, метавонад хато кунад. Дар масъалаҳои муҳим ба имом муроҷиат кунед. Саволҳоро барои беҳтар кардани ҷавобҳо маъмурон дида метавонанд.</i>",
+           "ai_status_free": "🎁 Саволҳои ройгони имрӯз: <b>{n}</b>", "ai_status_cred": "💎 Саволҳои харидашуда: <b>{n}</b>", "ai_status_unl": "♾ Бемаҳдуд то <b>{d}</b>",
+           "ai_limit2": "⏳ Саволҳои ройгони имрӯзаи шумо тамом шуданд. Саволҳоро бо ⭐ гирифтан ё фардо баргаштан мумкин 🤍",
+           "ai_global": "⏳ Имрӯз саволҳои ройгон барои ҳама тамом шуданд — пурсандагон бисёранд. Саволҳоро бо ⭐ гирифтан ё фардо баргаштан мумкин 🤍",
+           "pack_q": "{q} савол — {s} ⭐", "pack_unl": "♾ Бемаҳдуд ба {d} рӯз — {s} ⭐",
+           "inv_q_title": "{q} савол ба зеҳни сунъӣ", "inv_unl_title": "Саволҳои бемаҳдуд ба {d} рӯз",
+           "inv_desc": "Саволҳо дар бораи ислом ба ёрдамчии зеҳни сунъӣ дар боти Mawaqit",
+           "paid_ok": "✅ Пардохт қабул шуд! Илова шуд: {what}. Ташаккур 🤍",
+           "don_btn": "⭐ Дастгирии лоиҳа",
+           "don_title": "🤍 <b>Дастгирии лоиҳа</b>\n\nMawaqit ройгон аст. Агар хоҳед кори онро дастгирӣ кунед — ин садақаи ҷория мешавад. Аллоҳ шуморо подош диҳад 🤍",
+           "don_custom": "✏️ Маблағи дигар", "don_card": "💳 Ба корт",
+           "don_custom_ask": "Нависед, чанд ⭐ фиристодан мехоҳед (аз 1 то 100000):", "don_bad": "Рақам аз 1 то 100000 фиристед.",
+           "don_inv_title": "Дастгирии Mawaqit", "don_inv_desc": "Хайрияи ихтиёрӣ барои кори бот",
+           "don_thanks": "🤍 Ташаккур барои дастгирӣ! Аллоҳ шуморо подош диҳад.",
+           "don_cards_title": "💳 <b>Интиқол ба корт</b>\n\nБарои нусха гирифтан рақамро пахш кунед:", "don_owner": "👤 Соҳиби корт: {name}",
+           "don_sent": "✅ Фиристодам", "don_sent_ok": "🤍 Ташаккур! Аллоҳ шуморо подош диҳад.",
+           "ai_granted": "🎁 Ба шумо {n} савол ба ёрдамчии зеҳни сунъӣ дода шуд. Истифода баред 🤍"},
+    "ar": {"ai_intro2": "🤖 <b>أسئلة عن الإسلام</b>\n\nاكتب سؤالك — عن الصلاة والصيام والأذكار والقرآن والآداب. يمكنك طرح أسئلة متابعة.\n\n<i>الإجابات يكتبها الذكاء الاصطناعي وقد تحتوي على أخطاء. في الأمور المهمة اسأل إماماً. قد يطّلع المشرفون على الأسئلة لتحسين الإجابات.</i>",
+           "ai_status_free": "🎁 الأسئلة المجانية اليوم: <b>{n}</b>", "ai_status_cred": "💎 الأسئلة المشتراة: <b>{n}</b>", "ai_status_unl": "♾ بلا حد حتى <b>{d}</b>",
+           "ai_limit2": "⏳ انتهت أسئلتك المجانية لليوم. يمكنك الحصول على أسئلة مقابل ⭐ أو العودة غداً 🤍",
+           "ai_global": "⏳ انتهت الأسئلة المجانية اليوم للجميع — الطلب كبير. يمكنك الحصول على أسئلة مقابل ⭐ أو العودة غداً 🤍",
+           "pack_q": "{q} سؤالاً — {s} ⭐", "pack_unl": "♾ بلا حد لمدة {d} يوماً — {s} ⭐",
+           "inv_q_title": "{q} سؤالاً للذكاء الاصطناعي", "inv_unl_title": "أسئلة بلا حد لمدة {d} يوماً",
+           "inv_desc": "أسئلة عن الإسلام لمساعد الذكاء الاصطناعي في بوت مواقيت",
+           "paid_ok": "✅ تم الدفع! أضيف: {what}. شكراً 🤍",
+           "don_btn": "⭐ ادعم المشروع",
+           "don_title": "🤍 <b>ادعم المشروع</b>\n\nمواقيت مجاني. إن أردت دعم عمله فستكون صدقة جارية. جزاك الله خيراً 🤍",
+           "don_custom": "✏️ مبلغ آخر", "don_card": "💳 إلى بطاقة",
+           "don_custom_ask": "اكتب عدد ⭐ التي تريد إرسالها (من 1 إلى 100000):", "don_bad": "أرسل رقماً من 1 إلى 100000.",
+           "don_inv_title": "دعم مواقيت", "don_inv_desc": "تبرع طوعي لعمل البوت",
+           "don_thanks": "🤍 شكراً لدعمك! جزاك الله خيراً.",
+           "don_cards_title": "💳 <b>تحويل إلى بطاقة</b>\n\nاضغط على الرقم لنسخه:", "don_owner": "👤 صاحب البطاقة: {name}",
+           "don_sent": "✅ أرسلت", "don_sent_ok": "🤍 شكراً! جزاك الله خيراً.",
+           "ai_granted": "🎁 أضيف لك {n} سؤالاً لمساعد الذكاء الاصطناعي. بالتوفيق 🤍"},
+}
+for _l, _d in EXTRA10.items():
+    T[_l].update(_d)
+
 # ───────────────────────── Uzbek in Cyrillic ─────────────────────────
 # The Cyrillic Uzbek texts are produced from the Latin ones by the official spelling rules,
 # so both stay in sync. Words that the rules can't get right are listed in CYR_WORDS.
@@ -1156,6 +1250,31 @@ CREATE TABLE IF NOT EXISTS ai_usage (
     n       INT NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, day)
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE TABLE IF NOT EXISTS ai_credits (
+    user_id         BIGINT PRIMARY KEY,
+    credits         INT NOT NULL DEFAULT 0,
+    unlimited_until TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS payments (
+    id        SERIAL PRIMARY KEY,
+    user_id   BIGINT NOT NULL,
+    kind      TEXT NOT NULL,
+    payload   TEXT,
+    stars     INT NOT NULL,
+    charge_id TEXT,
+    refunded  BOOLEAN NOT NULL DEFAULT FALSE,
+    at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS ai_log (
+    id       SERIAL PRIMARY KEY,
+    user_id  BIGINT NOT NULL,
+    question TEXT,
+    answer   TEXT,
+    model    TEXT,
+    at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ai_log_user ON ai_log (user_id, id);
 CREATE TABLE IF NOT EXISTS msg_cleanup (
     chat_id BIGINT NOT NULL,
     msg_id  BIGINT NOT NULL,
@@ -1640,6 +1759,7 @@ def screen_settings(u):
             rows.append([btn(t(lang, "sb_azan", v=azan_label(lang, u)), "s:azan")])
         rows.append([btn(t(lang, "btn_fast"), "s:fast"), btn(t(lang, "btn_snd"), "s:snd")])
         rows.append([btn(t(lang, "btn_groups"), "s:groups")])
+        rows.append([btn(t(lang, "don_btn"), "don:menu")])
         if ADMINS:
             rows.append([btn(t(lang, "btn_support"), "s:support")])
     rows.append([btn(t(lang, "btn_back"), "m:home")])
@@ -1932,6 +2052,8 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             if await admin_text(update, ctx):
                 return
         u = await target_for(update, ctx)
+        if ctx.user_data.get("don_custom") and u["lang"]:
+            return await don_custom_amount(update, ctx, u)
         if ctx.user_data.get("ai_mode") and u["onboarded"] and not u["awaiting_city"]:
             return await ai_message(update, ctx, u)
     else:
@@ -2026,6 +2148,10 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return await support_button(update, ctx, parts)
     if act == "ai" and chat.type == "private":
         return await ai_button(update, ctx, parts)
+    if act == "don" and chat.type == "private":
+        return await don_button(update, ctx, parts)
+    if act == "buy" and chat.type == "private":
+        return await buy_button(update, ctx, parts)
     if chat.type == "private":
         ctx.user_data.pop("ai_mode", None)  # any other button leaves the AI conversation
     if chat.type == "private":
@@ -2391,7 +2517,8 @@ async def user_support(update: Update, ctx):
                       f"🆔 ID: <code>{user.id}</code>\n"
                       f"{where}🌐 {LANG_BUTTONS.get(lang, lang)}")
         delivered = 0
-        for admin in sorted(a for a in ADMINS if has_perm(a, "support")):  # any of them can reply
+        hidden = u["hidden"] if "hidden" in u.keys() else False
+        for admin in sorted(a for a in ADMINS if has_perm(a, "support") and (not hidden or is_main(a))):  # any can reply
             try:
                 if first:
                     await ctx.bot.send_message(admin, header, parse_mode=ParseMode.HTML)
@@ -2709,13 +2836,11 @@ async def screen_admin_home(uid=None):
              ("bc", btn("📣 Рассылка", "a:bc")), ("users", btn("🔎 Поиск", "a:user")),
              ("health", btn("✉️ Тест напоминания", "a:test")), ("bans", btn("🚫 Баны", "a:bans")),
              ("export", btn("📤 Экспорт CSV", "a:export")), ("health", btn("🩺 Здоровье", "a:health")),
-             ("azan", btn("🔊 Азаны", "a:azan"))]
+             ("azan", btn("🔊 Азаны", "a:azan")), ("ai", btn("🤖 ИИ-помощник", "a:ai"))]
     shown = [b for p, b in items if can(p)]
     rows = [shown[i:i + 2] for i in range(0, len(shown), 2)]
     if uid is not None and is_main(uid):
-        rows.append([btn("👮 Админы", "a:adm")])
-        if GEMINI_KEY:
-            rows.append([btn("🤖 ИИ-помощник: " + ("для всех ✅" if AI_STATE["public"] else "только админы 🔒"), "a:ai")])
+        rows.append([btn("👮 Админы", "a:adm"), btn("🙈 Скрытые", "a:hidden")])
     rows.append([btn("🏠 В меню бота", "m:home")])
     return text, kb(*rows)
 
@@ -2817,6 +2942,8 @@ def back_cb(token):
     """Where the "back" button of a profile leads: users list, search, chats list or the admin home."""
     if token and token[0] in "usc" and token[1:].isdigit():
         return {"u": "a:users:", "s": "a:usearch:", "c": "a:chats:"}[token[0]] + token[1:]
+    if token == "h":
+        return "a:hidden"
     return "a:home"
 
 
@@ -2835,9 +2962,9 @@ def person_label(r):
     return " · ".join(bits)
 
 
-async def user_card(uid, back=None):
+async def user_card(uid, back=None, viewer=None):
     r = await POOL.fetchrow("SELECT * FROM users WHERE user_id = $1", uid)
-    if not r:
+    if not r or (r["hidden"] and not is_main(viewer)):
         return None
     u = dict(r)
     lead = (f"за {u['lead_min']} мин" if u["lead_min"] else "без заранее") + (" + в момент азана" if u["at_time"] else "")
@@ -2868,8 +2995,16 @@ async def user_card(uid, back=None):
                          else btn("🚫 Забанить", f"a:ban:{uid}:{back or ''}")])
         if u["username"]:
             rows.append([InlineKeyboardButton("💬 Открыть в Telegram", url=f"https://t.me/{u['username']}")])
-        if not is_admin(uid) and ADMIN_ID:
-            rows.append([btn("👮 Сделать админом", f"a:adm:mk:{uid}")])
+        if viewer is not None and has_perm(viewer, "ai"):
+            credits, unl = await ai_wallet(uid)
+            text += f"\n🤖 ИИ: куплено {credits}" + (f", безлимит до {unl:%d.%m.%Y}" if unl and unl > datetime.now(ZoneInfo('UTC')) else "")
+            rows.append([btn("🎁 Начислить вопросы", f"a:grant:{uid}"), btn("📜 Его вопросы", f"a:ai:log:0:{uid}")])
+        if is_main(viewer):
+            if not is_admin(uid):
+                rows.append([btn("👮 Сделать админом", f"a:adm:mk:{uid}")])
+            rows.append([btn("👁 Показать всем админам" if u["hidden"] else "🙈 Скрыть от других админов", f"a:hide:{uid}:{back or ''}")])
+        if u["hidden"]:
+            text = "🙈 <i>Скрыт: видите только вы</i>\n" + text
     else:
         kind_ru = "👥 Группа" if u["chat_type"] == "group" else "📢 Канал"
         owner = await POOL.fetchrow("SELECT full_name, username FROM users WHERE user_id = $1", u["owner_id"]) \
@@ -2896,7 +3031,7 @@ def search_where(query):
     return "(full_name ILIKE $1 OR username ILIKE $1 OR city ILIKE $1 OR title ILIKE $1)", [f"%{q}%"]
 
 
-async def screen_people(page, kind="users", query=None):
+async def screen_people(page, kind="users", query=None, viewer=None):
     """kind: users | search | chats"""
     if kind == "chats":
         where, args, title = "chat_type <> 'private'", [], "📢 <b>Группы и каналы</b>"
@@ -2905,6 +3040,8 @@ async def screen_people(page, kind="users", query=None):
         where, title = w, f"🔎 <b>Поиск:</b> «{esc(query)}»"
     else:
         where, args, title = "chat_type = 'private'", [], "👥 <b>Пользователи</b>"
+    if not is_main(viewer):
+        where = f"({where}) AND NOT hidden"
     total = await POOL.fetchval(f"SELECT count(*) FROM users WHERE {where}", *args)
     pages = max(1, math.ceil(total / PAGE))
     page = max(0, min(page, pages - 1))
@@ -2934,8 +3071,9 @@ async def screen_people(page, kind="users", query=None):
     return text, kb(*buttons)
 
 
-async def screen_admin_bans():
-    rows = await POOL.fetch("SELECT user_id, city FROM users WHERE banned ORDER BY user_id LIMIT 20")
+async def screen_admin_bans(viewer=None):
+    rows = await POOL.fetch("SELECT user_id, city FROM users WHERE banned AND (NOT hidden OR $1) ORDER BY user_id LIMIT 20",
+                            is_main(viewer))
     if not rows:
         text = "🚫 <b>Баны</b>\n\nСписок пуст.\n\nЧтобы забанить пользователя, найдите его через 🔎 Пользователь."
         return text, kb(ADMIN_BACK)
@@ -3076,7 +3214,8 @@ async def run_broadcast(app, chat_id, text, bc):
 
 ADMIN_PERM_OF = {"stats": "stats", "geo": "stats", "health": "health", "test": "health", "bans": "bans", "ban": "bans",
                  "unban": "bans", "azan": "azan", "card": "users", "users": "users", "usearch": "users", "chats": "users",
-                 "user": "users", "export": "export", "bc": "bc", "bcl": "bc", "adm": "main", "ai": "main"}
+                 "user": "users", "export": "export", "bc": "bc", "bcl": "bc", "adm": "main", "ai": "ai",
+                 "grant": "ai", "hide": "main", "hidden": "main"}
 
 
 async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
@@ -3091,11 +3230,20 @@ async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
     if sub == "adm":
         return await admin_admins(update, ctx, parts)
     if sub == "ai":
-        AI_STATE["public"] = not AI_STATE["public"]
-        await kv_set("ai_public", "1" if AI_STATE["public"] else "0")
-        text, markup = await screen_admin_home(uid)
-        return await render(update, ("✅ ИИ-помощник открыт для всех пользователей." if AI_STATE["public"]
-                                     else "🔒 ИИ-помощник теперь только для админов.") + "\n\n" + text, markup)
+        return await admin_ai(update, ctx, parts)
+    if sub == "grant" and len(parts) > 2 and parts[2].lstrip("-").isdigit():
+        ctx.user_data["admin_state"] = f"ai_grant:{parts[2]}"
+        return await render(update, AI_ASK["grant"], kb([btn("⬅️ Назад", f"a:card:{parts[2]}")]))
+    if sub == "hide" and len(parts) > 2 and parts[2].lstrip("-").isdigit():
+        await POOL.execute("UPDATE users SET hidden = NOT hidden WHERE user_id = $1", int(parts[2]))
+        card = await user_card(int(parts[2]), parts[3] if len(parts) > 3 and parts[3] else None, viewer=uid)
+        if card:
+            return await render(update, card[0], card[1])
+    if sub == "hidden":
+        rows = await POOL.fetch("SELECT user_id, full_name, username, title, chat_type FROM users WHERE hidden ORDER BY user_id LIMIT 40")
+        text = "🙈 <b>Скрытые</b>\n\nИх видите только вы. Другие админы не видят их нигде." + ("" if rows else "\n\nПока никого.")
+        return await render(update, text, kb(*[[btn("🙈 " + (r["full_name"] or r["title"] or str(r["user_id"]))[:40],
+                                                    f"a:card:{r['user_id']}:h")] for r in rows], ADMIN_BACK))
     if sub == "home":
         ctx.user_data.pop("bc", None)
         text, markup = await screen_admin_home(uid)
@@ -3110,7 +3258,7 @@ async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
         text, markup = await screen_admin_health()
         return await render(update, text, markup)
     if sub == "bans":
-        text, markup = await screen_admin_bans()
+        text, markup = await screen_admin_bans(uid)
         return await render(update, text, markup)
     if sub == "azan":
         if len(parts) > 2 and parts[2] == "add":
@@ -3121,7 +3269,7 @@ async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
 
     if sub == "card" and len(parts) > 2 and parts[2].lstrip("-").isdigit():
         back = parts[3] if len(parts) > 3 else None
-        card = await user_card(int(parts[2]), back)
+        card = await user_card(int(parts[2]), back, viewer=uid)
         if not card:
             return await update.effective_chat.send_message("🤷 Такого пользователя нет в базе.")
         if back:  # opened from a list: show in place
@@ -3131,7 +3279,7 @@ async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
     if sub in ("users", "usearch", "chats"):
         page = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0
         kind = {"users": "users", "usearch": "search", "chats": "chats"}[sub]
-        text, markup = await screen_people(page, kind, ctx.user_data.get("user_q"))
+        text, markup = await screen_people(page, kind, ctx.user_data.get("user_q"), viewer=uid)
         return await render(update, text, markup)
 
     if sub == "user":
@@ -3144,7 +3292,7 @@ async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
         if is_admin(target):
             return await render(update, "😅 Себя забанить нельзя.", kb(ADMIN_BACK))
         await POOL.execute("UPDATE users SET banned = $2 WHERE user_id = $1", target, sub == "ban")
-        card = await user_card(target, parts[3] if len(parts) > 3 else None)
+        card = await user_card(target, parts[3] if len(parts) > 3 else None, viewer=uid)
         if card:
             return await render(update, card[0], card[1])
         return await render(update, "Пользователь не найден.", kb(ADMIN_BACK))
@@ -3162,7 +3310,7 @@ async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
         return
 
     if sub == "export":
-        rows = await POOL.fetch(f"SELECT {', '.join(CSV_COLUMNS)} FROM users ORDER BY created_at")
+        rows = await POOL.fetch(f"SELECT {', '.join(CSV_COLUMNS)} FROM users WHERE NOT hidden OR $1 ORDER BY created_at", is_main(uid))
         buf = io.StringIO()
         w = csv.writer(buf)
         w.writerow(CSV_COLUMNS)
@@ -3225,12 +3373,15 @@ async def admin_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if state == "adm_add" and is_main(update.effective_user.id):
         return await admin_add_from_message(update, ctx)
+    if state and state.startswith("ai_") and has_perm(update.effective_user.id, "ai"):
+        await admin_ai_text(update, ctx, state)
+        return True
 
     if state == "search":
         raw = msg.text.strip()[:64]
         ctx.user_data.pop("admin_state", None)
         ctx.user_data["user_q"] = raw
-        text, markup = await screen_people(0, "search", raw)
+        text, markup = await screen_people(0, "search", raw, viewer=update.effective_user.id)
         await msg.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
         return True
 
@@ -3521,8 +3672,9 @@ async def api_me(request):
         "ref": {"count": await POOL.fetchval("SELECT count(*) FROM users WHERE referred_by = $1", u["user_id"]),
                 "link": ref_link(u["user_id"])},
         "dev": DEV_CONTACT,
-        "ai": {"enabled": ai_allowed_now(u["user_id"]), "left": await ai_left(u), "limit": AI_DAILY,
+        "ai": {"enabled": ai_allowed_now(u["user_id"]), "status": ai_status_text(lang, await ai_quota(u)),
                "unlimited": is_admin(u["user_id"])},
+        "money": money_json(lang),
         "today": {"date": now.date().isoformat(), "t": {k: today[k] for k in TIMING_KEYS},
                   "hday": today["hday"], "hmonth": today["hmonth"], "hyear": today["hyear"]},
         "tomorrow": {"t": {k: tomorrow[k] for k in TIMING_KEYS}},
@@ -3597,7 +3749,10 @@ async def start_web(application=None):
                     web.post("/api/tracker_bulk", api_tracker_bulk), web.get("/api/community", api_community),
                     web.get("/api/challenges", api_challenges), web.post("/api/challenges", api_challenge_new),
                     web.post("/api/challenges/leave", api_challenge_leave),
-                    web.post("/api/share_prepare", api_share_prepare), web.post("/api/ai", api_ai)])
+                    web.post("/api/share_prepare", api_share_prepare), web.post("/api/ai", api_ai),
+                    web.post("/api/invoice", api_invoice), web.post("/api/donate/sent", api_donate_sent),
+                    web.get("/api/admin/ai", api_admin_ai), web.post("/api/admin/ai", api_admin_ai),
+                    web.post("/api/admin/hide", api_admin_hide)])
     WEB_RUNNER = web.AppRunner(app, access_log=None)
     await WEB_RUNNER.setup()
     port = int(os.getenv("PORT", "8080"))
@@ -4155,7 +4310,7 @@ def person_json(r):
 
 
 async def api_admin_people(request):
-    await admin_auth(request, "users")
+    viewer = await admin_auth(request, "users")
     kind = request.query.get("kind", "users")
     flt = request.query.get("filter", "all")
     q = (request.query.get("q") or "").strip()[:64]
@@ -4169,6 +4324,8 @@ async def api_admin_people(request):
         where += " AND " + w
     where += {"active": " AND last_seen >= now() - interval '7 days'", "banned": " AND banned",
               "blocked": " AND blocked"}.get(flt, "")
+    if not is_main(viewer):
+        where += " AND NOT hidden"
     total = await POOL.fetchval(f"SELECT count(*) FROM users WHERE {where}", *args)
     rows = await POOL.fetch(f"SELECT * FROM users WHERE {where} ORDER BY last_seen DESC NULLS LAST, created_at DESC "
                             f"LIMIT 20 OFFSET {page * 20}", *args)
@@ -4176,16 +4333,18 @@ async def api_admin_people(request):
 
 
 async def api_admin_person(request):
-    await admin_auth(request, "users")
+    viewer = await admin_auth(request, "users")
     try:
         uid = int(request.query["id"])
     except (KeyError, ValueError):
         raise web.HTTPBadRequest(text="bad id")
     r = await POOL.fetchrow("SELECT * FROM users WHERE user_id = $1", uid)
-    if not r:
+    if not r or (r["hidden"] and not is_main(viewer)):
         raise web.HTTPNotFound()
     u = dict(r)
     out = person_json(r)
+    out["hidden"] = r["hidden"]
+    out["can_hide"] = is_main(viewer)
     owned = await POOL.fetchrow(
         "SELECT count(*) FILTER (WHERE chat_type = 'group') AS g, count(*) FILTER (WHERE chat_type = 'channel') AS c "
         "FROM users WHERE owner_id = $1 AND NOT blocked", uid)
@@ -4222,6 +4381,19 @@ def admin_markup_text(text):
     s = esc(text)
     s = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s, flags=re.S)
     return re.sub(r"__(.+?)__", r"<i>\1</i>", s, flags=re.S)
+
+
+async def api_admin_hide(request):
+    viewer = await admin_auth(request)
+    if not is_main(viewer):
+        raise web.HTTPForbidden(text="main admin only")
+    body = await read_json(request)
+    try:
+        uid = int(body["id"])
+    except (KeyError, TypeError, ValueError):
+        raise web.HTTPBadRequest(text="bad id")
+    hidden = await POOL.fetchval("UPDATE users SET hidden = NOT hidden WHERE user_id = $1 RETURNING hidden", uid)
+    return web.json_response({"ok": True, "hidden": hidden})
 
 
 async def api_admin_message(request):
@@ -4326,7 +4498,7 @@ async def api_admin_health(request):
 
 async def api_admin_export(request):
     admin = await admin_auth(request, "export")
-    rows = await POOL.fetch(f"SELECT {', '.join(CSV_COLUMNS)} FROM users ORDER BY created_at")
+    rows = await POOL.fetch(f"SELECT {', '.join(CSV_COLUMNS)} FROM users WHERE NOT hidden OR $1 ORDER BY created_at", is_main(admin))
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(CSV_COLUMNS)
@@ -4600,6 +4772,10 @@ async def periodic(context: ContextTypes.DEFAULT_TYPE):
                 await asyncio.sleep(0.05)
     except Exception:  # noqa: BLE001
         log.exception("weekly reports failed")
+    try:
+        await POOL.execute("DELETE FROM ai_log WHERE at < now() - interval '90 days'")
+    except Exception:  # noqa: BLE001
+        pass
     try:
         await periodic_summaries(bot)
     except Exception:  # noqa: BLE001
@@ -5209,7 +5385,7 @@ PERMANENT_ADMINS = set(ADMINS)
 DB_ADMINS = {}  # user_id -> set of rights
 PERMS = [("stats", "📈 Статистика и география"), ("users", "👥 Пользователи и поиск"), ("support", "💬 Поддержка"),
          ("bans", "🚫 Баны"), ("bc", "📣 Рассылки"), ("export", "📤 Экспорт CSV"), ("azan", "🔊 Азаны"),
-         ("health", "🩺 Здоровье и тест"), ("summary", "📬 Ежедневная сводка")]
+         ("health", "🩺 Здоровье и тест"), ("summary", "📬 Ежедневная сводка"), ("ai", "🤖 ИИ-помощник")]
 PERM_KEYS = [k for k, _ in PERMS]
 DEFAULT_PERMS = ["stats", "support"]
 
@@ -5437,25 +5613,35 @@ async def cleanup_job(context: ContextTypes.DEFAULT_TYPE):
 
 
 # ───────────────────────── AI helper: questions about Islam (Google Gemini) ─────────────────────────
-# Free Gemini API key in GEMINI_API_KEY. For now only admins can use it, unless the main admin opens it
-# to everyone (stored in the kv table). Each user gets AI_DAILY questions a day; admins are unlimited.
+# Settings live in the kv table (ai_cfg) and are changed from the admin panel. Free questions per person
+# and for everyone per day; questions bought for Telegram Stars go first in the queue.
 
 GEMINI_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "").strip()
-GEMINI_PREFER = ("gemini-3-flash", "gemini-3-flash-preview", "gemini-2.5-flash", "gemini-2.5-flash-lite",
-                 "gemini-2.0-flash", "gemini-2.0-flash-lite")
-AI_DAILY = 20
-AI_HISTORY = {}  # user_id -> list of (role, text), the last few turns of the conversation
-AI_MODELS = []   # the models to try, best first (found once from the API's list)
-AI_COOLDOWN = {}  # model -> unix time until which it is skipped
+GEMINI_PREFER = ("gemini-3-flash", "gemini-3-flash-preview", "gemini-flash-latest", "gemini-2.5-flash",
+                 "gemini-flash-lite-latest", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite")
+AI_CFG_DEFAULT = {"enabled": True, "access": "admins", "selected": [], "banned": [], "daily_free": 20,
+                  "global_free": 350, "model": "auto", "length": "medium", "memory": 8, "extra": "",
+                  "disc_on": True, "disc": ""}
+DEFAULT_PACKS = [{"id": "q50", "q": 50, "stars": 50}, {"id": "q200", "q": 200, "stars": 150},
+                 {"id": "u30", "days": 30, "stars": 300}]
+DEFAULT_CARDS = {"owner": "Abdurahmon Boborajabov",
+                 "cards": [{"label": "VISA", "number": "4466 1369 0003 3243"},
+                           {"label": "VISA", "number": "4097 8402 1478 0988"},
+                           {"label": "HUMO", "number": "9860 3501 4472 5404"}]}
+AI = {"cfg": dict(AI_CFG_DEFAULT), "key": GEMINI_KEY, "models": [], "cool": {}, "packs": list(DEFAULT_PACKS),
+      "cards": json.loads(json.dumps(DEFAULT_CARDS))}
+AI_HISTORY = {}  # user_id -> list of (role, text)
 LANG_NAMES = {"en": "English", "ru": "Russian", "uz": "Uzbek (Latin script)", "uzc": "Uzbek (Cyrillic script)",
               "tg": "Tajik (Cyrillic script)", "ar": "Arabic"}
+AI_LENGTH = {"short": "Keep every answer short: 2–4 sentences or a short list.",
+             "medium": "Be concise: usually 3–8 short paragraphs or a short list.",
+             "long": "Give detailed, well-structured answers with explanations and, where you are sure of them, sources."}
 AI_SYSTEM = """You are a gentle, knowledgeable assistant inside "Mawaqit", a Muslim prayer-times app.
 You answer questions about Islam: prayer (salah), wudu, fasting, zakat, hajj, adhkar and duas, the Qur'an, the Prophet's life ﷺ,
 Islamic history, manners (adab) and everyday Muslim life.
 
 Rules:
-- Answer in {lang}. Be warm, clear and concise (usually 3–8 short paragraphs or a short list). No long introductions.
+- Answer in {lang}. Be warm and clear. No long introductions. {length}
 - The user follows the {madhab} madhab: give that school's position first; if the schools differ, say so briefly.
 - Rely on the mainstream Sunni understanding. Where scholars genuinely differ, say that there are different opinions.
 - Never invent hadiths, quotes, verse numbers or sources. Quote a verse or hadith only if you are sure of it, and name
@@ -5480,44 +5666,179 @@ async def kv_set(key, value):
                        key, value)
 
 
-AI_STATE = {"public": False}  # loaded from the kv table on start, changed by the main admin
+async def load_ai():
+    try:
+        cfg = json.loads(await kv_get("ai_cfg", "{}") or "{}")
+    except ValueError:
+        cfg = {}
+    if not cfg and await kv_get("ai_public") == "1":  # the earlier on/off switch
+        cfg["access"] = "all"
+    AI["cfg"] = {**AI_CFG_DEFAULT, **cfg}
+    AI["key"] = (await kv_get("gemini_key", "") or "").strip() or GEMINI_KEY
+    for k, default in (("packs", DEFAULT_PACKS), ("cards", DEFAULT_CARDS)):
+        try:
+            v = json.loads(await kv_get("ai_" + k, "") or "null")
+            AI[k] = v if v else json.loads(json.dumps(default))
+        except ValueError:
+            AI[k] = json.loads(json.dumps(default))
+
+
+async def save_ai_cfg(**changes):
+    AI["cfg"].update(changes)
+    await kv_set("ai_cfg", json.dumps(AI["cfg"], ensure_ascii=False))
+
+
+def ai_allowed_now(uid):
+    c = AI["cfg"]
+    if not AI["key"] or not c["enabled"] or uid in c["banned"]:
+        return False
+    if is_admin(uid) or c["access"] == "all":
+        return True
+    return c["access"] == "selected" and uid in c["selected"]
 
 
 async def ai_allowed(uid):
     return ai_allowed_now(uid)
 
 
-def ai_allowed_now(uid):
-    return bool(GEMINI_KEY) and (is_admin(uid) or AI_STATE["public"])
+async def ai_wallet(uid):
+    r = await POOL.fetchrow("SELECT credits, unlimited_until FROM ai_credits WHERE user_id = $1", uid)
+    return (r["credits"] if r else 0), (r["unlimited_until"] if r else None)
 
 
-async def ai_left(u):
-    if is_admin(u["user_id"]):
-        return AI_DAILY
-    used = await POOL.fetchval("SELECT n FROM ai_usage WHERE user_id = $1 AND day = $2", u["user_id"], user_today(u)) or 0
-    return max(0, AI_DAILY - used)
+async def ai_quota(u):
+    """What this question would be paid with: admin / unl / free / credit, or None + the reason."""
+    uid = u["user_id"]
+    if is_admin(uid):
+        return {"kind": "admin"}
+    credits, unl = await ai_wallet(uid)
+    now = datetime.now(ZoneInfo("UTC"))
+    info = {"credits": credits, "unl": unl if unl and unl > now else None}
+    used = await POOL.fetchval("SELECT n FROM ai_usage WHERE user_id = $1 AND day = $2", uid, user_today(u)) or 0
+    c = AI["cfg"]
+    info["free_left"] = max(0, c["daily_free"] - used) if c["daily_free"] else 10 ** 6
+    if info["unl"]:
+        return {**info, "kind": "unl"}
+    everyone = await POOL.fetchval("SELECT stat_value FROM daily_stats WHERE stat_day = CURRENT_DATE AND stat_key = 'ai_free'") or 0
+    global_ok = not c["global_free"] or everyone < c["global_free"]
+    if info["free_left"] > 0 and global_ok:
+        return {**info, "kind": "free"}
+    if credits > 0:
+        return {**info, "kind": "credit"}
+    return {**info, "kind": None, "reason": "global" if info["free_left"] > 0 else "personal"}
+
+
+def ai_status_text(lang, q):
+    if q.get("kind") == "admin":
+        return ""
+    parts = []
+    if q.get("unl"):
+        parts.append(t(lang, "ai_status_unl", d=q["unl"].strftime("%d.%m.%Y")))
+    else:
+        parts.append(t(lang, "ai_status_free", n=min(q.get("free_left", 0), 999)))
+        if q.get("credits"):
+            parts.append(t(lang, "ai_status_cred", n=q["credits"]))
+    return "\n".join(parts)
+
+
+async def ai_left(u):  # kept for the mini app: free questions left today (admins: the daily limit)
+    q = await ai_quota(u)
+    return AI["cfg"]["daily_free"] if q["kind"] == "admin" else q.get("free_left", 0) + q.get("credits", 0)
 
 
 async def ai_models():
-    if AI_MODELS:
-        return AI_MODELS
-    if GEMINI_MODEL:
-        AI_MODELS.append(GEMINI_MODEL)
+    if AI["models"]:
+        return AI["models"]
     try:
         r = await HTTP.get("https://generativelanguage.googleapis.com/v1beta/models", params={"pageSize": 200},
-                           headers={"x-goog-api-key": GEMINI_KEY}, timeout=15)
+                           headers={"x-goog-api-key": AI["key"]}, timeout=15)
         r.raise_for_status()
         have = [m["name"].split("/")[-1] for m in r.json().get("models", [])
                 if "generateContent" in (m.get("supportedGenerationMethods") or [])]
-        AI_MODELS.extend(m for m in GEMINI_PREFER if m in have and m not in AI_MODELS)
-        AI_MODELS.extend(m for m in have if "flash" in m and "image" not in m and "tts" not in m
-                         and "live" not in m and "audio" not in m and m not in AI_MODELS)
-        log.info("gemini models: %s", ", ".join(AI_MODELS[:5]))
+        found = [m for m in GEMINI_PREFER if m in have]
+        found += [m for m in have if "flash" in m and not any(x in m for x in ("image", "tts", "live", "audio", "exp"))
+                  and m not in found]
+        AI["models"] = found
+        log.info("gemini models: %s", ", ".join(found[:6]))
     except Exception:  # noqa: BLE001
         log.exception("gemini: could not list models")
-    if not AI_MODELS:
-        AI_MODELS.extend(GEMINI_PREFER[2:4])
-    return AI_MODELS
+    return AI["models"] or ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
+
+
+def ai_order(models, cheap):
+    """Free questions go to Flash-Lite first (much bigger free quota), paid ones and admins to Flash first."""
+    chosen = AI["cfg"]["model"]
+    lite = [m for m in models if "lite" in m]
+    full = [m for m in models if "lite" not in m]
+    order = (lite + full) if cheap else (full + lite)
+    if chosen != "auto":
+        order = [chosen] + [m for m in order if m != chosen]
+    return order
+
+
+async def ai_answer(u, question, cheap=False, keep=True):
+    """Returns (answer, model, error_key)."""
+    lang = u["lang"] or "en"
+    c = AI["cfg"]
+    hist = AI_HISTORY.setdefault(u["user_id"], []) if keep else []
+    mem = int(c["memory"])
+    contents = [{"role": r, "parts": [{"text": x}]} for r, x in (hist[-mem:] if mem else [])]
+    contents.append({"role": "user", "parts": [{"text": question[:2000]}]})
+    system = AI_SYSTEM.format(lang=LANG_NAMES.get(lang, "English"), length=AI_LENGTH.get(c["length"], AI_LENGTH["medium"]),
+                              madhab="Hanafi" if u["madhab"] == "hanafi" else "Shafi'i/Maliki/Hanbali")
+    if c["extra"].strip():
+        system += ("\n\nAdditional instructions from the app owner (follow them unless they conflict with the rules above):\n"
+                   + c["extra"].strip()[:3000])
+    body = {"systemInstruction": {"parts": [{"text": system}]}, "contents": contents,
+            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 8192 if c["length"] == "long" else 4096}}
+    models = ai_order(await ai_models(), cheap)
+    ready = [m for m in models if AI["cool"].get(m, 0) < _time.time()] or models
+    for model in ready:
+        try:
+            r = await HTTP.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                                json=body, headers={"x-goog-api-key": AI["key"]}, timeout=60)
+            if r.status_code in (404, 429, 500, 503):
+                log.warning("gemini %s: HTTP %s %s", model, r.status_code, r.text[:200])
+                if r.status_code == 429:
+                    await bump("ai_quota")
+                # out of free quota → rest this model for 10 min; unknown model → for a day
+                AI["cool"][model] = _time.time() + (86400 if r.status_code == 404 else 600)
+                continue
+            r.raise_for_status()
+            j = r.json()
+            if (j.get("promptFeedback") or {}).get("blockReason"):
+                return None, model, "ai_blocked"
+            parts = ((j.get("candidates") or [{}])[0].get("content") or {}).get("parts") or []
+            text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
+            if not text:
+                log.warning("gemini %s: empty answer %s", model, str(j)[:300])
+                continue
+            if keep:
+                hist += [("user", question[:2000]), ("model", text[:4000])]
+                del hist[:-12]
+            return text, model, None
+        except Exception:  # noqa: BLE001
+            log.exception("gemini %s failed", model)
+    await bump("ai_errors")
+    return None, None, "ai_err"
+
+
+async def ai_count(u, kind, model, question, answer):
+    await bump("ai_questions")
+    await bump("ai_" + (kind or "admin"))
+    if model:
+        await bump("ai_m_" + model[:40])
+    uid = u["user_id"]
+    if kind == "free":
+        await POOL.execute("INSERT INTO ai_usage (user_id, day, n) VALUES ($1, $2, 1) "
+                           "ON CONFLICT (user_id, day) DO UPDATE SET n = ai_usage.n + 1", uid, user_today(u))
+    elif kind == "credit":
+        await POOL.execute("UPDATE ai_credits SET credits = greatest(0, credits - 1) WHERE user_id = $1", uid)
+    try:
+        await POOL.execute("INSERT INTO ai_log (user_id, question, answer, model) VALUES ($1, $2, $3, $4)",
+                           uid, question[:2000], answer[:6000], model)
+    except Exception:  # noqa: BLE001
+        log.exception("ai log failed")
 
 
 def ai_markup_html(text):
@@ -5530,53 +5851,22 @@ def ai_markup_html(text):
     return out
 
 
-async def ai_answer(u, question):
-    """Returns (answer_text or None, error_key)."""
-    lang = u["lang"] or "en"
-    hist = AI_HISTORY.setdefault(u["user_id"], [])
-    contents = [{"role": r, "parts": [{"text": x}]} for r, x in hist[-8:]]
-    contents.append({"role": "user", "parts": [{"text": question[:2000]}]})
-    system = AI_SYSTEM.format(lang=LANG_NAMES.get(lang, "English"),
-                              madhab="Hanafi" if u["madhab"] == "hanafi" else "Shafi'i/Maliki/Hanbali")
-    body = {"systemInstruction": {"parts": [{"text": system}]}, "contents": contents,
-            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 4096}}
-    models = await ai_models()
-    ready = [m for m in models if AI_COOLDOWN.get(m, 0) < _time.time()] or models
-    for model in ready:
-        try:
-            r = await HTTP.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-                                json=body, headers={"x-goog-api-key": GEMINI_KEY}, timeout=60)
-            if r.status_code in (404, 429, 500, 503):
-                log.warning("gemini %s: HTTP %s %s", model, r.status_code, r.text[:200])
-                # out of free quota → rest this model for 10 min; unknown model → for a day
-                AI_COOLDOWN[model] = _time.time() + (86400 if r.status_code == 404 else 600)
-                continue
-            r.raise_for_status()
-            j = r.json()
-            if (j.get("promptFeedback") or {}).get("blockReason"):
-                return None, "ai_blocked"
-            parts = ((j.get("candidates") or [{}])[0].get("content") or {}).get("parts") or []
-            text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
-            if not text:
-                log.warning("gemini %s: empty answer %s", model, str(j)[:300])
-                continue
-            hist += [("user", question[:2000]), ("model", text[:4000])]
-            del hist[:-8]
-            return text, None
-        except Exception:  # noqa: BLE001
-            log.exception("gemini %s failed", model)
-    return None, "ai_err"
+def ai_disclaimer(lang):
+    c = AI["cfg"]
+    if not c["disc_on"]:
+        return ""
+    return c["disc"].strip() or t(lang, "ai_disclaimer")
 
 
-async def ai_count(u):
-    await bump("ai_questions")
-    if not is_admin(u["user_id"]):
-        await POOL.execute("INSERT INTO ai_usage (user_id, day, n) VALUES ($1, $2, 1) "
-                           "ON CONFLICT (user_id, day) DO UPDATE SET n = ai_usage.n + 1", u["user_id"], user_today(u))
+def pack_label(lang, p):
+    return t(lang, "pack_unl", d=p["days"], s=p["stars"]) if p.get("days") else t(lang, "pack_q", q=p["q"], s=p["stars"])
 
 
-def ai_buttons(lang):
-    return kb([btn(t(lang, "ai_new"), "ai:reset"), btn(t(lang, "ai_exit"), "ai:exit")])
+def ai_buttons(lang, buy=False):
+    rows = [[btn(pack_label(lang, p), f"buy:{p['id']}")] for p in AI["packs"]] if buy else []
+    rows.append([btn(t(lang, "ai_new"), "ai:reset"), btn(t(lang, "ai_exit"), "ai:exit")])
+    rows.append([btn(t(lang, "don_btn"), "don:menu")])
+    return kb(*rows)
 
 
 async def ai_button(update, ctx, parts):
@@ -5585,7 +5875,7 @@ async def ai_button(update, ctx, parts):
     u = await get_user(uid)
     lang = (u or {}).get("lang") or "en"
     await q.answer()
-    if not u or not await ai_allowed(uid):
+    if not u or not ai_allowed_now(uid):
         return
     sub = parts[1] if len(parts) > 1 else "start"
     if sub == "exit":
@@ -5597,30 +5887,35 @@ async def ai_button(update, ctx, parts):
         ctx.user_data["ai_mode"] = True
         return await update.effective_chat.send_message(t(lang, "ai_reset_done"), reply_markup=ai_buttons(lang))
     ctx.user_data["ai_mode"] = True
-    await render(update, t(lang, "ai_intro", n=await ai_left(u)), ai_buttons(lang))
+    status = ai_status_text(lang, await ai_quota(u))
+    await render(update, t(lang, "ai_intro2") + ("\n\n" + status if status else ""), ai_buttons(lang))
 
 
 async def ai_message(update, ctx, u):
     """A question typed while the AI mode is on."""
     msg = update.message
     lang = u["lang"] or "en"
-    if not await ai_allowed(u["user_id"]):
+    if not ai_allowed_now(u["user_id"]):
         ctx.user_data.pop("ai_mode", None)
         return
-    if await ai_left(u) <= 0:
-        return await msg.reply_text(t(lang, "ai_limit", n=AI_DAILY), reply_markup=ai_buttons(lang))
+    quota = await ai_quota(u)
+    if not quota["kind"]:
+        return await msg.reply_text(t(lang, "ai_global" if quota.get("reason") == "global" else "ai_limit2"),
+                                    reply_markup=ai_buttons(lang, buy=True))
     try:
         await update.effective_chat.send_action("typing")
     except Exception:  # noqa: BLE001
         pass
-    answer, err = await ai_answer(u, msg.text or "")
+    answer, model, err = await ai_answer(u, msg.text or "", cheap=quota["kind"] == "free")
     if not answer:
         return await msg.reply_text(t(lang, err), reply_markup=ai_buttons(lang))
-    await ai_count(u)
+    await ai_count(u, quota["kind"], model, msg.text or "", answer)
     body = ai_markup_html(answer)
-    tail = f"\n\n<i>{t(lang, 'ai_disclaimer')}</i>"
-    if not is_admin(u["user_id"]):
-        tail += f"\n<i>{t(lang, 'ai_left', n=await ai_left(u))}</i>"
+    disc = ai_disclaimer(lang)
+    tail = f"\n\n<i>{esc(disc)}</i>" if disc else ""
+    status = ai_status_text(lang, await ai_quota(u))
+    if status:
+        tail += "\n" + status
     chunks = [body[i:i + 3600] for i in range(0, len(body), 3600)] or [""]
     for i, ch in enumerate(chunks):
         last = i == len(chunks) - 1
@@ -5632,27 +5927,577 @@ async def ai_message(update, ctx, u):
                                  reply_markup=ai_buttons(lang) if last else None)
 
 
-# mini app
+# ───────────────────────── Telegram Stars: question packs and donations; card donations ─────────────────────────
+
+def find_pack(pid):
+    return next((p for p in AI["packs"] if p["id"] == pid), None)
+
+
+def pack_invoice(lang, p):
+    title = t(lang, "inv_unl_title", d=p["days"]) if p.get("days") else t(lang, "inv_q_title", q=p["q"])
+    return title[:32], t(lang, "inv_desc")
+
+
+async def send_pack_invoice(bot, chat_id, lang, p, uid):
+    title, desc = pack_invoice(lang, p)
+    await bot.send_invoice(chat_id, title, desc, f"pack:{p['id']}:{p['stars']}:{uid}", currency="XTR",
+                           prices=[LabeledPrice(title, p["stars"])])
+
+
+async def send_donate_invoice(bot, chat_id, lang, stars, uid):
+    await bot.send_invoice(chat_id, t(lang, "don_inv_title")[:32], t(lang, "don_inv_desc"), f"don:{stars}:{uid}",
+                           currency="XTR", prices=[LabeledPrice(t(lang, "don_inv_title")[:32], stars)])
+
+
+def screen_donate(lang):
+    amounts = [btn(f"⭐ {n}", f"don:{n}") for n in (50, 100, 250, 500)]
+    return t(lang, "don_title"), kb(amounts[:2], amounts[2:], [btn(t(lang, "don_custom"), "don:custom")],
+                                    [btn(t(lang, "don_card"), "don:card")], [btn(t(lang, "btn_menu"), "m:home")])
+
+
+def screen_cards(lang):
+    cards = AI["cards"]
+    lines = [t(lang, "don_cards_title"), ""]
+    for c in cards.get("cards", []):
+        lines.append(f"💳 <b>{esc(c['label'])}</b>\n<code>{esc(c['number'])}</code>")
+    if cards.get("owner"):
+        lines += ["", t(lang, "don_owner", name=esc(cards["owner"]))]
+    rows = [[InlineKeyboardButton(f"📋 {c['label']} •{c['number'].replace(' ', '')[-4:]}",
+                                  copy_text=CopyTextButton(c["number"].replace(" ", "")))] for c in cards.get("cards", [])]
+    rows.append([btn(t(lang, "don_sent"), "don:sent")])
+    rows.append([btn(t(lang, "btn_back"), "don:menu")])
+    return "\n".join(lines), kb(*rows)
+
+
+async def notify_card_sent(bot, user):
+    """Someone says they sent money to the card: tell the admins who handle support."""
+    u = await get_user(user.id)
+    hidden = u and u["hidden"]
+    text = (f"💳 <b>Перевод на карту</b>\n\n<a href=\"tg://user?id={user.id}\">{esc(user.full_name)}</a>"
+            f"{(' @' + esc(user.username)) if user.username else ''} · <code>{user.id}</code>\n"
+            f"сообщил(а), что отправил(а) пожертвование на карту. Проверьте поступление 🤍")
+    for admin in sorted(a for a in ADMINS if has_perm(a, "support") and (not hidden or is_main(a))):
+        try:
+            await bot.send_message(admin, text, parse_mode=ParseMode.HTML,
+                                   reply_markup=kb([btn("✉️ Поблагодарить", f"sup:reply:{user.id}:w")]))
+        except Exception:  # noqa: BLE001
+            pass
+
+
+async def don_button(update, ctx, parts):
+    q = update.callback_query
+    uid = q.from_user.id
+    u = await get_user(uid)
+    lang = (u or {}).get("lang") or "en"
+    sub = parts[1] if len(parts) > 1 else "menu"
+    if sub == "sent":
+        last = ctx.user_data.get("don_sent_at", 0)
+        await q.answer(t(lang, "don_sent_ok"), show_alert=True)
+        if _time.time() - last > 3600:
+            ctx.user_data["don_sent_at"] = _time.time()
+            await notify_card_sent(ctx.bot, q.from_user)
+        return
+    await q.answer()
+    if sub == "card":
+        text, markup = screen_cards(lang)
+        return await render(update, text, markup)
+    if sub == "custom":
+        ctx.user_data["don_custom"] = True
+        return await update.effective_chat.send_message(t(lang, "don_custom_ask"), reply_markup=ForceReply())
+    if sub.isdigit():
+        return await send_donate_invoice(ctx.bot, update.effective_chat.id, lang, int(sub), uid)
+    text, markup = screen_donate(lang)
+    return await render(update, text, markup)
+
+
+async def don_custom_amount(update, ctx, u):
+    msg = update.message
+    lang = u["lang"] or "en"
+    raw = (msg.text or "").strip().replace(" ", "")
+    if not raw.isdigit() or not 1 <= int(raw) <= 100000:
+        return await msg.reply_text(t(lang, "don_bad"))
+    ctx.user_data.pop("don_custom", None)
+    await send_donate_invoice(ctx.bot, update.effective_chat.id, lang, int(raw), u["user_id"])
+
+
+async def buy_button(update, ctx, parts):
+    q = update.callback_query
+    u = await get_user(q.from_user.id)
+    lang = (u or {}).get("lang") or "en"
+    await q.answer()
+    p = find_pack(parts[1]) if len(parts) > 1 else None
+    if p and u:
+        await send_pack_invoice(ctx.bot, update.effective_chat.id, lang, p, u["user_id"])
+
+
+async def on_precheckout(update, ctx):
+    pq = update.pre_checkout_query
+    parts = (pq.invoice_payload or "").split(":")
+    ok = False
+    if parts[0] == "pack" and len(parts) == 4:
+        p = find_pack(parts[1])
+        ok = bool(p) and p["stars"] == pq.total_amount and pq.currency == "XTR"
+    elif parts[0] == "don" and len(parts) == 3:
+        ok = pq.currency == "XTR" and pq.total_amount == int(parts[1])
+    if ok:
+        await pq.answer(ok=True)
+    else:
+        await pq.answer(ok=False, error_message="This offer has changed. Please open it again.")
+
+
+async def grant(uid, questions=0, days=0):
+    await POOL.execute("INSERT INTO ai_credits (user_id) VALUES ($1) ON CONFLICT DO NOTHING", uid)
+    if questions:
+        await POOL.execute("UPDATE ai_credits SET credits = credits + $2 WHERE user_id = $1", uid, questions)
+    if days:
+        await POOL.execute("UPDATE ai_credits SET unlimited_until = greatest(coalesce(unlimited_until, now()), now()) "
+                           "+ make_interval(days => $2) WHERE user_id = $1", uid, days)
+
+
+async def on_paid(update, ctx):
+    msg = update.message
+    sp = msg.successful_payment
+    uid = update.effective_user.id
+    u = await get_user(uid)
+    lang = (u or {}).get("lang") or "en"
+    parts = (sp.invoice_payload or "").split(":")
+    kind = parts[0]
+    await POOL.execute("INSERT INTO payments (user_id, kind, payload, stars, charge_id) VALUES ($1, $2, $3, $4, $5)",
+                       uid, kind, sp.invoice_payload, sp.total_amount, sp.telegram_payment_charge_id)
+    await bump("stars_" + kind, sp.total_amount)
+    if kind == "pack":
+        p = find_pack(parts[1]) or {"q": 0, "stars": sp.total_amount, "id": parts[1]}
+        await grant(uid, questions=p.get("q", 0), days=p.get("days", 0))
+        what = pack_label(lang, p).split(" — ")[0]
+        await msg.reply_text(t(lang, "paid_ok", what=what), reply_markup=ai_buttons(lang) if ai_allowed_now(uid) else None)
+        note = f"⭐ <b>Покупка</b>: {esc(what)} за {sp.total_amount} ⭐"
+    else:
+        await msg.reply_text(t(lang, "don_thanks"))
+        note = f"🤍 <b>Пожертвование</b>: {sp.total_amount} ⭐"
+    hidden = u and u["hidden"]
+    for admin in sorted(a for a in ADMINS if has_perm(a, "ai") and (not hidden or is_main(a))):
+        try:
+            await ctx.bot.send_message(admin, f"{note}\n👤 {esc(update.effective_user.full_name)} · <code>{uid}</code>",
+                                       parse_mode=ParseMode.HTML, disable_notification=True)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+# mini app: AI chat, purchases, donations
 
 async def api_ai(request):
     tg_user, u, lang = await api_auth(request)
-    if not u or not await ai_allowed(u["user_id"]):
+    if not u or not ai_allowed_now(u["user_id"]):
         raise web.HTTPForbidden(text="ai is off")
     body = await read_json(request)
     if body.get("reset"):
         AI_HISTORY.pop(u["user_id"], None)
-        return web.json_response({"ok": True, "left": await ai_left(u)})
+        return web.json_response({"ok": True, "status": ai_status_text(lang, await ai_quota(u))})
     question = str(body.get("text") or "").strip()[:2000]
     if not question:
         raise web.HTTPBadRequest(text="empty")
-    if await ai_left(u) <= 0:
-        return web.json_response({"ok": False, "error": "limit", "left": 0})
-    answer, err = await ai_answer(u, question)
+    quota = await ai_quota(u)
+    if not quota["kind"]:
+        return web.json_response({"ok": False, "error": "limit", "reason": quota.get("reason"),
+                                  "status": ai_status_text(lang, quota)})
+    answer, model, err = await ai_answer(u, question, cheap=quota["kind"] == "free")
     if not answer:
         return web.json_response({"ok": False, "error": err})
-    await ai_count(u)
-    return web.json_response({"ok": True, "html": ai_markup_html(answer), "left": await ai_left(u),
-                              "unlimited": is_admin(u["user_id"])})
+    await ai_count(u, quota["kind"], model, question, answer)
+    return web.json_response({"ok": True, "html": ai_markup_html(answer), "disc": ai_disclaimer(u["lang"] or lang),
+                              "status": ai_status_text(lang, await ai_quota(u))})
+
+
+async def api_invoice(request):
+    """Invoice link for the mini app: {pack: id} or {donate: stars}."""
+    tg_user, u, lang = await api_auth(request)
+    if not u:
+        raise web.HTTPBadRequest(text="no user")
+    body = await read_json(request)
+    bot = request.app["bot"]
+    if body.get("pack"):
+        p = find_pack(str(body["pack"]))
+        if not p:
+            raise web.HTTPBadRequest(text="no pack")
+        title, desc = pack_invoice(lang, p)
+        link = await bot.create_invoice_link(title, desc, f"pack:{p['id']}:{p['stars']}:{u['user_id']}", currency="XTR",
+                                             prices=[LabeledPrice(title, p["stars"])])
+    else:
+        try:
+            stars = int(body.get("donate"))
+            assert 1 <= stars <= 100000
+        except (TypeError, ValueError, AssertionError):
+            raise web.HTTPBadRequest(text="bad amount")
+        link = await bot.create_invoice_link(t(lang, "don_inv_title")[:32], t(lang, "don_inv_desc"), f"don:{stars}:{u['user_id']}",
+                                             currency="XTR", prices=[LabeledPrice(t(lang, "don_inv_title")[:32], stars)])
+    return web.json_response({"ok": True, "link": link})
+
+
+async def api_donate_sent(request):
+    tg_user, u, lang = await api_auth(request)
+    key = ("don_sent", int(tg_user["id"]))
+    if _time.time() - SENT.get(key, 0) > 3600:
+        SENT[key] = _time.time()
+        user = NS_User(int(tg_user["id"]), " ".join(x for x in (tg_user.get("first_name"), tg_user.get("last_name")) if x),
+                       tg_user.get("username"))
+        await notify_card_sent(request.app["bot"], user)
+    return web.json_response({"ok": True})
+
+
+class NS_User:
+    def __init__(self, uid, full_name, username):
+        self.id, self.full_name, self.username = uid, full_name or str(uid), username
+
+
+def money_json(lang):
+    return {"packs": [{"id": p["id"], "label": pack_label(lang, p), "stars": p["stars"]} for p in AI["packs"]],
+            "cards": AI["cards"]}
+
+
+# ───────────────────────── admin: AI settings, journal, sales ─────────────────────────
+
+AI_ACCESS_RU = {"admins": "только админы 🔒", "all": "все ✅", "selected": "избранные 👥"}
+AI_LEN_RU = {"short": "коротко", "medium": "средне", "long": "подробно"}
+
+
+async def ai_stats(days):
+    rows = await POOL.fetch("SELECT stat_key, sum(stat_value) AS v FROM daily_stats WHERE stat_day > CURRENT_DATE - $1::int "
+                            "AND (stat_key LIKE 'ai_%' OR stat_key LIKE 'stars_%') GROUP BY stat_key", days)
+    return {r["stat_key"]: r["v"] for r in rows}
+
+
+async def screen_admin_ai():
+    c = AI["cfg"]
+    today = await ai_stats(1)
+    key = AI["key"]
+    lines = ["🤖 <b>ИИ-помощник</b>", "",
+             f"Статус: {'✅ включён' if c['enabled'] else '⛔ выключен'} · ключ: {'…' + key[-4:] if key else 'нет ❗'}",
+             f"Доступ: {AI_ACCESS_RU[c['access']]}" + (f" ({len(c['selected'])})" if c["access"] == "selected" else "")
+             + (f" · в бане: {len(c['banned'])}" if c["banned"] else ""),
+             f"Бесплатно: {c['daily_free'] or '∞'} в день на человека · {c['global_free'] or '∞'} в день на всех",
+             f"Модель: {c['model'] if c['model'] != 'auto' else 'авто'} · ответы: {AI_LEN_RU[c['length']]} · память: {c['memory']}",
+             "", f"📊 Сегодня: <b>{today.get('ai_questions', 0)}</b> вопросов "
+             f"(бесплатных {today.get('ai_free', 0)}, купленных {today.get('ai_credit', 0) + today.get('ai_unl', 0)}, "
+             f"админов {today.get('ai_admin', 0)}) · квота Google: {today.get('ai_quota', 0)} · ошибок: {today.get('ai_errors', 0)}"]
+    rows = [[btn("⛔ Выключить" if c["enabled"] else "✅ Включить", "a:ai:on"), btn("🔐 Доступ", "a:ai:acc")],
+            [btn(f"👥 Избранные ({len(c['selected'])})", "a:ai:list:selected"), btn(f"🚫 Бан ({len(c['banned'])})", "a:ai:list:banned")],
+            [btn(f"🎁 На человека: {c['daily_free'] or '∞'}", "a:ai:opt:daily_free"), btn(f"🌍 На всех: {c['global_free'] or '∞'}", "a:ai:opt:global_free")],
+            [btn("🧠 Модель", "a:ai:opt:model"), btn(f"📏 {AI_LEN_RU[c['length']]}", "a:ai:opt:length"), btn(f"💭 {c['memory']}", "a:ai:opt:memory")],
+            [btn("✍️ Свои инструкции", "a:ai:ask:extra"), btn(("🏷 Пометка ✅" if c["disc_on"] else "🏷 Пометка ❌"), "a:ai:dsc")],
+            [btn("✏️ Текст пометки", "a:ai:ask:disc"), btn("🧪 Тест", "a:ai:ask:test")],
+            [btn("📊 Статистика", "a:ai:st"), btn("📜 Журнал", "a:ai:log:0")],
+            [btn("⭐ Пакеты", "a:ai:packs"), btn("💳 Карты", "a:ai:cards"), btn("💰 Продажи", "a:ai:pay:0")],
+            [btn("🔑 Ключ Gemini", "a:ai:ask:key")],
+            ADMIN_BACK]
+    return "\n".join(lines), kb(*rows)
+
+
+AI_OPTIONS = {"daily_free": [3, 5, 10, 20, 30, 50, 0], "global_free": [100, 200, 350, 450, 1000, 0],
+              "length": ["short", "medium", "long"], "memory": [0, 4, 8, 12]}
+AI_ASK = {"extra": "✍️ <b>Свои инструкции</b>\n\nОтправьте текст — дополнительные правила для ответов. Например: «опирайся на позицию "
+                   "Духовного управления мусульман Узбекистана», «в конце предлагай дуа по теме».\n\nОтправьте «-», чтобы очистить.",
+          "disc": "✏️ <b>Текст пометки под ответом</b>\n\nОтправьте свой текст. Отправьте «-», чтобы вернуть стандартный (на языке человека).",
+          "test": "🧪 <b>Тест</b>\n\nОтправьте вопрос — ответ придёт с текущими настройками (вопрос не считается в лимитах).",
+          "key": "🔑 <b>Ключ Gemini</b>\n\nОтправьте новый ключ (начинается с AIza…). Бот сначала проверит его.",
+          "selected": "👥 Отправьте ID или @username человека, чтобы добавить его в избранные.",
+          "banned": "🚫 Отправьте ID или @username человека, чтобы закрыть ему ИИ-помощника.",
+          "packs": "⭐ <b>Пакеты</b>\n\nОтправьте список, каждый пакет с новой строки:\n<code>50 50</code> — 50 вопросов за 50 ⭐\n"
+                   "<code>200 150</code> — 200 вопросов за 150 ⭐\n<code>30д 300</code> — безлимит на 30 дней за 300 ⭐",
+          "cards": "💳 <b>Карты</b>\n\nОтправьте список, каждая карта с новой строки: <code>VISA 4466 1369 0003 3243</code>\n"
+                   "Последней строкой можно указать владельца: <code>Владелец: Имя Фамилия</code>",
+          "grant": "🎁 Сколько вопросов начислить? Отправьте число (или <code>30д</code> — безлимит на 30 дней)."}
+
+
+async def find_user_id(raw):
+    raw = (raw or "").strip()
+    if raw.lstrip("-").isdigit():
+        return int(raw)
+    return await POOL.fetchval("SELECT user_id FROM users WHERE lower(username) = lower($1) AND chat_type = 'private'",
+                               raw.lstrip("@").split("/")[-1])
+
+
+async def admin_ai(update, ctx, parts):
+    uid = update.effective_user.id
+    c = AI["cfg"]
+    op = parts[2] if len(parts) > 2 else ""
+    back = kb([btn("⬅️ Назад", "a:ai")])
+    if op == "on":
+        await save_ai_cfg(enabled=not c["enabled"])
+    elif op == "acc":
+        order = ["admins", "all", "selected"]
+        await save_ai_cfg(access=order[(order.index(c["access"]) + 1) % 3])
+    elif op == "dsc":
+        await save_ai_cfg(disc_on=not c["disc_on"])
+    elif op == "opt" and len(parts) > 3:
+        field = parts[3]
+        if len(parts) > 4:  # a:ai:opt:field:value
+            v = parts[4]
+            if field == "model":
+                await save_ai_cfg(model=v)
+            elif field in AI_OPTIONS:
+                await save_ai_cfg(**{field: v if field == "length" else int(v)})
+        else:
+            if field == "model":
+                ms = await ai_models()
+                opts = [("auto", "🪄 Авто (бесплатные → Lite, платные → Flash)")] + [(m, m) for m in ms[:10]]
+            else:
+                lab = {"short": "коротко", "medium": "средне", "long": "подробно"}
+                opts = [(v, (lab.get(v) if field == "length" else ("∞ без лимита" if v == 0 else str(v)))) for v in AI_OPTIONS[field]]
+            cur = c[field]
+            rows = [[btn(("✅ " if str(v) == str(cur) else "") + label, f"a:ai:opt:{field}:{v}")] for v, label in opts]
+            rows.append([btn("⬅️ Назад", "a:ai")])
+            return await render(update, "Выберите значение 👇", kb(*rows))
+    elif op == "ask" and len(parts) > 3:
+        ctx.user_data["admin_state"] = "ai_" + parts[3]
+        cur = ""
+        if parts[3] == "extra" and c["extra"]:
+            cur = "\n\nСейчас:\n<i>" + esc(c["extra"][:1500]) + "</i>"
+        if parts[3] == "disc":
+            cur = "\n\nСейчас: <i>" + esc(c["disc"] or "стандартная") + "</i>"
+        return await render(update, AI_ASK[parts[3]] + cur, back)
+    elif op == "list" and len(parts) > 3:
+        field = parts[3]
+        if len(parts) > 5 and parts[4] == "rm":
+            await save_ai_cfg(**{field: [x for x in c[field] if str(x) != parts[5]]})
+        if len(parts) > 4 and parts[4] == "add":
+            ctx.user_data["admin_state"] = "ai_" + field
+            return await render(update, AI_ASK[field], back)
+        rows = [[btn(f"❌ {await admin_name(x)}", f"a:ai:list:{field}:rm:{x}")] for x in AI["cfg"][field][:30]]
+        rows.append([btn("➕ Добавить", f"a:ai:list:{field}:add")])
+        rows.append([btn("⬅️ Назад", "a:ai")])
+        title = "👥 <b>Избранные</b> — им доступен ИИ, когда доступ «избранные»." if field == "selected" else \
+            "🚫 <b>Бан в ИИ</b> — им помощник закрыт (остальной бот работает)."
+        return await render(update, title + "\n\nНажмите на человека, чтобы убрать его из списка.", kb(*rows))
+    elif op == "st":
+        lines = ["📊 <b>Статистика ИИ</b>", ""]
+        for days, name in ((1, "Сегодня"), (7, "7 дней"), (30, "30 дней")):
+            s = await ai_stats(days)
+            people = await POOL.fetchval("SELECT count(DISTINCT user_id) FROM ai_log WHERE at > now() - make_interval(days => $1)", days)
+            lines.append(f"<b>{name}</b>: {s.get('ai_questions', 0)} вопросов · {people} чел. · бесплатных {s.get('ai_free', 0)} · "
+                         f"купленных {s.get('ai_credit', 0) + s.get('ai_unl', 0)} · квота {s.get('ai_quota', 0)} · ошибок {s.get('ai_errors', 0)} · "
+                         f"⭐ продажи {s.get('stars_pack', 0)} · ⭐ пожертвования {s.get('stars_don', 0)}")
+        today = await ai_stats(1)
+        per_model = [(k[5:], v) for k, v in today.items() if k.startswith("ai_m_")]
+        if per_model:
+            lines += ["", "<b>Модели сегодня:</b>"] + [f"• {esc(m)}: {v}" for m, v in sorted(per_model, key=lambda x: -x[1])]
+        main = is_main(uid)
+        top = await POOL.fetch("SELECT l.user_id, count(*) AS n FROM ai_log l JOIN users u ON u.user_id = l.user_id "
+                               "WHERE l.at > now() - interval '30 days' AND (NOT u.hidden OR $1) GROUP BY l.user_id ORDER BY n DESC LIMIT 10", main)
+        if top:
+            lines += ["", "<b>Чаще всех спрашивают (30 дн.):</b>"] + [f"• {esc(await admin_name(r['user_id']))} — {r['n']}" for r in top]
+        return await render(update, "\n".join(lines), back)
+    elif op == "log":
+        page = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
+        who = int(parts[4]) if len(parts) > 4 and parts[4].lstrip("-").isdigit() else None
+        main = is_main(uid)
+        rows = await POOL.fetch("SELECT l.* FROM ai_log l JOIN users u ON u.user_id = l.user_id WHERE (NOT u.hidden OR $1) "
+                                "AND ($2::bigint IS NULL OR l.user_id = $2) ORDER BY l.id DESC LIMIT 5 OFFSET $3", main, who, page * 5)
+        lines = ["📜 <b>Журнал вопросов</b>" + (f" · <code>{who}</code>" if who else ""), ""]
+        for r in rows:
+            lines.append(f"👤 {esc(await admin_name(r['user_id']))} · {r['at']:%d.%m %H:%M} UTC · {esc(r['model'] or '')}\n"
+                         f"❓ {esc(r['question'][:300])}\n💬 {esc(r['answer'][:400])}{'…' if len(r['answer']) > 400 else ''}\n")
+        if not rows:
+            lines.append("Пусто.")
+        tail = f":{who}" if who else ""
+        nav = ([btn("◀️", f"a:ai:log:{page - 1}{tail}")] if page else []) + ([btn("▶️", f"a:ai:log:{page + 1}{tail}")] if len(rows) == 5 else [])
+        rows_kb = ([nav] if nav else []) + [[btn("🔎 По человеку", "a:ai:ask:logwho"), btn("⬅️ Назад", "a:ai")]]
+        return await render(update, "\n".join(lines)[:4000], kb(*rows_kb))
+    elif op == "packs":
+        lines = ["⭐ <b>Пакеты вопросов</b>", ""] + [f"• {esc(pack_label('ru', p))}" for p in AI["packs"]]
+        return await render(update, "\n".join(lines), kb([btn("✏️ Изменить", "a:ai:ask:packs")], [btn("⬅️ Назад", "a:ai")]))
+    elif op == "cards":
+        text, _ = screen_cards("ru")
+        return await render(update, text, kb([btn("✏️ Изменить", "a:ai:ask:cards")], [btn("⬅️ Назад", "a:ai")]))
+    elif op == "pay":
+        page = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
+        if len(parts) > 4 and parts[3] in ("ref", "refok"):
+            pid = int(parts[4])
+            p = await POOL.fetchrow("SELECT * FROM payments WHERE id = $1", pid)
+            if p and parts[3] == "ref" and not p["refunded"]:
+                return await render(update, f"↩️ Вернуть {p['stars']} ⭐ пользователю <code>{p['user_id']}</code>?\n"
+                                            "Купленные вопросы (или безлимит) будут сняты.",
+                                    kb([btn("✅ Да, вернуть", f"a:ai:pay:refok:{pid}"), btn("❌ Нет", "a:ai:pay:0")]))
+            if p and parts[3] == "refok" and not p["refunded"]:
+                try:
+                    await ctx.bot.refund_star_payment(p["user_id"], p["charge_id"])
+                    await POOL.execute("UPDATE payments SET refunded = TRUE WHERE id = $1", pid)
+                    pk = find_pack(p["payload"].split(":")[1]) if p["kind"] == "pack" else None
+                    if pk and pk.get("q"):
+                        await POOL.execute("UPDATE ai_credits SET credits = greatest(0, credits - $2) WHERE user_id = $1",
+                                           p["user_id"], pk["q"])
+                    elif pk and pk.get("days"):
+                        await POOL.execute("UPDATE ai_credits SET unlimited_until = unlimited_until - make_interval(days => $2) "
+                                           "WHERE user_id = $1", p["user_id"], pk["days"])
+                    await bump("stars_refund", p["stars"])
+                    note = "✅ Возвращено."
+                except Exception as e:  # noqa: BLE001
+                    note = f"⚠️ Не получилось: {esc(e)}"
+                await update.effective_chat.send_message(note, parse_mode=ParseMode.HTML)
+        main = is_main(uid)
+        rows = await POOL.fetch("SELECT p.* FROM payments p LEFT JOIN users u ON u.user_id = p.user_id "
+                                "WHERE (u.hidden IS NOT TRUE OR $1) ORDER BY p.id DESC LIMIT 8 OFFSET $2", main, page * 8)
+        total = await POOL.fetchrow("SELECT coalesce(sum(stars) FILTER (WHERE kind = 'pack' AND NOT refunded), 0) AS packs, "
+                                    "coalesce(sum(stars) FILTER (WHERE kind = 'don' AND NOT refunded), 0) AS don, "
+                                    "coalesce(sum(stars) FILTER (WHERE at > now() - interval '30 days' AND NOT refunded), 0) AS m "
+                                    "FROM payments")
+        lines = ["💰 <b>Продажи и пожертвования</b>",
+                 f"Всего: пакеты {total['packs']} ⭐ · пожертвования {total['don']} ⭐ · за 30 дней {total['m']} ⭐", ""]
+        kbrows = []
+        for p in rows:
+            what = "пожертвование" if p["kind"] == "don" else "пакет " + p["payload"].split(":")[1]
+            lines.append(f"{'↩️' if p['refunded'] else '⭐'} {p['at']:%d.%m %H:%M} · {p['stars']} ⭐ · {what} · "
+                         f"{esc(await admin_name(p['user_id']))}")
+            if not p["refunded"]:
+                kbrows.append([btn(f"↩️ Вернуть #{p['id']} ({p['stars']} ⭐)", f"a:ai:pay:ref:{p['id']}")])
+        if not rows:
+            lines.append("Пока пусто.")
+        nav = ([btn("◀️", f"a:ai:pay:{page - 1}")] if page else []) + ([btn("▶️", f"a:ai:pay:{page + 1}")] if len(rows) == 8 else [])
+        return await render(update, "\n".join(lines), kb(*(kbrows + ([nav] if nav else []) + [[btn("⬅️ Назад", "a:ai")]])))
+    text, markup = await screen_admin_ai()
+    return await render(update, text, markup)
+
+
+async def admin_ai_text(update, ctx, state):
+    """Typed answers for the AI settings. Returns True if consumed."""
+    msg = update.message
+    raw = (msg.text or "").strip()
+    uid = update.effective_user.id
+    back = kb([btn("⬅️ К настройкам ИИ", "a:ai")])
+    field = state[3:]
+    if field not in ("test", "logwho"):
+        ctx.user_data.pop("admin_state", None)
+    if field == "extra":
+        await save_ai_cfg(extra="" if raw == "-" else raw[:3000])
+        return await msg.reply_text("✅ Инструкции сохранены.", reply_markup=back)
+    if field == "disc":
+        await save_ai_cfg(disc="" if raw == "-" else raw[:300])
+        return await msg.reply_text("✅ Пометка сохранена.", reply_markup=back)
+    if field == "test":
+        u = dict(await get_user(uid))
+        await update.effective_chat.send_action("typing")
+        answer, model, err = await ai_answer(u, raw, keep=False)
+        text = (ai_markup_html(answer) + f"\n\n<i>🧪 {esc(model)}</i>") if answer else t("ru", err)
+        return await msg.reply_text(text[:4000], parse_mode=ParseMode.HTML, reply_markup=back)
+    if field == "logwho":
+        ctx.user_data.pop("admin_state", None)
+        who = await find_user_id(raw)
+        return await admin_ai(update, ctx, ["a", "ai", "log", "0", str(who or 0)])
+    if field == "key":
+        try:
+            r = await HTTP.get("https://generativelanguage.googleapis.com/v1beta/models", params={"pageSize": 5},
+                               headers={"x-goog-api-key": raw}, timeout=15)
+            r.raise_for_status()
+        except Exception:  # noqa: BLE001
+            return await msg.reply_text("❌ Ключ не подошёл. Проверьте и отправьте ещё раз.", reply_markup=back)
+        await kv_set("gemini_key", raw)
+        AI["key"], AI["models"], AI["cool"] = raw, [], {}
+        try:
+            await msg.delete()  # don't leave the key in the chat
+        except Exception:  # noqa: BLE001
+            pass
+        await ai_models()
+        return await update.effective_chat.send_message("✅ Новый ключ сохранён и работает.", reply_markup=back)
+    if field in ("selected", "banned"):
+        who = await find_user_id(raw)
+        if not who or not await get_user(who):
+            return await msg.reply_text("🤷 Такого человека нет в базе.", reply_markup=back)
+        await save_ai_cfg(**{field: sorted(set(AI["cfg"][field]) | {who})})
+        return await msg.reply_text(f"✅ Добавлен: {esc(await admin_name(who))}", parse_mode=ParseMode.HTML, reply_markup=back)
+    if field == "packs":
+        packs = []
+        for i, line in enumerate(raw.splitlines()):
+            m = re.match(r"\s*(\d+)\s*(д|d|дн|days?)?\s+(\d+)\s*$", line.lower())
+            if not m:
+                continue
+            n, is_days, stars = int(m.group(1)), bool(m.group(2)), int(m.group(3))
+            if n and 1 <= stars <= 100000:
+                packs.append({"id": f"{'u' if is_days else 'q'}{n}_{stars}", **({"days": n} if is_days else {"q": n}), "stars": stars})
+        if not packs:
+            return await msg.reply_text("❗ Не понял список. Пример: <code>50 50</code>, <code>30д 300</code>.",
+                                        parse_mode=ParseMode.HTML, reply_markup=back)
+        AI["packs"] = packs[:6]
+        await kv_set("ai_packs", json.dumps(AI["packs"]))
+        return await msg.reply_text("✅ Пакеты сохранены:\n" + "\n".join("• " + pack_label("ru", p) for p in AI["packs"]),
+                                    reply_markup=back)
+    if field == "cards":
+        cards, owner = [], AI["cards"].get("owner", "")
+        for line in raw.splitlines():
+            line = line.strip()
+            if line.lower().startswith(("владелец:", "owner:")):
+                owner = line.split(":", 1)[1].strip()
+                continue
+            m = re.match(r"([A-Za-zА-Яа-я]+)\s+([\d ]{12,23})$", line)
+            if m:
+                cards.append({"label": m.group(1).upper(), "number": " ".join(re.findall(r"\d{4}", m.group(2).replace(" ", "")))})
+        if not cards:
+            return await msg.reply_text("❗ Не понял. Пример: <code>VISA 4466 1369 0003 3243</code>", parse_mode=ParseMode.HTML,
+                                        reply_markup=back)
+        AI["cards"] = {"owner": owner, "cards": cards[:6]}
+        await kv_set("ai_cards", json.dumps(AI["cards"], ensure_ascii=False))
+        text, _ = screen_cards("ru")
+        return await msg.reply_text("✅ Сохранено.\n\n" + text, parse_mode=ParseMode.HTML, reply_markup=back)
+    if field.startswith("grant:"):
+        target = int(field.split(":")[1])
+        m = re.match(r"\s*(\d+)\s*(д|d|дн|days?)?\s*$", raw.lower())
+        if not m:
+            return await msg.reply_text("❗ Отправьте число, например 20 или 30д.", reply_markup=back)
+        n, is_days = int(m.group(1)), bool(m.group(2))
+        await grant(target, questions=0 if is_days else n, days=n if is_days else 0)
+        tu = await get_user(target)
+        tl = (tu or {}).get("lang") or "en"
+        try:
+            await ctx.bot.send_message(target, t(tl, "ai_granted", n=(f"♾ {n} д." if is_days else n)))
+        except Exception:  # noqa: BLE001
+            pass
+        return await msg.reply_text(f"✅ Начислено {'безлимит на ' + str(n) + ' дн.' if is_days else str(n) + ' вопросов'}.",
+                                    reply_markup=back)
+    return True
+
+
+# mini app admin: AI settings
+
+async def api_admin_ai(request):
+    uid = await admin_auth(request, "ai")
+    if request.method == "POST":
+        body = await read_json(request)
+        if body.get("test"):
+            u = dict(await get_user(uid))
+            answer, model, err = await ai_answer(u, str(body["test"])[:2000], keep=False)
+            return web.json_response({"ok": bool(answer), "html": ai_markup_html(answer) if answer else "", "model": model,
+                                      "error": err})
+        patch = {}
+        for k in ("enabled", "disc_on"):
+            if isinstance(body.get(k), bool):
+                patch[k] = body[k]
+        if body.get("access") in AI_ACCESS_RU:
+            patch["access"] = body["access"]
+        for k in ("daily_free", "global_free", "memory"):
+            if body.get(k) in AI_OPTIONS[k]:
+                patch[k] = body[k]
+        if body.get("length") in AI_OPTIONS["length"]:
+            patch["length"] = body["length"]
+        if isinstance(body.get("model"), str) and (body["model"] == "auto" or body["model"] in await ai_models()):
+            patch["model"] = body["model"]
+        for k, lim in (("extra", 3000), ("disc", 300)):
+            if isinstance(body.get(k), str):
+                patch[k] = body[k].strip()[:lim]
+        if patch:
+            await save_ai_cfg(**patch)
+    main = is_main(uid)
+    logs = await POOL.fetch("SELECT l.*, u.full_name, u.username FROM ai_log l JOIN users u ON u.user_id = l.user_id "
+                            "WHERE (NOT u.hidden OR $1) ORDER BY l.id DESC LIMIT 30", main)
+    stats = {}
+    for days in (1, 7, 30):
+        s = await ai_stats(days)
+        stats[str(days)] = {"q": s.get("ai_questions", 0), "free": s.get("ai_free", 0),
+                            "paid": s.get("ai_credit", 0) + s.get("ai_unl", 0), "quota": s.get("ai_quota", 0),
+                            "err": s.get("ai_errors", 0), "stars_pack": s.get("stars_pack", 0), "stars_don": s.get("stars_don", 0)}
+    return web.json_response({
+        "ok": True, "cfg": AI["cfg"], "models": await ai_models(), "has_key": bool(AI["key"]), "stats": stats,
+        "options": AI_OPTIONS,
+        "log": [{"name": r["full_name"] or str(r["user_id"]), "username": r["username"], "id": r["user_id"],
+                 "at": r["at"].isoformat(), "q": r["question"][:500], "a": r["answer"][:1500], "model": r["model"]} for r in logs]})
+
 
 # ───────────────────────── app ─────────────────────────
 
@@ -5732,8 +6577,8 @@ async def post_init(app: Application):
     HTTP = httpx.AsyncClient(timeout=15)
     await load_azans()
     await load_admins()
-    AI_STATE["public"] = await kv_get("ai_public") == "1"
-    if GEMINI_KEY:  # check the key and pick the model in the background
+    await load_ai()
+    if AI["key"]:  # check the key and pick the models in the background
         asyncio.get_running_loop().create_task(ai_models())
     global BOT_USERNAME
     BOT_USERNAME = app.bot.username
@@ -5783,6 +6628,8 @@ def main():
     app.job_queue.run_repeating(cleanup_job, interval=60, first=30)
     app.job_queue.run_repeating(menu_buttons_job, interval=120, first=120)
     app.add_handler(InlineQueryHandler(on_inline), group=1)
+    app.add_handler(PreCheckoutQueryHandler(on_precheckout), group=1)
+    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, on_paid), group=1)
     app.run_polling(drop_pending_updates=True)
 
 
