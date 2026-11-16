@@ -70,7 +70,7 @@ h2{font-size:17px;margin:20px 0 10px}
 
 /* qibla */
 .compass{position:relative;width:min(84vw,330px);aspect-ratio:1;margin:18px auto 8px}
-.compass .dial{position:absolute;inset:0;transition:transform .12s linear}
+.compass .dial{position:absolute;inset:0;will-change:transform;transform:translateZ(0)}
 .compass .marker{position:absolute;left:50%;top:-6px;transform:translateX(-50%);width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;border-top:20px solid var(--gold);z-index:3;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
 .compass.ok .marker{border-top-color:var(--green)}
 .compass .glow{position:absolute;inset:-6px;border-radius:50%;box-shadow:0 0 0 0 rgba(34,163,122,0);transition:box-shadow .3s}
@@ -496,7 +496,7 @@ function go(tab) {
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
   show(tab);
   try { tg?.BackButton?.hide(); } catch (e) {}
-  if (tab === "qibla") startCompass();
+  if (tab === "qibla") { startCompass(); if (target != null && !rafOn) { rafOn = true; requestAnimationFrame(frame); } }
   if (tab === "cal") renderCal();
   if (tab === "tasbih") renderTasbih();
 }
@@ -575,41 +575,56 @@ function buildDial() {
   parts.push(`<g transform="translate(${kx} ${ky}) rotate(${QIBLA})"><rect x="-17" y="-17" width="34" height="34" rx="4" fill="#151515" stroke="#d4af37" stroke-width="3"/><rect x="-17" y="-9" width="34" height="6" fill="#d4af37"/></g>`);
   $("dial").innerHTML = parts.join("");
 }
-let compassOn = false, heading = null, smooth = null, lastOk = false, gotEvent = false;
-function onHeading(h) {
+/* One heading source only (mixing iPhone's compass with Telegram's made the dial jump between two values),
+   and a single animation loop that eases the dial towards the latest reading. */
+let compassOn = false, target = null, shown = null, lastOk = false, gotEvent = false, SOURCE = null, rafOn = false, lastStatus = "";
+const PRIORITY = {ios: 3, abs: 2, tg: 1};
+function onHeading(h, src) {
   if (h == null || isNaN(h)) return;
+  if (SOURCE && PRIORITY[src] < PRIORITY[SOURCE]) return;   // a better source already works
+  if (SOURCE !== src) { SOURCE = src; shown = null; }
   gotEvent = true;
-  h = (h + 360) % 360;
-  if (smooth == null) smooth = h;
-  let d = ((h - smooth + 540) % 360) - 180; smooth = (smooth + d * 0.25 + 360) % 360;
-  heading = smooth;
-  $("dial").style.transform = `rotate(${-heading}deg)`;
-  const diff = Math.abs(((QIBLA - heading + 540) % 360) - 180), ok = diff < 5;
-  $("compass").classList.toggle("ok", ok);
-  $("qStatus").textContent = ok ? tr("q_ok") : `${Math.round(diff)}°`;
-  $("qStatus").classList.toggle("ok", ok);
-  if (ok && !lastOk) { try { tg?.HapticFeedback?.notificationOccurred("success"); } catch (e) {} }
-  lastOk = ok;
+  target = ((h % 360) + 360) % 360;
   $("qEnableWrap").hidden = true;
+  if (!rafOn) { rafOn = true; requestAnimationFrame(frame); }
+}
+function frame() {
+  if (target == null || TAB !== "qibla") { rafOn = false; return; }
+  if (shown == null) shown = target;
+  const d = ((target - shown + 540) % 360) - 180;           // shortest way round
+  shown = Math.abs(d) < 0.05 ? target : (shown + d * 0.18 + 360) % 360;
+  $("dial").style.transform = `rotate(${(-shown).toFixed(2)}deg)`;
+  const diff = Math.abs(((QIBLA - shown + 540) % 360) - 180), ok = diff < 5;
+  const status = ok ? tr("q_ok") : `${Math.round(diff)}°`;
+  if (status !== lastStatus) { $("qStatus").textContent = status; lastStatus = status; }
+  if (ok !== lastOk) {
+    $("compass").classList.toggle("ok", ok); $("qStatus").classList.toggle("ok", ok);
+    if (ok) { try { tg?.HapticFeedback?.notificationOccurred("success"); } catch (e) {} }
+    lastOk = ok;
+  }
+  requestAnimationFrame(frame);
 }
 function screenAngle() { return (screen.orientation && screen.orientation.angle) || window.orientation || 0; }
 function listenBrowser() {
-  window.addEventListener("deviceorientationabsolute", e => { if (e.alpha != null) onHeading(360 - e.alpha + screenAngle()); }, true);
+  window.addEventListener("deviceorientationabsolute", e => { if (e.alpha != null) onHeading(360 - e.alpha + screenAngle(), "abs"); }, true);
   window.addEventListener("deviceorientation", e => {
-    if (e.webkitCompassHeading != null) onHeading(e.webkitCompassHeading + screenAngle());
-    else if (e.absolute && e.alpha != null) onHeading(360 - e.alpha + screenAngle());
+    if (e.webkitCompassHeading != null && e.webkitCompassHeading >= 0) onHeading(e.webkitCompassHeading + screenAngle(), "ios");
+    else if (e.absolute && e.alpha != null) onHeading(360 - e.alpha + screenAngle(), "abs");
   }, true);
 }
 function listenTelegram() {
   if (!ver("8.0") || !tg.DeviceOrientation) return;
-  try {
-    tg.onEvent("deviceOrientationChanged", () => {
-      if (gotEvent && !tg.DeviceOrientation.absolute) return;
-      const a = tg.DeviceOrientation.alpha;
-      if (a != null && tg.DeviceOrientation.absolute) onHeading(360 - a * 180 / Math.PI);
-    });
-    tg.DeviceOrientation.start({refresh_rate: 60, need_absolute: true});
-  } catch (e) {}
+  // Telegram's sensor is only a fallback: used if the phone's own compass sends nothing within 1.5 s.
+  setTimeout(() => {
+    if (gotEvent) return;
+    try {
+      tg.onEvent("deviceOrientationChanged", () => {
+        const a = tg.DeviceOrientation.alpha;
+        if (a != null && tg.DeviceOrientation.absolute) onHeading(360 - a * 180 / Math.PI, "tg");
+      });
+      tg.DeviceOrientation.start({refresh_rate: 50, need_absolute: true});
+    } catch (e) {}
+  }, 1500);
 }
 function startCompass() {
   if (compassOn) return;
