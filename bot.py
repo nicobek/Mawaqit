@@ -893,6 +893,37 @@ EXTRA7 = {
 for _l, _d in EXTRA7.items():
     T[_l].update(_d)
 
+
+EXTRA8 = {
+    "en": {"rb_morning": "🌅 Morning adhkar", "rb_evening": "🌙 Evening adhkar", "rb_tracker": "✅ Mark today's prayers",
+           "mb_azkar": "📿 Adhkar", "mb_tracker": "✅ Tracker",
+           "tour_text": "✨ <b>There's more in the app</b>\n\n🧭 Qibla with a live compass\n📿 Tasbih and 🌅 morning & evening adhkar\n✅ Prayer tracker, streaks and challenges with friends\n📅 Calendar for the month and Ramadan\n🤲 Daily duas and the 99 Names of Allah\n\nOpen any section 👇",
+           "tb_qibla": "🧭 Qibla", "tb_tasbih": "📿 Tasbih", "tb_azkar": "🌅 Adhkar", "tb_tracker": "✅ Tracker", "tb_cal": "📅 Calendar", "tb_duas": "🤲 Duas",
+           "app_menu": "🕌 App"},
+    "ru": {"rb_morning": "🌅 Утренние азкары", "rb_evening": "🌙 Вечерние азкары", "rb_tracker": "✅ Отметить намазы за день",
+           "mb_azkar": "📿 Азкары", "mb_tracker": "✅ Трекер",
+           "tour_text": "✨ <b>В приложении есть ещё много полезного</b>\n\n🧭 Кибла с живым компасом\n📿 Тасбих и 🌅 утренние и вечерние азкары\n✅ Трекер намазов, серии и вызовы с друзьями\n📅 Календарь на месяц и Рамадан\n🤲 Дуа на каждый день и 99 имён Аллаха\n\nОткройте любой раздел 👇",
+           "tb_qibla": "🧭 Кибла", "tb_tasbih": "📿 Тасбих", "tb_azkar": "🌅 Азкары", "tb_tracker": "✅ Трекер", "tb_cal": "📅 Календарь", "tb_duas": "🤲 Дуа",
+           "app_menu": "🕌 Приложение"},
+    "uz": {"rb_morning": "🌅 Tong zikrlari", "rb_evening": "🌙 Kech zikrlari", "rb_tracker": "✅ Bugungi namozlarni belgilash",
+           "mb_azkar": "📿 Zikrlar", "mb_tracker": "✅ Kundalik",
+           "tour_text": "✨ <b>Ilovada yana ko'p foydali narsalar bor</b>\n\n🧭 Jonli kompasli qibla\n📿 Tasbeh va 🌅 tong va kech zikrlari\n✅ Namoz kundaligi, ketma-ketlik va do'stlar bilan musobaqalar\n📅 Oylik taqvim va Ramazon\n🤲 Har kunlik duolar va Allohning 99 ismi\n\nIstalgan bo'limni oching 👇",
+           "tb_qibla": "🧭 Qibla", "tb_tasbih": "📿 Tasbeh", "tb_azkar": "🌅 Zikrlar", "tb_tracker": "✅ Kundalik", "tb_cal": "📅 Taqvim", "tb_duas": "🤲 Duolar",
+           "app_menu": "🕌 Ilova"},
+    "tg": {"rb_morning": "🌅 Зикрҳои субҳ", "rb_evening": "🌙 Зикрҳои шом", "rb_tracker": "✅ Қайди намозҳои имрӯз",
+           "mb_azkar": "📿 Зикрҳо", "mb_tracker": "✅ Рӯйхат",
+           "tour_text": "✨ <b>Дар барнома боз чизҳои муфид зиёданд</b>\n\n🧭 Қибла бо компаси зинда\n📿 Тасбеҳ ва 🌅 зикрҳои субҳу шом\n✅ Рӯйхати намозҳо, силсила ва мусобиқа бо дӯстон\n📅 Тақвими моҳ ва Рамазон\n🤲 Дуоҳои ҳаррӯза ва 99 номи Аллоҳ\n\nҲар бахшро кушоед 👇",
+           "tb_qibla": "🧭 Қибла", "tb_tasbih": "📿 Тасбеҳ", "tb_azkar": "🌅 Зикрҳо", "tb_tracker": "✅ Рӯйхат", "tb_cal": "📅 Тақвим", "tb_duas": "🤲 Дуоҳо",
+           "app_menu": "🕌 Барнома"},
+    "ar": {"rb_morning": "🌅 أذكار الصباح", "rb_evening": "🌙 أذكار المساء", "rb_tracker": "✅ سجّل صلوات اليوم",
+           "mb_azkar": "📿 الأذكار", "mb_tracker": "✅ المتابعة",
+           "tour_text": "✨ <b>في التطبيق المزيد من الفوائد</b>\n\n🧭 القبلة مع بوصلة حيّة\n📿 التسبيح و🌅 أذكار الصباح والمساء\n✅ متابعة الصلوات والسلاسل وتحديات مع الأصدقاء\n📅 تقويم الشهر ورمضان\n🤲 أدعية يومية وأسماء الله الحسنى\n\nافتح أي قسم 👇",
+           "tb_qibla": "🧭 القبلة", "tb_tasbih": "📿 التسبيح", "tb_azkar": "🌅 الأذكار", "tb_tracker": "✅ المتابعة", "tb_cal": "📅 التقويم", "tb_duas": "🤲 الأدعية",
+           "app_menu": "🕌 التطبيق"},
+}
+for _l, _d in EXTRA8.items():
+    T[_l].update(_d)
+
 # ───────────────────────── Uzbek in Cyrillic ─────────────────────────
 # The Cyrillic Uzbek texts are produced from the Latin ones by the official spelling rules,
 # so both stay in sync. Words that the rules can't get right are listed in CYR_WORDS.
@@ -1052,6 +1083,8 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS azan TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_screen_msg BIGINT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS rem_msgs BIGINT[];
 ALTER TABLE users ADD COLUMN IF NOT EXISTS fast_show BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS tour_sent BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS menu_btn TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS suhoor_rem INT NOT NULL DEFAULT -1;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS iftar_rem INT NOT NULL DEFAULT -1;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS fast_sound BOOLEAN NOT NULL DEFAULT TRUE;
@@ -1502,6 +1535,12 @@ def screen_menu(u):
         [qibla_btn(u), btn(t(lang, "btn_rem_s_on" if u["remind"] else "btn_rem_s_off"), "m:toggle")],
         [btn(t(lang, "btn_settings"), "m:settings")],
     ]
+    if is_private(u) and WEBAPP_URL:  # quick ways into the app: adhkar, tracker, qibla
+        rows[1:2] = [[webapp_btn(t(lang, "mb_azkar"), "more&sub=azkar"), webapp_btn(t(lang, "mb_tracker"), "more&sub=tracker"),
+                      qibla_btn(u)],
+                     [btn(t(lang, "btn_rem_s_on" if u["remind"] else "btn_rem_s_off"), "m:toggle"),
+                      btn(t(lang, "btn_settings"), "m:settings")]]
+        rows = rows[:3]
     if kind(u) == "channel":
         rows.append([btn(t(lang, "btn_my_channels"), "ch:list"), btn(t(lang, "btn_my_menu"), "ch:exit")])
         return t(lang, "channel_menu_title", title=esc(u["title"] or "—"), city=esc(u["city"] or "—")), kb(*rows)
@@ -1955,6 +1994,8 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if act == "lang" and len(parts) > 1 and parts[1] in LANGS:
         await save(tid, lang=parts[1])
         u = await get_user(tid)
+        if is_private(u) and u["onboarded"]:
+            await sync_menu_button(ctx.bot, u)
         if u["onboarded"]:
             text, markup = screen_settings(u)
             return await render(update, text, markup)
@@ -2002,7 +2043,11 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         u = await get_user(tid)
         _, markup = screen_menu(u)
         text = t(lang, "remind_on", phrase=reminder_phrase(lang, u)) if on else t(lang, "remind_off")
-        return await render(update, text, markup)
+        shown = await render(update, text, markup)
+        if is_private(u):
+            await sync_menu_button(ctx.bot, u)
+            await send_tour(ctx.bot, u)
+        return shown
 
     # everything below needs a finished setup
     if not (u["madhab"] and u["city"] and u["tz"]):
@@ -3339,6 +3384,8 @@ async def api_settings(request):
         fields["onboarded"] = True
     await save(u["user_id"], **fields)
     u = await get_user(u["user_id"])
+    if "lang" in fields and u["onboarded"]:
+        asyncio.get_running_loop().create_task(sync_menu_button(request.app["bot"], u))
     return web.json_response({"ok": True, "profile": profile_json(u, u["lang"] or "en")})
 
 
@@ -4604,9 +4651,70 @@ BADGES = [("s7", "streak", 7), ("s30", "streak", 30), ("s100", "streak", 100),
           ("t100", "total", 100), ("t500", "total", 500), ("t1000", "total", 1000)]
 
 
+APP_HINT = {0: ("rb_morning", "more&sub=azkar&az=m"), 2: ("rb_evening", "more&sub=azkar&az=e"), 4: ("rb_tracker", "more&sub=tracker")}
+
+
 def prayed_markup(lang, day, idx, done=False):
     first = btn(t(lang, "btn_prayed_done"), "pr:ok") if done else btn(t(lang, "btn_prayed"), f"pr:{day}:{idx}")
-    return kb([first], [btn(t(lang, "btn_menu"), "m:new")])
+    rows = [[first]]
+    if WEBAPP_URL and idx in APP_HINT:  # Fajr → morning adhkar, Asr → evening adhkar, Isha → tracker
+        key, tab = APP_HINT[idx]
+        rows.append([webapp_btn(t(lang, key), tab)])
+    rows.append([btn(t(lang, "btn_menu"), "m:new")])
+    return kb(*rows)
+
+
+TOUR_DIR = Path(__file__).with_name("assets")
+TOUR_FILE_IDS = {}
+
+
+async def send_tour(bot, u):
+    """Once, right after the setup: what else is in the mini app, with buttons straight into each part."""
+    if not WEBAPP_URL or not is_private(u) or u["tour_sent"]:
+        return
+    lang = u["lang"]
+    await save(u["user_id"], tour_sent=True)
+    b = lambda k, tab: webapp_btn(t(lang, k), tab)  # noqa: E731
+    markup = kb([b("tb_qibla", "qibla"), b("tb_tasbih", "tasbih")],
+                [b("tb_azkar", "more&sub=azkar"), b("tb_tracker", "more&sub=tracker")],
+                [b("tb_cal", "cal"), b("tb_duas", "more&sub=duas")])
+    try:
+        img = TOUR_DIR / f"tour_{lang}.jpg"
+        if img.exists():
+            m = await bot.send_photo(u["user_id"], TOUR_FILE_IDS.get(lang) or img.read_bytes(), caption=t(lang, "tour_text"),
+                                     parse_mode=ParseMode.HTML, reply_markup=markup)
+            TOUR_FILE_IDS[lang] = m.photo[-1].file_id
+        else:
+            await bot.send_message(u["user_id"], t(lang, "tour_text"), parse_mode=ParseMode.HTML, reply_markup=markup)
+    except Exception:  # noqa: BLE001
+        log.exception("tour failed for %s", u["user_id"])
+
+
+async def sync_menu_button(bot, u):
+    """The button next to the message field, in the person's language."""
+    if not WEBAPP_URL or not u or not is_private(u) or not u["lang"]:
+        return
+    try:
+        await bot.set_chat_menu_button(chat_id=u["user_id"],
+                                       menu_button=MenuButtonWebApp(t(u["lang"], "app_menu"), WebAppInfo(url=WEBAPP_URL)))
+    except RetryAfter as e:
+        await asyncio.sleep(e.retry_after + 1)
+        return
+    except Exception:  # noqa: BLE001  (blocked the bot, deleted account…)
+        pass
+    await POOL.execute("UPDATE users SET menu_btn = $2 WHERE user_id = $1", u["user_id"], u["lang"])
+
+
+async def menu_buttons_job(context: ContextTypes.DEFAULT_TYPE):
+    """Little by little gives existing users the menu button in their language."""
+    try:
+        rows = await POOL.fetch("SELECT * FROM users WHERE chat_type = 'private' AND lang IS NOT NULL AND NOT blocked "
+                                "AND menu_btn IS DISTINCT FROM lang LIMIT 25")
+    except Exception:  # noqa: BLE001
+        return
+    for r in rows:
+        await sync_menu_button(context.bot, r)
+        await asyncio.sleep(0.2)
 
 
 async def on_prayed(update, ctx, parts):
@@ -5285,6 +5393,7 @@ def main():
     app.job_queue.run_repeating(refresh_cards, interval=60, first=40)
     app.job_queue.run_repeating(periodic, interval=600, first=90)
     app.job_queue.run_repeating(cleanup_job, interval=60, first=30)
+    app.job_queue.run_repeating(menu_buttons_job, interval=120, first=120)
     app.add_handler(InlineQueryHandler(on_inline), group=1)
     app.run_polling(drop_pending_updates=True)
 
