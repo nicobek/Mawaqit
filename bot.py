@@ -1732,7 +1732,7 @@ def screen_menu(u):
         if WEBAPP_URL:
             rows.insert(1, [webapp_btn(t(lang, "btn_app"), "today")])
         if ai_allowed_now(u["user_id"]):
-            rows.append([btn(t(lang, "ai_btn"), "ai:start")])
+            rows.append([InlineKeyboardButton(t(lang, "ai_btn"), callback_data="ai:start", style="primary")])
         if is_admin(u["user_id"]):
             rows.append([btn("🛠 Админка", "a:home")])
     return t(lang, "menu_title", city=esc(u["city"])), kb(*rows)
