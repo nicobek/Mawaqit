@@ -3598,51 +3598,149 @@ def _font(size, bold=False):
 
 
 def render_share(u, data, day_iso):
-    """A 1080×1920 story picture with the day's prayer times."""
-    from PIL import Image, ImageDraw
+    """A 1080×1920 story picture with the day's prayer times (night sky, mosque skyline, glass cards)."""
+    import random
+    from PIL import Image, ImageDraw, ImageFilter
     lang = u["lang"] or "en"
     rtl = lang == "ar"
     W, H = 1080, 1920
-    img = Image.new("RGB", (W, H), (12, 21, 38))
-    d = ImageDraw.Draw(img)
-    for y in range(H):  # soft vertical gradient
-        k = y / H
-        d.line([(0, y), (W, y)], fill=(int(12 + 14 * k), int(21 + 16 * k), int(38 + 26 * k)))
-    gold, white, hint, card = (212, 175, 55), (238, 242, 248), (150, 164, 186), (24, 38, 64)
+    gold, white, hint = (226, 190, 92), (244, 246, 250), (170, 180, 205)
 
-    def text(xy, s, font, fill, anchor="la"):
-        if rtl and anchor[0] == "l":
-            xy, anchor = (W - xy[0], xy[1]), "r" + anchor[1]
+    # sky: vertical gradient + soft glows + stars
+    img = Image.new("RGB", (W, H))
+    d = ImageDraw.Draw(img)
+    top, mid, bot_ = (10, 16, 40), (33, 24, 66), (14, 22, 44)
+    for y in range(H):
+        k = y / H
+        a, b, kk = (top, mid, k / 0.45) if k < 0.45 else (mid, bot_, (k - 0.45) / 0.55)
+        d.line([(0, y), (W, y)], fill=tuple(int(a[i] + (b[i] - a[i]) * kk) for i in range(3)))
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    g = ImageDraw.Draw(glow)
+    g.ellipse([W // 2 - 420, 40, W // 2 + 420, 760], fill=(226, 190, 92, 46))
+    g.ellipse([-300, 1100, 520, 1900], fill=(110, 70, 160, 60))
+    g.ellipse([700, 900, 1400, 1600], fill=(40, 120, 140, 40))
+    img.paste(glow.filter(ImageFilter.GaussianBlur(110)), (0, 0), glow.filter(ImageFilter.GaussianBlur(110)))
+    d = ImageDraw.Draw(img)
+    rnd = random.Random(7)
+    for _ in range(140):
+        x, y, r = rnd.randint(0, W), rnd.randint(0, 600), rnd.choice((1, 1, 1, 2, 2, 3))
+        if 120 < x < W - 120 and 310 < y < 590:  # keep the title area clean
+            continue
+        c = rnd.randint(150, 255)
+        d.ellipse([x - r, y - r, x + r, y + r], fill=(c, c, min(255, c + 10)))
+
+    # crescent with a soft halo
+    halo = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(halo).ellipse([W // 2 - 130, 70, W // 2 + 130, 330], fill=(226, 190, 92, 90))
+    halo = halo.filter(ImageFilter.GaussianBlur(40))
+    img.paste(halo, (0, 0), halo)
+    d = ImageDraw.Draw(img)
+    cx, cy, r = W // 2, 200, 82
+    moon = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    md = ImageDraw.Draw(moon)
+    md.ellipse([cx - r, cy - r, cx + r, cy + r], fill=gold + (255,))
+    md.ellipse([cx - r + 44, cy - r - 22, cx + r + 44, cy + r - 22], fill=(0, 0, 0, 0))
+    img.paste(moon, (0, 0), moon)
+    d = ImageDraw.Draw(img)
+    d.polygon([(cx + 70, 128), (cx + 78, 150), (cx + 101, 150), (cx + 83, 164), (cx + 90, 186), (cx + 70, 173),
+               (cx + 50, 186), (cx + 57, 164), (cx + 39, 150), (cx + 62, 150)], fill=gold)
+
+    def text(xy, s, font, fill, anchor="mm"):
         kw = {"direction": "rtl"} if rtl and any("؀" <= ch <= "ۿ" for ch in s) else {}
         try:
             d.text(xy, s, font=font, fill=fill, anchor=anchor, **kw)
-        except Exception:  # noqa: BLE001  (no RAQM: draw without direction)
+        except Exception:  # noqa: BLE001
             d.text(xy, s, font=font, fill=fill, anchor=anchor)
 
-    # crescent
-    d.ellipse([W // 2 - 70, 150, W // 2 + 70, 290], fill=gold)
-    d.ellipse([W // 2 - 38, 132, W // 2 + 92, 262], fill=(13, 22, 40))
-    text((W // 2, 360), t(lang, "times_title").replace("🕌 ", "").replace("<b>", "").replace("</b>", ""),
-         _font(72, True), white, "mm")
-    text((W // 2, 450), u["city"] or "", _font(44), gold, "mm")
+    title = t(lang, "times_title").replace("🕌 ", "").replace("<b>", "").replace("</b>", "")
+    text((W // 2, 375), title, _font(76, True), white)
+    text((W // 2, 455), u["city"] or "", _font(44, True), gold)
     y0, m0, dd = (int(x) for x in day_iso.split("-"))
     hij = f"{data['hday']} {HM[lang][data['hmonth'] - 1]} {data['hyear']}"
-    text((W // 2, 520), f"{dd:02d}.{m0:02d}.{y0} · {hij}", _font(36), hint, "mm")
+    pill = f"{dd:02d}.{m0:02d}.{y0}  ·  {hij}"
+    f = _font(34)
+    pw = d.textlength(pill, font=f) + 70
+    d.rounded_rectangle([W // 2 - pw / 2, 500, W // 2 + pw / 2, 566], radius=33, outline=(226, 190, 92), width=2)
+    text((W // 2, 533), pill, f, hint)
 
+    # mosque skyline (domes and minarets) along the horizon behind the cards
+    sky = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(sky)
+    base, col = 830, (226, 190, 92, 44)
+    sd.rectangle([0, base - 30, W, base], fill=col)
+
+    def dome(cx_, w, h):  # body + onion dome + crescent tip
+        sd.rectangle([cx_ - w / 2, base - h * 0.45, cx_ + w / 2, base], fill=col)
+        sd.ellipse([cx_ - w * 0.42, base - h, cx_ + w * 0.42, base - h * 0.3], fill=col)
+        sd.polygon([(cx_ - w * 0.12, base - h * 0.93), (cx_ + w * 0.12, base - h * 0.93), (cx_, base - h - 34)], fill=col)
+        sd.rectangle([cx_ - 3, base - h - 52, cx_ + 3, base - h - 26], fill=col)
+
+    def minaret(mx, mh):
+        sd.rectangle([mx - 14, base - mh, mx + 14, base], fill=col)
+        sd.rectangle([mx - 22, base - mh * 0.62, mx + 22, base - mh * 0.62 + 14], fill=col)
+        sd.rectangle([mx - 20, base - mh * 0.9, mx + 20, base - mh * 0.9 + 12], fill=col)
+        sd.polygon([(mx - 18, base - mh), (mx + 18, base - mh), (mx, base - mh - 56)], fill=col)
+
+    dome(150, 170, 120)
+    dome(395, 210, 165)
+    dome(W // 2 + 40, 300, 215)
+    dome(935, 190, 135)
+    for mx, mh in ((40, 150), (270, 205), (720, 225), (1045, 170)):
+        minaret(mx, mh)
+    img.paste(sky, (0, 0), sky)
+    d = ImageDraw.Draw(img)
+
+    # glass cards
     names = PN[lang]
-    top = 620
+    icons_y, top_y, step, ch = [], 850, 150, 124
+    card_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    cd = ImageDraw.Draw(card_layer)
     for i, key in enumerate(("Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha")):
-        y = top + i * 170
-        d.rounded_rectangle([90, y, W - 90, y + 140], radius=36, fill=card)
-        if key != "Sunrise":
-            d.rounded_rectangle([90, y, 104, y + 140], radius=7, fill=gold)
-        text((150, y + 70), names[key.lower()], _font(52, True), white, "lm")
-        if rtl:
-            d.text((150, y + 70), data[key], font=_font(60, True), fill=gold, anchor="lm")
+        y = top_y + i * step
+        cd.rounded_rectangle([80, y, W - 80, y + ch], radius=40, fill=(255, 255, 255, 20 if key == "Sunrise" else 30),
+                             outline=(255, 255, 255, 45), width=2)
+        icons_y.append(y)
+    img.paste(card_layer, (0, 0), card_layer)
+    d = ImageDraw.Draw(img)
+
+    def icon(kind, x, y):  # little drawn symbols: sun, half sun, moon
+        import math as _m
+        if kind == "sun":
+            d.ellipse([x - 20, y - 20, x + 20, y + 20], fill=gold)
+            for k in range(8):
+                a = _m.pi * k / 4
+                d.line([(x + 28 * _m.cos(a), y + 28 * _m.sin(a)), (x + 37 * _m.cos(a), y + 37 * _m.sin(a))], fill=gold, width=5)
+        elif kind == "half":  # the sun on the horizon
+            hy = y + 10
+            d.pieslice([x - 21, hy - 21, x + 21, hy + 21], 180, 360, fill=gold)
+            for k in range(5):
+                a = _m.pi + _m.pi * (k + 0.5) / 5
+                d.line([(x + 28 * _m.cos(a), hy + 28 * _m.sin(a)), (x + 37 * _m.cos(a), hy + 37 * _m.sin(a))], fill=gold, width=5)
+            d.line([(x - 34, hy + 2), (x + 34, hy + 2)], fill=gold, width=4)
         else:
-            d.text((W - 150, y + 70), data[key], font=_font(60, True), fill=gold, anchor="rm")
+            d.ellipse([x - 24, y - 24, x + 24, y + 24], fill=gold)
+            d.ellipse([x - 12, y - 32, x + 34, y + 14], fill=(40, 34, 74))
+
+    kinds = {"Fajr": "moon", "Sunrise": "half", "Dhuhr": "sun", "Asr": "sun", "Maghrib": "half", "Isha": "moon"}
+    for i, key in enumerate(("Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha")):
+        y = icons_y[i] + ch // 2
+        ix = W - 170 if rtl else 170
+        d.ellipse([ix - 46, y - 46, ix + 46, y + 46], fill=(40, 34, 74), outline=(226, 190, 92), width=2)
+        icon(kinds[key], ix, y)
+        name_col = hint if key == "Sunrise" else white
+        if rtl:
+            text((W - 250, y), names[key.lower()], _font(52, True), name_col, "rm")
+            d.text((150, y), data[key], font=_font(64, True), fill=gold if key != "Sunrise" else hint, anchor="lm")
+        else:
+            text((250, y), names[key.lower()], _font(52, True), name_col, "lm")
+            d.text((W - 150, y), data[key], font=_font(64, True), fill=gold if key != "Sunrise" else hint, anchor="rm")
+
     if BOT_USERNAME:
-        d.text((W // 2, H - 120), f"@{BOT_USERNAME}", font=_font(40, True), fill=hint, anchor="mm")
+        f = _font(40, True)
+        label = f"@{BOT_USERNAME}"
+        tw = d.textlength(label, font=f) + 90
+        d.rounded_rectangle([W // 2 - tw / 2, H - 150, W // 2 + tw / 2, H - 70], radius=40, fill=gold)
+        d.text((W // 2, H - 110), label, font=f, fill=(30, 22, 6), anchor="mm")
     buf = io.BytesIO()
     img.save(buf, "PNG", optimize=True)
     return buf.getvalue()
