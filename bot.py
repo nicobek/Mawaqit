@@ -4178,13 +4178,19 @@ def ayah_parts(a, lang):
         elif lang == "uzc" and not is_cyr:
             tr = to_cyr(tr)
     num = f"{a['s']}:{a['a']}"
+    ar = a["ar"]
+    if "۝" in ar:  # between verses: the verse number in ornate brackets (the ۝ sign is missing in many fonts)
+        first = int(str(a["a"]).split("–")[0])
+        digits = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
+        bits = [x.strip() for x in ar.split("۝")]
+        ar = " ".join(f"{b} ﴿{str(first + k).translate(digits)}﴾" if k < len(bits) - 1 else b for k, b in enumerate(bits))
     if lang == "ar":
         ref = f"{a['ar_name']} · {num}"
     elif lang in ("ru", "tg", "uzc"):
         ref = f"{t(lang, 'quran')} · {name_cyr(a['name'])} {num}"
     else:
         ref = f"{t(lang, 'quran')} · {a['name']} {num}"
-    return a["ar"], tr, ref
+    return ar, tr, ref
 
 
 async def screen_ayah(u, day=None):

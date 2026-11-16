@@ -56,7 +56,7 @@ def fix_text(s):
 
 
 def strip_marks(s):
-    return "".join(ch for ch in s if not ("ۖ" <= ch <= "ۭ"))
+    return "".join(ch for ch in s if not ("ۖ" <= ch <= "ۭ")).replace("﴿", "(").replace("﴾", ")")
 
 
 def shape(s):
