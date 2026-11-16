@@ -1,4 +1,6 @@
 python-telegram-bot[job-queue]>=21.6,<22
 asyncpg>=0.29
 httpx
+aiohttp>=3.9
+Pillow>=10.1
 tzdata

@@ -8,31 +8,41 @@ Env vars:
   BOT_TOKEN     - token from @BotFather
   DATABASE_URL  - PostgreSQL URL (Railway sets it for you)
   ADMIN_ID      - your Telegram user ID (enables the admin panel)
+  WEBAPP_URL    - (optional) mini app address; on Railway it is detected automatically
   CONTACT       - (optional) your email/@username, sent to the geocoder as required by its usage policy
 """
 import asyncio
 import csv
+import hashlib
+import hmac
 import html
 import io
+import json
 import logging
 import math
 import os
 import time as _time
 from collections import deque
 from datetime import datetime, time as dtime, timedelta
+from pathlib import Path
+from urllib.parse import parse_qsl
 from zoneinfo import ZoneInfo
 
 import asyncpg
 import httpx
+from aiohttp import web
 from telegram import (
     BotCommand,
     ForceReply,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
+    MenuButtonCommands,
+    MenuButtonWebApp,
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
     Update,
+    WebAppInfo,
 )
 from telegram.constants import ParseMode
 from telegram.error import BadRequest, Forbidden, RetryAfter
@@ -93,7 +103,7 @@ LANG_PICK_TEXT = (
 
 EVENTS = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]  # prayers that get reminders
 ROWS = [("Fajr", "🌌"), ("Sunrise", "🌅"), ("Dhuhr", "☀️"), ("Asr", "🌤"), ("Maghrib", "🌇"), ("Isha", "🌙")]
-LEAD_OPTIONS = [0, 5, 10, 15, 30]
+LEAD_OPTIONS = [5, 10, 15, 30, 0]  # 0 = no early reminder
 QUIET_PRESETS = [(23, 4), (22, 5), (0, 5)]
 DEFAULT_LEAD = 10
 KAABA = (21.4225, 39.8262)
@@ -571,6 +581,41 @@ EXTRA = {
 for _l, _d in EXTRA.items():
     T[_l].update(_d)
 
+EXTRA2 = {
+    "en": {"lead_none": "Don't remind early",
+           "phrase_both": "{n} minutes before each prayer and at prayer time",
+           "phrase_off": "— reminders are turned off in ⚙️ Settings",
+           "btn_at_on": "🕌 At prayer time: ON ✅", "btn_at_off": "🕌 At prayer time: OFF ❌",
+           "btn_app": "📱 Open the app", "btn_compass": "🧭 Live compass",
+           "qibla_img_hint": "📱 Hold your phone flat and turn it so that <b>N</b> points north — the gold arrow shows the Qibla."},
+    "ru": {"lead_none": "Не напоминать заранее",
+           "phrase_both": "за {n} минут до каждой молитвы и в момент азана",
+           "phrase_off": "— напоминания выключены в ⚙️ Настройках",
+           "btn_at_on": "🕌 В момент намаза: ВКЛ ✅", "btn_at_off": "🕌 В момент намаза: ВЫКЛ ❌",
+           "btn_app": "📱 Открыть приложение", "btn_compass": "🧭 Живой компас",
+           "qibla_img_hint": "📱 Положите телефон ровно и поверните так, чтобы <b>N</b> смотрела на север — золотая стрелка покажет Киблу."},
+    "uz": {"lead_none": "Oldindan eslatmaslik",
+           "phrase_both": "har bir namozdan {n} daqiqa oldin va namoz vaqti kirganda",
+           "phrase_off": "— eslatmalar ⚙️ Sozlamalarda o'chirilgan",
+           "btn_at_on": "🕌 Namoz vaqtida: YOQILGAN ✅", "btn_at_off": "🕌 Namoz vaqtida: O'CHIQ ❌",
+           "btn_app": "📱 Ilovani ochish", "btn_compass": "🧭 Jonli kompas",
+           "qibla_img_hint": "📱 Telefonni tekis ushlang va <b>N</b> shimolga qaraydigan qilib buring — oltin strelka Qiblani ko'rsatadi."},
+    "tg": {"lead_none": "Пешакӣ ёдрас накардан",
+           "phrase_both": "{n} дақиқа пеш аз ҳар намоз ва ҳангоми дохилшавии вақти он",
+           "phrase_off": "— ёдовариҳо дар ⚙️ Танзимот хомӯшанд",
+           "btn_at_on": "🕌 Дар вақти намоз: ФАЪОЛ ✅", "btn_at_off": "🕌 Дар вақти намоз: ХОМӮШ ❌",
+           "btn_app": "📱 Кушодани барнома", "btn_compass": "🧭 Компаси зинда",
+           "qibla_img_hint": "📱 Телефонро рост нигоҳ доред ва тавре гардонед, ки <b>N</b> ба шимол нигарад — тирчаи тиллоӣ қибларо нишон медиҳад."},
+    "ar": {"lead_none": "لا تذكير مسبق",
+           "phrase_both": "قبل كل صلاة بـ {n} دقيقة وعند دخول وقتها",
+           "phrase_off": "— التذكيرات متوقفة في ⚙️ الإعدادات",
+           "btn_at_on": "🕌 عند دخول الوقت: مفعّل ✅", "btn_at_off": "🕌 عند دخول الوقت: متوقف ❌",
+           "btn_app": "📱 فتح التطبيق", "btn_compass": "🧭 بوصلة حية",
+           "qibla_img_hint": "📱 ضع هاتفك بشكل مستوٍ وأدره حتى يشير <b>N</b> إلى الشمال — السهم الذهبي يشير إلى القبلة."},
+}
+for _l, _d in EXTRA2.items():
+    T[_l].update(_d)
+
 GROUP_WELCOME = ("🕌 <b>Assalamu alaikum!</b>\n\n"
                  "I'll post prayer times and reminders here. Group admins, please set me up 👇\n\n" + LANG_PICK_TEXT)
 
@@ -585,11 +630,16 @@ def esc(s):
 
 
 def lead_label(lang, n):
-    return t(lang, "lead_0") if n == 0 else t(lang, "lead_n", n=n)
+    return t(lang, "lead_none") if n == 0 else t(lang, "lead_n", n=n)
 
 
-def lead_phrase(lang, n):
-    return t(lang, "phrase_0") if n == 0 else t(lang, "phrase_n", n=n)
+def reminder_phrase(lang, u):
+    n, at = u["lead_min"], u["at_time"]
+    if n and at:
+        return t(lang, "phrase_both", n=n)
+    if n:
+        return t(lang, "phrase_n", n=n)
+    return t(lang, "phrase_0") if at else t(lang, "phrase_off")
 
 
 def quiet_label(lang, qs, qe):
@@ -630,6 +680,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS title     TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS owner_id  BIGINT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS members   INT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS daily     TEXT NOT NULL DEFAULT 'off';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS at_time   BOOLEAN NOT NULL DEFAULT TRUE;
 CREATE TABLE IF NOT EXISTS daily_stats (
     stat_day   DATE NOT NULL,
     stat_key   TEXT NOT NULL,
@@ -781,14 +832,13 @@ async def render(update: Update, text, markup=None):
     if q:
         try:
             await q.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
-            return
+            return q.message
         except BadRequest as e:
             if "not modified" in str(e).lower():
-                return
+                return q.message
             log.warning("edit failed (%s), sending new message", e)
-        await update.effective_chat.send_message(text, parse_mode=ParseMode.HTML, reply_markup=markup)
-    else:
-        await update.effective_message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
+        return await update.effective_chat.send_message(text, parse_mode=ParseMode.HTML, reply_markup=markup)
+    return await update.effective_message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
 
 
 async def ensure_chat(chat, ctype, owner_id=None):
@@ -875,12 +925,16 @@ async def show_city_prompt(update, ctx, u):
                 await q.message.delete()
             except Exception:  # noqa: BLE001
                 pass
-        await update.effective_chat.send_message(
+        m = await update.effective_chat.send_message(
             t(lang, "group_ask_city"), parse_mode=ParseMode.HTML,
             reply_markup=ForceReply(input_field_placeholder=t(lang, "city_ph")))
+        await remember_prompt(update, ctx, m)
         return
     text, markup = screen_city(u)
-    await render(update, text, markup)
+    await remember_prompt(update, ctx, await render(update, text, markup))
+    old_helper = ctx.user_data.pop("loc_msg", None)
+    if old_helper:
+        await drop_message(update, old_helper)
     helper = await update.effective_chat.send_message(
         t(lang, "loc_hint"),
         reply_markup=ReplyKeyboardMarkup(
@@ -888,6 +942,29 @@ async def show_city_prompt(update, ctx, u):
             resize_keyboard=True, one_time_keyboard=True),
     )
     ctx.user_data["loc_msg"] = helper.message_id
+
+
+async def remember_prompt(update, ctx, msg):
+    """Keep the id of the city question so it can be removed once the city is set."""
+    old = ctx.chat_data.get("city_prompt")
+    if old and msg is not None and old != msg.message_id:
+        await drop_message(update, old)
+    if msg is not None:
+        ctx.chat_data["city_prompt"] = msg.message_id
+
+
+async def drop_message(update, mid):
+    try:
+        await update.effective_chat.delete_message(mid)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+async def cleanup_city_prompt(update, ctx):
+    mid = ctx.chat_data.pop("city_prompt", None)
+    q = update.callback_query
+    if mid and not (q and q.message and q.message.message_id == mid):  # never delete the message we edit next
+        await drop_message(update, mid)
 
 
 async def cleanup_loc_kb(update, ctx):
@@ -917,11 +994,18 @@ def add_channel_btn(lang):
                                 url=f"https://t.me/{BOT_USERNAME}?startchannel&admin=post_messages")
 
 
+def qibla_btn(u):
+    lang = u["lang"]
+    if is_private(u) and WEBAPP_URL:
+        return webapp_btn(t(lang, "btn_qibla"), "qibla")  # live compass
+    return btn(t(lang, "btn_qibla"), "m:qibla")  # compass picture
+
+
 def screen_menu(u):
     lang = u["lang"]
     rows = [
         [btn(t(lang, "btn_times"), "m:times")],
-        [btn(t(lang, "btn_qibla"), "m:qibla")],
+        [qibla_btn(u)],
         [btn(t(lang, "btn_rem_on" if u["remind"] else "btn_rem_off"), "m:toggle")],
         [btn(t(lang, "btn_settings"), "m:settings")],
     ]
@@ -929,6 +1013,8 @@ def screen_menu(u):
         rows.append([btn(t(lang, "btn_my_channels"), "ch:list"), btn(t(lang, "btn_my_menu"), "ch:exit")])
         return t(lang, "channel_menu_title", title=esc(u["title"] or "—"), city=esc(u["city"] or "—")), kb(*rows)
     if is_private(u):
+        if WEBAPP_URL:
+            rows.insert(0, [webapp_btn(t(lang, "btn_app"), "today")])
         rows.append([add_group_btn(lang), add_channel_btn(lang)])
         rows.append([btn(t(lang, "btn_my_channels"), "ch:list")])
         if is_admin(u["user_id"]):
@@ -953,6 +1039,7 @@ def screen_settings(u):
         [btn(t(lang, "btn_city"), "s:city")],
         [btn(t(lang, "btn_lang"), "s:lang"), btn(t(lang, "btn_madhab"), "s:madhab")],
         [btn(t(lang, "btn_lead"), "s:lead")],
+        [btn(t(lang, "btn_at_on" if u["at_time"] else "btn_at_off"), "s:attime")],
         [btn(t(lang, "btn_quiet"), "s:quiet")],
         [btn(t(lang, "btn_ram_on" if u["ramadan"] else "btn_ram_off"), "s:ramadan")],
     ]
@@ -991,18 +1078,6 @@ def screen_daily(u):
     return t(lang, "daily_title"), kb(*rows)
 
 
-def screen_qibla(u):
-    lang = u["lang"]
-    deg = qibla_bearing(u["lat"], u["lon"])
-    arrow = ARROWS[int((deg + 22.5) // 45) % 8]
-    text = t(lang, "qibla", city=esc(u["city"]), arrow=arrow, deg=round(deg))
-    markup = kb(
-        [InlineKeyboardButton(t(lang, "btn_kaaba"), url=f"https://maps.google.com/?q={KAABA[0]},{KAABA[1]}")],
-        [btn(t(lang, "btn_menu"), "m:home")],
-    )
-    return text, markup
-
-
 async def screen_times(u, onboarding=False):
     lang = u["lang"]
     tz = ZoneInfo(u["tz"])
@@ -1039,7 +1114,7 @@ async def screen_times(u, onboarding=False):
     lines += ["", t(lang, "next_line", name=names[nxt[0].lower()], left=fmt_left(lang, minutes))]
 
     markup = None if onboarding else kb(
-        [btn(t(lang, "btn_qibla"), "m:qibla")],
+        [qibla_btn(u)],
         [btn(t(lang, "btn_menu"), "m:home")],
     )
     return "\n".join(lines), markup
@@ -1048,7 +1123,7 @@ async def screen_times(u, onboarding=False):
 async def ask_remind(update, u):
     lang = u["lang"]
     await update.effective_chat.send_message(
-        t(lang, "ask_remind", phrase=lead_phrase(lang, u["lead_min"])),
+        t(lang, "ask_remind", phrase=reminder_phrase(lang, u)),
         parse_mode=ParseMode.HTML,
         reply_markup=kb([btn(t(lang, "btn_yes"), "rem:yes")], [btn(t(lang, "btn_no"), "rem:no")]),
     )
@@ -1088,6 +1163,7 @@ async def apply_location(update, ctx, u, name, lat, lon, cc):
     await save(tid, city=name, lat=lat, lon=lon, country=cc, tz=data["tz"], awaiting_city=False)
     u = await get_user(tid)
     await cleanup_loc_kb(update, ctx)
+    await cleanup_city_prompt(update, ctx)
     onboarding = not u["onboarded"]
     text, markup = await screen_times(u, onboarding)
     await render(update, text, markup)
@@ -1249,7 +1325,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await save(tid, remind=on, onboarded=True)
         u = await get_user(tid)
         _, markup = screen_menu(u)
-        text = t(lang, "remind_on", phrase=lead_phrase(lang, u["lead_min"])) if on else t(lang, "remind_off")
+        text = t(lang, "remind_on", phrase=reminder_phrase(lang, u)) if on else t(lang, "remind_off")
         return await render(update, text, markup)
 
     # everything below needs a finished setup
@@ -1265,7 +1341,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 log.exception("times failed")
                 text, markup = t(lang, "error"), screen_menu(u)[1]
         elif sub == "qibla":
-            text, markup = screen_qibla(u)
+            return await send_qibla_image(update, u)
         elif sub == "toggle":
             await save(tid, remind=not u["remind"], onboarded=True)
             text, markup = screen_menu(await get_user(tid))
@@ -1293,6 +1369,9 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             text, markup = screen_quiet(u)
         elif sub == "daily" and not is_private(u):
             text, markup = screen_daily(u)
+        elif sub == "attime":
+            await save(tid, at_time=not u["at_time"])
+            text, markup = screen_settings(await get_user(tid))
         elif sub == "ramadan":
             await save(tid, ramadan=not u["ramadan"])
             text, markup = screen_settings(await get_user(tid))
@@ -1564,26 +1643,30 @@ async def process_user(bot, u):
     for key in EVENTS:
         hh, mm = map(int, data[key].split(":"))
         event_time = datetime.combine(d, dtime(hh, mm), tzinfo=tz)
-        remind_at = event_time - timedelta(minutes=u["lead_min"])
-        if not due(now, remind_at):
-            continue
-        sk = (u["user_id"], d.isoformat(), key)
-        if sk in SENT:
-            continue
-        SENT[sk] = _time.time()
-        if in_quiet(remind_at.hour, u["quiet_start"], u["quiet_end"]):
-            continue
-        if key == "Dhuhr" and d.weekday() == 4:
-            kind_ = "jumah"
-        elif ramadan and key == "Fajr":
-            kind_ = "fajr_ram"
-        elif ramadan and key == "Maghrib":
-            kind_ = "iftar"
-        else:
-            kind_ = "std"
-        tmpl = f"rem_{kind_}_{'n' if u['lead_min'] == 0 else 'b'}"
-        text = t(lang, tmpl, name=PN[lang][key.lower()], n=u["lead_min"], time=data[key])
-        await send_reminder(bot, u, text)
+        plan = []  # two reminders: "b" = before, "n" = now
+        if u["lead_min"] > 0:
+            plan.append(("b", event_time - timedelta(minutes=u["lead_min"])))
+        if u["at_time"]:
+            plan.append(("n", event_time))
+        for suffix, when in plan:
+            if not due(now, when):
+                continue
+            sk = (u["user_id"], d.isoformat(), key, suffix)
+            if sk in SENT:
+                continue
+            SENT[sk] = _time.time()
+            if in_quiet(when.hour, u["quiet_start"], u["quiet_end"]):
+                continue
+            if key == "Dhuhr" and d.weekday() == 4:
+                kind_ = "jumah"
+            elif ramadan and key == "Fajr":
+                kind_ = "fajr_ram"
+            elif ramadan and key == "Maghrib":
+                kind_ = "iftar"
+            else:
+                kind_ = "std"
+            text = t(lang, f"rem_{kind_}_{suffix}", name=PN[lang][key.lower()], n=u["lead_min"], time=data[key])
+            await send_reminder(bot, u, text)
 
 
 async def tick(context: ContextTypes.DEFAULT_TYPE):
@@ -1619,7 +1702,7 @@ async def tick(context: ContextTypes.DEFAULT_TYPE):
 # One admin (ADMIN_ID). The admin UI is in Russian and fully button-driven.
 
 ADMIN_BACK = [btn("⬅️ Назад", "a:home")]
-CSV_COLUMNS = ("user_id", "chat_type", "title", "owner_id", "members", "lang", "madhab", "city", "country", "tz", "remind", "lead_min", "quiet_start",
+CSV_COLUMNS = ("user_id", "chat_type", "title", "owner_id", "members", "lang", "madhab", "city", "country", "tz", "remind", "lead_min", "at_time", "quiet_start",
                "quiet_end", "ramadan", "onboarded", "banned", "blocked", "created_at", "last_seen")
 MADHAB_RU = {"std": "Шафиитский / Маликитский / Ханбалитский", "hanafi": "Ханафитский"}
 
@@ -1769,7 +1852,7 @@ async def user_card(uid):
     if not r:
         return None
     u = dict(r)
-    lead = "в момент азана" if u["lead_min"] == 0 else f"за {u['lead_min']} мин"
+    lead = (f"за {u['lead_min']} мин" if u["lead_min"] else "без заранее") + (" + в момент азана" if u["at_time"] else "")
     quiet = "выкл" if u["quiet_start"] is None else f"{u['quiet_start']:02d}:00–{u['quiet_end']:02d}:00"
     kind_ru = {"private": "👤 Пользователь", "group": "👥 Группа", "channel": "📢 Канал"}.get(u["chat_type"], "👤")
     extra = "" if u["chat_type"] == "private" else (
@@ -2097,6 +2180,257 @@ async def cmd_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await render(update, text, markup)
 
 
+# ───────────────────────── mini app: web server + API ─────────────────────────
+# Railway gives the service a public address when you press "Generate Domain" and passes it
+# to the bot as RAILWAY_PUBLIC_DOMAIN. WEBAPP_URL can override it. Without either, the bot
+# simply hides the app buttons and shows the compass picture instead.
+
+PUBLIC_DOMAIN = os.getenv("RAILWAY_PUBLIC_DOMAIN", "")
+WEBAPP_URL = (os.getenv("WEBAPP_URL") or (f"https://{PUBLIC_DOMAIN}" if PUBLIC_DOMAIN else "")).rstrip("/")
+WEBAPP_FILE = Path(__file__).with_name("webapp.html")
+WEB_RUNNER = None
+MONTH_CACHE = {}
+TIMING_KEYS = ("Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha")
+
+
+def webapp_btn(text, tab="today"):
+    return InlineKeyboardButton(text, web_app=WebAppInfo(url=f"{WEBAPP_URL}/?tab={tab}"))
+
+
+def check_init_data(init_data):
+    """Validate Telegram Mini App initData (HMAC signed with the bot token). Returns the user dict."""
+    if not init_data:
+        return None
+    try:
+        pairs = dict(parse_qsl(init_data, keep_blank_values=True, strict_parsing=True))
+    except ValueError:
+        return None
+    their = pairs.pop("hash", None)
+    if not their:
+        return None
+    check = "\n".join(f"{k}={v}" for k, v in sorted(pairs.items()))
+    secret = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+    ours = hmac.new(secret, check.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(ours, their):
+        return None
+    try:
+        if _time.time() - int(pairs.get("auth_date", "0")) > 7 * 86400:
+            return None
+        user = json.loads(pairs.get("user", "{}"))
+    except (ValueError, TypeError):
+        return None
+    return user if isinstance(user, dict) and "id" in user else None
+
+
+async def api_auth(request):
+    tg_user = check_init_data(request.headers.get("X-Init-Data", ""))
+    if not tg_user:
+        raise web.HTTPUnauthorized(text="bad initData")
+    u = await get_user(int(tg_user["id"]))
+    lang = (u or {}).get("lang") or str(tg_user.get("language_code") or "en")[:2]
+    return tg_user, u, (lang if lang in LANGS else "en")
+
+
+async def fetch_month(u, y, m):
+    method, school = method_for(u["country"]), (1 if u["madhab"] == "hanafi" else 0)
+    key = (round(u["lat"], 2), round(u["lon"], 2), method, school, y, m)
+    if key in MONTH_CACHE:
+        return MONTH_CACHE[key]
+    async with SEM:
+        r = await HTTP.get(f"https://api.aladhan.com/v1/calendar/{y}/{m}",
+                           params={"latitude": u["lat"], "longitude": u["lon"], "method": method, "school": school})
+    r.raise_for_status()
+    days = []
+    for item in r.json()["data"]:
+        g, h, tm = item["date"]["gregorian"], item["date"]["hijri"], item["timings"]
+        days.append({"date": g["date"], "day": int(g["day"]), "wd": g["weekday"]["en"][:3],
+                     "hday": int(h["day"]), "hmonth": int(h["month"]["number"]), "hyear": int(h["year"]),
+                     "t": {k: tm[k].split()[0] for k in TIMING_KEYS}})
+    if len(MONTH_CACHE) > 400:
+        MONTH_CACHE.clear()
+    MONTH_CACHE[key] = days
+    return days
+
+
+async def fetch_hijri_month(u, hy, hm):
+    method, school = method_for(u["country"]), (1 if u["madhab"] == "hanafi" else 0)
+    key = ("h", round(u["lat"], 2), round(u["lon"], 2), method, school, hy, hm)
+    if key in MONTH_CACHE:
+        return MONTH_CACHE[key]
+    async with SEM:
+        r = await HTTP.get(f"https://api.aladhan.com/v1/hijriCalendar/{hy}/{hm}",
+                           params={"latitude": u["lat"], "longitude": u["lon"], "method": method, "school": school})
+    r.raise_for_status()
+    days = []
+    for item in r.json()["data"]:
+        g, h, tm = item["date"]["gregorian"], item["date"]["hijri"], item["timings"]
+        days.append({"date": g["date"], "hday": int(h["day"]),
+                     "t": {k: tm[k].split()[0] for k in TIMING_KEYS}})
+    MONTH_CACHE[key] = days
+    return days
+
+
+def profile_json(u, lang):
+    return {"lang": lang, "city": u["city"], "lat": u["lat"], "lon": u["lon"], "tz": u["tz"],
+            "madhab": u["madhab"], "country": u["country"], "lead": u["lead_min"], "at_time": u["at_time"]}
+
+
+async def api_me(request):
+    tg_user, u, lang = await api_auth(request)
+    if not u or not (u["city"] and u["tz"] and u["madhab"]):
+        return web.json_response({"ok": True, "need_setup": True, "lang": lang, "bot": BOT_USERNAME})
+    try:
+        now = datetime.now(ZoneInfo(u["tz"]))
+        today = await get_timings(u, now.date())
+        tomorrow = await get_timings(u, now.date() + timedelta(days=1))
+        month = await fetch_month(u, now.year, now.month)
+    except Exception:  # noqa: BLE001
+        log.exception("api_me failed")
+        return web.json_response({"ok": False, "error": "timings"}, status=502)
+    return web.json_response({
+        "ok": True, "need_setup": False, "bot": BOT_USERNAME, "profile": profile_json(u, lang),
+        "today": {"date": now.date().isoformat(), "t": {k: today[k] for k in TIMING_KEYS},
+                  "hday": today["hday"], "hmonth": today["hmonth"], "hyear": today["hyear"]},
+        "tomorrow": {"t": {k: tomorrow[k] for k in TIMING_KEYS}},
+        "month": {"y": now.year, "m": now.month, "days": month},
+    })
+
+
+async def api_month(request):
+    _, u, _ = await api_auth(request)
+    if not u or not u["city"]:
+        raise web.HTTPBadRequest(text="no city")
+    try:
+        y, m = int(request.query["y"]), int(request.query["m"])
+        if not (2000 <= y <= 2100 and 1 <= m <= 12):
+            raise ValueError
+    except (KeyError, ValueError):
+        raise web.HTTPBadRequest(text="bad month")
+    try:
+        days = await fetch_month(u, y, m)
+    except Exception:  # noqa: BLE001
+        log.exception("api_month failed")
+        return web.json_response({"ok": False}, status=502)
+    return web.json_response({"ok": True, "y": y, "m": m, "days": days})
+
+
+async def api_ramadan(request):
+    _, u, _ = await api_auth(request)
+    if not u or not u["city"]:
+        raise web.HTTPBadRequest(text="no city")
+    try:
+        now = datetime.now(ZoneInfo(u["tz"]))
+        today = await get_timings(u, now.date())
+        hy = today["hyear"] if today["hmonth"] <= 9 else today["hyear"] + 1
+        days = await fetch_hijri_month(u, hy, 9)
+    except Exception:  # noqa: BLE001
+        log.exception("api_ramadan failed")
+        return web.json_response({"ok": False}, status=502)
+    return web.json_response({"ok": True, "hyear": hy, "today": now.date().isoformat(), "days": days})
+
+
+async def page_index(request):
+    try:
+        body = WEBAPP_FILE.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return web.Response(text="webapp.html is missing next to bot.py", status=500)
+    return web.Response(text=body, content_type="text/html", headers={"Cache-Control": "no-cache"})
+
+
+async def page_health(request):
+    return web.Response(text="ok")
+
+
+async def start_web():
+    global WEB_RUNNER
+    app = web.Application()
+    app.add_routes([web.get("/", page_index), web.get("/health", page_health),
+                    web.get("/api/me", api_me), web.get("/api/month", api_month),
+                    web.get("/api/ramadan", api_ramadan)])
+    WEB_RUNNER = web.AppRunner(app, access_log=None)
+    await WEB_RUNNER.setup()
+    port = int(os.getenv("PORT", "8080"))
+    await web.TCPSite(WEB_RUNNER, "0.0.0.0", port).start()
+    log.info("Mini app server on port %s (%s)", port, WEBAPP_URL or "no public domain yet")
+
+
+# ───────────────────────── compass picture (groups, desktop, no domain) ─────────────────────────
+
+COMPASS_CACHE = {}
+
+
+def compass_png(bearing):
+    """A clean compass card with a gold arrow pointing to the Qibla."""
+    key = round(bearing)
+    if key in COMPASS_CACHE:
+        return COMPASS_CACHE[key]
+    from PIL import Image, ImageDraw, ImageFont
+
+    S = 1600  # draw big, then shrink for smooth edges
+    c = S // 2
+    img = Image.new("RGB", (S, S), (14, 24, 41))
+    d = ImageDraw.Draw(img)
+    gold, soft, white, red = (212, 175, 55), (70, 86, 112), (236, 240, 246), (230, 92, 92)
+
+    def font(size):
+        try:
+            return ImageFont.load_default(size=size)
+        except TypeError:  # very old Pillow
+            return ImageFont.load_default()
+
+    def pt(angle, r):
+        a = math.radians(angle)
+        return c + r * math.sin(a), c - r * math.cos(a)
+
+    R = 640
+    d.ellipse([c - R - 18, c - R - 18, c + R + 18, c + R + 18], fill=(20, 33, 56))
+    d.ellipse([c - R, c - R, c + R, c + R], outline=gold, width=10)
+    for a in range(0, 360, 5):
+        long_ = a % 30 == 0
+        d.line([pt(a, R - (70 if long_ else 36)), pt(a, R - 12)], fill=white if long_ else soft,
+               width=8 if long_ else 4)
+    f_big = font(120)
+    for a, label in ((0, "N"), (90, "E"), (180, "S"), (270, "W")):
+        x, y = pt(a, R - 150)
+        d.text((x, y), label, fill=red if label == "N" else white, font=f_big, anchor="mm")
+
+    # arrow
+    tip, tail = pt(key, R - 120), pt(key + 180, 170)
+    left, right = pt(key - 90, 46), pt(key + 90, 46)
+    d.line([tail, tip], fill=gold, width=30)
+    hb1, hb2 = pt(key - 7, R - 300), pt(key + 7, R - 300)
+    d.polygon([tip, hb1, hb2], fill=gold)
+    d.polygon([pt(key, 120), left, pt(key + 180, 60), right], fill=gold)
+    d.ellipse([c - 34, c - 34, c + 34, c + 34], fill=(14, 24, 41), outline=gold, width=10)
+
+    # Kaaba at the tip
+    kx, ky = pt(key, R + 2)
+    k = 70
+    d.rectangle([kx - k, ky - k, kx + k, ky + k], fill=(18, 18, 18), outline=gold, width=8)
+    d.rectangle([kx - k, ky - k + 34, kx + k, ky - k + 54], fill=gold)
+
+    img = img.resize((800, 800), Image.LANCZOS)
+    d = ImageDraw.Draw(img)
+    d.text((400, 760), f"{key}°", fill=gold, font=font(44), anchor="mm")
+    buf = io.BytesIO()
+    img.save(buf, "PNG", optimize=True)
+    COMPASS_CACHE[key] = buf.getvalue()
+    return COMPASS_CACHE[key]
+
+
+async def send_qibla_image(update, u):
+    lang = u["lang"]
+    deg = qibla_bearing(u["lat"], u["lon"])
+    arrow = ARROWS[int((deg + 22.5) // 45) % 8]
+    caption = t(lang, "qibla", city=esc(u["city"]), arrow=arrow, deg=round(deg)) + "\n\n" + t(lang, "qibla_img_hint")
+    rows = []
+    if is_private(u) and WEBAPP_URL:
+        rows.append([webapp_btn(t(lang, "btn_compass"), "qibla")])
+    rows.append([btn(t(lang, "btn_menu"), "m:home")])
+    photo = await asyncio.get_running_loop().run_in_executor(None, compass_png, deg)
+    await update.effective_chat.send_photo(photo, caption=caption, parse_mode=ParseMode.HTML, reply_markup=kb(*rows))
+
+
 # ───────────────────────── app ─────────────────────────
 
 
@@ -2143,6 +2477,13 @@ async def setup_profile(bot):
                 return
             except Exception:  # noqa: BLE001
                 log.exception("could not set profile texts for %s", code or "default")
+    try:  # the button next to the message field opens the app
+        if WEBAPP_URL:
+            await bot.set_chat_menu_button(menu_button=MenuButtonWebApp("🕌 App", WebAppInfo(url=WEBAPP_URL)))
+        else:
+            await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+    except Exception:  # noqa: BLE001
+        log.exception("could not set menu button")
 
 
 async def post_init(app: Application):
@@ -2154,10 +2495,16 @@ async def post_init(app: Application):
     global BOT_USERNAME
     BOT_USERNAME = app.bot.username
     asyncio.get_running_loop().create_task(setup_profile(app.bot))  # in background, never blocks startup
+    try:
+        await start_web()
+    except Exception:  # noqa: BLE001
+        log.exception("mini app server failed to start (the bot keeps working)")
     log.info("Bot is ready")
 
 
 async def post_shutdown(app: Application):
+    if WEB_RUNNER:
+        await WEB_RUNNER.cleanup()
     if HTTP:
         await HTTP.aclose()
     if POOL:

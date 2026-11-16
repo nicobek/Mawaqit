@@ -1,0 +1,877 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Prayer Times</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --bg: var(--tg-theme-bg-color, #0e1829);
+  --card: var(--tg-theme-secondary-bg-color, #16233a);
+  --text: var(--tg-theme-text-color, #eef2f8);
+  --hint: var(--tg-theme-hint-color, #8b98ad);
+  --link: var(--tg-theme-link-color, #d4af37);
+  --gold: #d4af37;
+  --gold-soft: rgba(212,175,55,.16);
+  --green: #22a37a;
+  --green-soft: rgba(34,163,122,.16);
+  --line: rgba(127,140,160,.18);
+  --safe-top: var(--tg-content-safe-area-inset-top, 0px);
+  --safe-bottom: max(env(safe-area-inset-bottom), var(--tg-safe-area-inset-bottom, 0px));
+  --nav-h: 64px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans","Noto Sans Arabic",sans-serif}
+body{min-height:100vh;overscroll-behavior:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+.app{padding:calc(12px + var(--safe-top)) 16px calc(var(--nav-h) + var(--safe-bottom) + 20px);max-width:560px;margin:0 auto}
+.view{display:none;animation:fade .25s ease}
+.view.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+h1{font-size:22px;margin:4px 0 2px;letter-spacing:-.2px}
+h2{font-size:17px;margin:20px 0 10px}
+.sub{color:var(--hint);font-size:13px}
+.card{background:var(--card);border-radius:18px;padding:14px 16px;margin:12px 0}
+.row{display:flex;align-items:center;gap:10px}
+.between{justify-content:space-between}
+.muted{color:var(--hint)}
+.center{text-align:center}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:var(--gold-soft);color:var(--gold);font-weight:600;font-size:13px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px 16px;border-radius:14px;background:var(--gold);color:#1b1404;font-weight:700}
+.btn.ghost{background:var(--card);color:var(--text)}
+.state{min-height:60vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:20px}
+.state .big{font-size:56px}
+
+/* header */
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.top .place{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* today */
+.ring-wrap{position:relative;width:240px;height:240px;margin:16px auto 6px}
+.ring-wrap svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring-bg{stroke:var(--line);fill:none;stroke-width:14}
+.ring-fg{stroke:url(#gold);fill:none;stroke-width:14;stroke-linecap:round;transition:stroke-dashoffset .9s linear}
+.ring-in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.ring-in .label{color:var(--hint);font-size:13px}
+.ring-in .name{font-size:22px;font-weight:800;margin:2px 0}
+.ring-in .left{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.5px}
+.ring-in .at{color:var(--gold);font-weight:600;margin-top:2px}
+.times .t{display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--line)}
+.times .t:last-child{border-bottom:0}
+.times .ico{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:var(--gold-soft);font-size:18px}
+.times .nm{flex:1;font-weight:600}
+.times .tm{font-weight:800;font-variant-numeric:tabular-nums;font-size:17px}
+.times .t.now{background:var(--green-soft);border-radius:12px;border-bottom-color:transparent}
+.times .t.now .ico{background:var(--green);}
+.times .t.next .tm{color:var(--gold)}
+.times .t.past .nm,.times .t.past .tm{opacity:.55}
+
+/* qibla */
+.compass{position:relative;width:min(84vw,330px);aspect-ratio:1;margin:18px auto 8px}
+.compass .dial{position:absolute;inset:0;transition:transform .12s linear}
+.compass .marker{position:absolute;left:50%;top:-6px;transform:translateX(-50%);width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;border-top:20px solid var(--gold);z-index:3;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
+.compass.ok .marker{border-top-color:var(--green)}
+.compass .glow{position:absolute;inset:-6px;border-radius:50%;box-shadow:0 0 0 0 rgba(34,163,122,0);transition:box-shadow .3s}
+.compass.ok .glow{box-shadow:0 0 0 6px rgba(34,163,122,.5),0 0 40px rgba(34,163,122,.55)}
+.compass .hub{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px;border-radius:50%;background:var(--gold);z-index:2}
+.qinfo{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.qinfo .card{margin:0;text-align:center}
+.qinfo b{display:block;font-size:22px}
+.qstatus{text-align:center;font-weight:700;font-size:17px;margin:6px 0 2px;min-height:24px}
+.qstatus.ok{color:var(--green)}
+
+/* calendar */
+.calnav{display:flex;align-items:center;justify-content:space-between;margin:8px 0}
+.calnav button{width:40px;height:40px;border-radius:12px;background:var(--card);font-size:18px}
+.tbl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:13px}
+.tbl th{color:var(--hint);font-weight:600;padding:8px 2px;position:sticky;top:0;background:var(--card)}
+.tbl td{padding:8px 2px;text-align:center;border-top:1px solid var(--line)}
+.tbl td:first-child{text-align:left;padding-left:6px}
+.tbl tr.today td{background:var(--gold-soft);font-weight:800}
+.tbl tr.fri td:first-child{color:var(--green)}
+.tbl .h{display:block;color:var(--hint);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:74px}
+.scroll{overflow:auto;border-radius:18px;background:var(--card);max-height:62vh}
+
+/* tasbih */
+.dhikr{text-align:center;margin-top:8px}
+.dhikr .ar{font-size:30px;font-family:"Noto Naskh Arabic","Amiri","Geeza Pro",serif;direction:rtl}
+.dhikr .tr{color:var(--hint)}
+.bead{display:block;width:min(70vw,250px);aspect-ratio:1;margin:18px auto;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f3d77a,var(--gold) 45%,#8a6d14);box-shadow:0 18px 40px rgba(212,175,55,.35),inset 0 -10px 30px rgba(0,0,0,.25);color:#1b1404;transition:transform .08s}
+.bead:active{transform:scale(.96)}
+.bead .n{font-size:64px;font-weight:900;line-height:1}
+.bead .g{font-weight:700;opacity:.75}
+.goals{display:flex;gap:8px;justify-content:center;margin:6px 0 10px}
+.goals button{padding:8px 16px;border-radius:999px;background:var(--card);font-weight:700}
+.goals button.on{background:var(--gold);color:#1b1404}
+
+/* more */
+.menu .item{display:flex;align-items:center;gap:14px;padding:14px;border-radius:16px;background:var(--card);margin:10px 0;width:100%;text-align:start}
+.menu .item .ico{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:22px;background:var(--gold-soft)}
+.menu .item .tt{font-weight:700}
+.menu .item .ds{color:var(--hint);font-size:13px}
+.menu .item .ch{margin-inline-start:auto;color:var(--hint);font-size:20px}
+.backbar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.backbar button{font-size:15px;color:var(--link);padding:6px 0}
+
+/* tracker */
+.checks .c{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line);width:100%;text-align:start}
+.checks .c:last-child{border-bottom:0}
+.checks .box{width:28px;height:28px;border-radius:9px;border:2px solid var(--line);display:grid;place-items:center;font-weight:900;color:#fff;transition:.15s}
+.checks .c.on .box{background:var(--green);border-color:var(--green)}
+.checks .c .nm{flex:1;font-weight:600}
+.week{display:flex;gap:8px;align-items:flex-end;height:120px;margin-top:8px}
+.week .d{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+.week .bar{width:100%;border-radius:8px;background:var(--gold);min-height:4px;transition:height .3s}
+.week .bar.full{background:var(--green)}
+.week .lb{font-size:11px;color:var(--hint)}
+.stat{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat .card{margin:0;text-align:center}
+.stat b{display:block;font-size:24px}
+
+/* ramadan */
+.count{font-size:38px;font-weight:900;text-align:center;font-variant-numeric:tabular-nums;margin:6px 0}
+
+/* mosques */
+#map{height:44vh;border-radius:18px;overflow:hidden;margin:10px 0;background:var(--card)}
+.mlist .m{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line)}
+.mlist .m:last-child{border-bottom:0}
+.mlist .m .nm{flex:1;min-width:0}
+.mlist .m .nm b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mlist .m a,.mlist .m button.go{color:var(--link);font-weight:700;white-space:nowrap}
+
+/* names */
+.search{width:100%;padding:12px 14px;border-radius:14px;border:0;background:var(--card);color:var(--text);font:inherit;margin:6px 0}
+.names{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.names .nm{background:var(--card);border-radius:16px;padding:12px;text-align:center}
+.names .no{color:var(--hint);font-size:11px}
+.names .ar{font-size:24px;font-family:"Noto Naskh Arabic","Amiri","Geeza Pro",serif;direction:rtl;margin:2px 0}
+.names .tr{font-weight:700;font-size:13px}
+.names .mn{color:var(--hint);font-size:12px;margin-top:2px}
+
+/* nav */
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:6px 6px calc(6px + var(--safe-bottom));border-top:1px solid var(--line);z-index:10}
+nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:12px;color:var(--hint);font-size:11px;font-weight:600}
+nav button .i{font-size:21px;line-height:1.1;filter:grayscale(.6);opacity:.8}
+nav button.on{color:var(--gold)}
+nav button.on .i{filter:none;opacity:1}
+[dir=rtl] .calnav button{transform:scaleX(-1)}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="state" id="boot"><div class="big">🕌</div><div class="muted" id="bootText">…</div></div>
+
+  <!-- TODAY -->
+  <section class="view" id="v-today">
+    <div class="top"><div><div class="place" id="place"></div><div class="sub" id="dates"></div></div><span class="pill" id="hijriPill"></span></div>
+    <div class="ring-wrap">
+      <svg viewBox="0 0 240 240"><defs><linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f3d77a"/><stop offset="1" stop-color="#b8901f"/></linearGradient></defs>
+        <circle class="ring-bg" cx="120" cy="120" r="104"/><circle class="ring-fg" id="ring" cx="120" cy="120" r="104"/></svg>
+      <div class="ring-in"><div class="label" id="untilLbl"></div><div class="name" id="nextName"></div><div class="left" id="left">--:--:--</div><div class="at" id="nextAt"></div></div>
+    </div>
+    <div class="card times" id="times"></div>
+  </section>
+
+  <!-- QIBLA -->
+  <section class="view" id="v-qibla">
+    <h1 id="qTitle"></h1><div class="sub" id="qPlace"></div>
+    <div class="compass" id="compass">
+      <div class="glow"></div><div class="marker"></div>
+      <svg class="dial" id="dial" viewBox="0 0 300 300"></svg>
+      <div class="hub"></div>
+    </div>
+    <div class="qstatus" id="qStatus"></div>
+    <div class="sub center" id="qHint"></div>
+    <div style="margin:14px 0" id="qEnableWrap"><button class="btn" id="qEnable"></button></div>
+    <div class="qinfo"><div class="card"><span class="sub" id="qDegL">°</span><b id="qDeg"></b></div><div class="card"><span class="sub">🕋</span><b id="qDist" dir="auto"></b></div></div>
+    <div class="sub center" style="margin-top:12px" id="qCalib"></div>
+  </section>
+
+  <!-- CALENDAR -->
+  <section class="view" id="v-cal">
+    <div class="calnav"><button id="calPrev">‹</button><div class="center"><h1 id="calTitle" style="margin:0"></h1><div class="sub" id="calSub"></div></div><button id="calNext">›</button></div>
+    <div class="scroll"><table class="tbl" id="calTbl"></table></div>
+  </section>
+
+  <!-- TASBIH -->
+  <section class="view" id="v-tasbih">
+    <div class="dhikr"><div class="ar" id="dAr"></div><div class="tr" id="dTr"></div></div>
+    <button class="bead" id="bead"><div class="n" id="tCount">0</div><div class="g" id="tGoal"></div></button>
+    <div class="goals" id="goals"></div>
+    <div class="row between card"><span class="muted" id="tTotalL"></span><b id="tTotal">0</b></div>
+    <button class="btn ghost" id="tReset"></button>
+  </section>
+
+  <!-- MORE -->
+  <section class="view" id="v-more">
+    <h1 id="moreTitle"></h1>
+    <div class="menu" id="moreMenu"></div>
+  </section>
+
+  <section class="view" id="v-tracker">
+    <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
+    <h1 id="trTitle"></h1><div class="sub" id="trHint"></div>
+    <div class="card checks" id="trChecks"></div>
+    <div class="stat"><div class="card"><span class="sub" id="trStreakL"></span><b id="trStreak">0</b></div><div class="card"><span class="sub" id="trWeekL"></span><b id="trWeekN" dir="ltr">0</b></div></div>
+    <div class="card"><div class="week" id="trWeek"></div></div>
+  </section>
+
+  <section class="view" id="v-ramadan">
+    <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
+    <h1 id="rTitle"></h1><div class="sub" id="rSub"></div>
+    <div class="card center" id="rCountCard"><div class="sub" id="rCountL"></div><div class="count" id="rCount"></div></div>
+    <div class="scroll"><table class="tbl" id="rTbl"></table></div>
+  </section>
+
+  <section class="view" id="v-mosques">
+    <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
+    <h1 id="moTitle"></h1><div class="sub" id="moSub"></div>
+    <div id="map"></div>
+    <button class="btn ghost" id="moNear"></button>
+    <div class="card mlist" id="moList"></div>
+  </section>
+
+  <section class="view" id="v-names">
+    <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
+    <h1 id="nTitle"></h1>
+    <input class="search" id="nSearch" type="search" autocomplete="off">
+    <div class="names" id="nList"></div>
+  </section>
+</div>
+
+<nav id="nav" hidden>
+  <button data-tab="today"><span class="i">🕌</span><span data-l="t_today"></span></button>
+  <button data-tab="qibla"><span class="i">🧭</span><span data-l="t_qibla"></span></button>
+  <button data-tab="cal"><span class="i">📅</span><span data-l="t_cal"></span></button>
+  <button data-tab="tasbih"><span class="i">📿</span><span data-l="t_tasbih"></span></button>
+  <button data-tab="more"><span class="i">☰</span><span data-l="t_more"></span></button>
+</nav>
+
+<script>
+"use strict";
+const tg = window.Telegram && window.Telegram.WebApp;
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const KAABA = [21.4225, 39.8262];
+const PRAYERS = ["Fajr","Sunrise","Dhuhr","Asr","Maghrib","Isha"];
+const FARD = ["Fajr","Dhuhr","Asr","Maghrib","Isha"];
+const ICONS = {Fajr:"🌌",Sunrise:"🌅",Dhuhr:"☀️",Asr:"🌤",Maghrib:"🌇",Isha:"🌙"};
+
+/* ───────── texts ───────── */
+const LX = {
+ en:{t_today:"Today",t_qibla:"Qibla",t_cal:"Calendar",t_tasbih:"Tasbih",t_more:"More",
+  pn:{Fajr:"Fajr",Sunrise:"Sunrise",Dhuhr:"Dhuhr",Asr:"Asr",Maghrib:"Maghrib",Isha:"Isha"},
+  hm:["Muharram","Safar","Rabi' al-awwal","Rabi' al-thani","Jumada al-ula","Jumada al-thani","Rajab","Sha'ban","Ramadan","Shawwal","Dhu al-Qi'dah","Dhu al-Hijjah"],
+  gm:["January","February","March","April","May","June","July","August","September","October","November","December"],
+  wd:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+  next_l:"Next prayer",at:"at {t}",h:"h",m:"min",
+  q_title:"Qibla direction",q_deg:"From north",q_dist:"{km} km to Makkah",q_turn:"Turn your phone until 🕋 reaches the mark at the top",q_ok:"You are facing the Qibla 🤍",q_enable:"🧭 Turn on the compass",q_nocompass:"No compass on this device. The Qibla is {deg}° clockwise from north.",q_calib:"Compass inaccurate? Move your phone in a figure-eight.",q_flat:"Hold your phone flat",
+  c_today:"Today",
+  s_goal:"of {n}",s_reset:"↺ Reset",s_total:"Total",s_done:"Goal reached! 🤍",
+  m_tracker:"Prayer tracker",m_tracker_d:"Mark your prayers, keep a streak",m_ramadan:"Ramadan",m_ramadan_d:"Suhoor, iftar and countdown",m_mosques:"Mosques nearby",m_mosques_d:"Map of mosques around you",m_names:"99 Names of Allah",m_names_d:"Al-Asma ul-Husna",m_home:"Add to home screen",m_home_d:"Open the app like any other",m_home_done:"Already on your home screen ✅",
+  tr_hint:"Mark the prayers you have performed today",tr_streak:"Streak, days",tr_week:"Last 7 days",
+  r_title:"Ramadan {y}",r_in:"Ramadan begins in",r_days:"{n} days",r_iftar:"Until iftar",r_suhoor:"Until suhoor ends",r_day:"Day",r_s:"Suhoor",r_i:"Iftar",r_mub:"Ramadan Mubarak 🌙",r_over:"May Allah accept your fast 🤍",
+  mo_city:"Around {c}",mo_near:"📍 Near me",mo_load:"Looking for mosques…",mo_none:"No mosques found nearby",mo_err:"Could not load the map. Try again later.",mo_route:"Route",mo_noname:"Mosque",km:"km",mt:"m",
+  n_search:"Search…",back:"Back",loading:"Loading…",err:"Could not load data. Please try again later.",need:"First choose your city in the bot",to_bot:"Open the bot",open_tg:"Please open this app from Telegram"},
+ ru:{t_today:"Сегодня",t_qibla:"Кибла",t_cal:"Календарь",t_tasbih:"Тасбих",t_more:"Ещё",
+  pn:{Fajr:"Фаджр",Sunrise:"Восход",Dhuhr:"Зухр",Asr:"Аср",Maghrib:"Магриб",Isha:"Иша"},
+  hm:["Мухаррам","Сафар","Раби аль-авваль","Раби ас-сани","Джумада аль-уля","Джумада ас-сания","Раджаб","Шаабан","Рамадан","Шавваль","Зуль-каада","Зуль-хиджа"],
+  gm:["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"],
+  wd:["Пн","Вт","Ср","Чт","Пт","Сб","Вс"],
+  next_l:"Следующий намаз",at:"в {t}",h:"ч",m:"мин",
+  q_title:"Направление Киблы",q_deg:"От севера",q_dist:"{km} км до Мекки",q_turn:"Поворачивайте телефон, пока 🕋 не окажется у отметки сверху",q_ok:"Вы смотрите на Киблу 🤍",q_enable:"🧭 Включить компас",q_nocompass:"На этом устройстве нет компаса. Кибла: {deg}° от севера по часовой стрелке.",q_calib:"Компас неточный? Покрутите телефон восьмёркой.",q_flat:"Держите телефон ровно",
+  c_today:"Сегодня",
+  s_goal:"из {n}",s_reset:"↺ Сбросить",s_total:"Всего",s_done:"Цель достигнута! 🤍",
+  m_tracker:"Трекер намазов",m_tracker_d:"Отмечайте намазы, держите серию",m_ramadan:"Рамадан",m_ramadan_d:"Сухур, ифтар и обратный отсчёт",m_mosques:"Мечети рядом",m_mosques_d:"Карта мечетей вокруг вас",m_names:"99 имён Аллаха",m_names_d:"Аль-Асма уль-Хусна",m_home:"На главный экран",m_home_d:"Открывайте как обычное приложение",m_home_done:"Уже на главном экране ✅",
+  tr_hint:"Отмечайте намазы, совершённые сегодня",tr_streak:"Серия, дней",tr_week:"За 7 дней",
+  r_title:"Рамадан {y}",r_in:"До Рамадана",r_days:"{n} дн.",r_iftar:"До ифтара",r_suhoor:"До конца сухура",r_day:"День",r_s:"Сухур",r_i:"Ифтар",r_mub:"Рамадан мубарак 🌙",r_over:"Пусть Аллах примет ваш пост 🤍",
+  mo_city:"Рядом с: {c}",mo_near:"📍 Рядом со мной",mo_load:"Ищу мечети…",mo_none:"Мечетей поблизости не найдено",mo_err:"Не удалось загрузить карту. Попробуйте позже.",mo_route:"Маршрут",mo_noname:"Мечеть",km:"км",mt:"м",
+  n_search:"Поиск…",back:"Назад",loading:"Загрузка…",err:"Не удалось загрузить данные. Попробуйте позже.",need:"Сначала выберите город в боте",to_bot:"Открыть бота",open_tg:"Откройте это приложение через Telegram"},
+ uz:{t_today:"Bugun",t_qibla:"Qibla",t_cal:"Taqvim",t_tasbih:"Tasbeh",t_more:"Yana",
+  pn:{Fajr:"Bomdod",Sunrise:"Quyosh",Dhuhr:"Peshin",Asr:"Asr",Maghrib:"Shom",Isha:"Xufton"},
+  hm:["Muharram","Safar","Rabiul avval","Rabiul oxir","Jumodul avval","Jumodul oxir","Rajab","Sha'bon","Ramazon","Shavvol","Zulqa'da","Zulhijja"],
+  gm:["Yanvar","Fevral","Mart","Aprel","May","Iyun","Iyul","Avgust","Sentabr","Oktabr","Noyabr","Dekabr"],
+  wd:["Du","Se","Ch","Pa","Ju","Sh","Ya"],
+  next_l:"Keyingi namoz",at:"soat {t}",h:"soat",m:"daq",
+  q_title:"Qibla yo'nalishi",q_deg:"Shimoldan",q_dist:"Makkagacha {km} km",q_turn:"🕋 yuqoridagi belgiga yetguncha telefonni buring",q_ok:"Siz Qiblaga qarab turibsiz 🤍",q_enable:"🧭 Kompasni yoqish",q_nocompass:"Bu qurilmada kompas yo'q. Qibla shimoldan soat mili bo'yicha {deg}°.",q_calib:"Kompas noaniqmi? Telefonni sakkiz shaklida aylantiring.",q_flat:"Telefonni tekis ushlang",
+  c_today:"Bugun",
+  s_goal:"{n} dan",s_reset:"↺ Qayta boshlash",s_total:"Jami",s_done:"Maqsadga yetdingiz! 🤍",
+  m_tracker:"Namoz kundaligi",m_tracker_d:"Namozlarni belgilang, ketma-ketlikni saqlang",m_ramadan:"Ramazon",m_ramadan_d:"Saharlik, iftor va qolgan vaqt",m_mosques:"Yaqin masjidlar",m_mosques_d:"Atrofingizdagi masjidlar xaritasi",m_names:"Allohning 99 ismi",m_names_d:"Al-Asma ul-Husna",m_home:"Bosh ekranga qo'shish",m_home_d:"Oddiy ilova kabi oching",m_home_done:"Bosh ekranda bor ✅",
+  tr_hint:"Bugun o'qigan namozlaringizni belgilang",tr_streak:"Ketma-ket kunlar",tr_week:"So'nggi 7 kun",
+  r_title:"Ramazon {y}",r_in:"Ramazongacha",r_days:"{n} kun",r_iftar:"Iftorgacha",r_suhoor:"Saharlik tugashiga",r_day:"Kun",r_s:"Saharlik",r_i:"Iftor",r_mub:"Ramazon muborak 🌙",r_over:"Allohdan ro'zangiz qabul bo'lsin 🤍",
+  mo_city:"{c} atrofida",mo_near:"📍 Yonimda",mo_load:"Masjidlar qidirilmoqda…",mo_none:"Yaqin atrofda masjid topilmadi",mo_err:"Xaritani yuklab bo'lmadi. Keyinroq urinib ko'ring.",mo_route:"Yo'nalish",mo_noname:"Masjid",km:"km",mt:"m",
+  n_search:"Qidirish…",back:"Orqaga",loading:"Yuklanmoqda…",err:"Ma'lumotni yuklab bo'lmadi. Keyinroq urinib ko'ring.",need:"Avval botda shaharingizni tanlang",to_bot:"Botni ochish",open_tg:"Bu ilovani Telegram orqali oching"},
+ tg:{t_today:"Имрӯз",t_qibla:"Қибла",t_cal:"Тақвим",t_tasbih:"Тасбеҳ",t_more:"Боз",
+  pn:{Fajr:"Бомдод",Sunrise:"Офтоб",Dhuhr:"Пешин",Asr:"Аср",Maghrib:"Шом",Isha:"Хуфтан"},
+  hm:["Муҳаррам","Сафар","Рабеъулаввал","Рабеъуссонӣ","Ҷумодулаввал","Ҷумодуссонӣ","Раҷаб","Шаъбон","Рамазон","Шаввол","Зулқаъда","Зулҳиҷҷа"],
+  gm:["Январ","Феврал","Март","Апрел","Май","Июн","Июл","Август","Сентябр","Октябр","Ноябр","Декабр"],
+  wd:["Дш","Сш","Чш","Пш","Ҷм","Шб","Яш"],
+  next_l:"Намози навбатӣ",at:"соати {t}",h:"соат",m:"дақ",
+  q_title:"Самти қибла",q_deg:"Аз шимол",q_dist:"То Макка {km} км",q_turn:"Телефонро гардонед, то 🕋 ба аломати боло расад",q_ok:"Шумо рӯ ба қибла ҳастед 🤍",q_enable:"🧭 Фаъол кардани компас",q_nocompass:"Дар ин дастгоҳ компас нест. Қибла аз шимол ба самти ақрабаки соат {deg}°.",q_calib:"Компас нодуруст? Телефонро ба шакли ҳашт гардонед.",q_flat:"Телефонро рост нигоҳ доред",
+  c_today:"Имрӯз",
+  s_goal:"аз {n}",s_reset:"↺ Аз нав",s_total:"Ҳамагӣ",s_done:"Ба ҳадаф расидед! 🤍",
+  m_tracker:"Рӯйхати намозҳо",m_tracker_d:"Намозҳоро қайд кунед, силсиларо нигоҳ доред",m_ramadan:"Рамазон",m_ramadan_d:"Саҳарӣ, ифтор ва вақти боқимонда",m_mosques:"Масҷидҳои наздик",m_mosques_d:"Харитаи масҷидҳои атроф",m_names:"99 номи Аллоҳ",m_names_d:"Ал-Асмоу-л-Ҳусно",m_home:"Ба экрани асосӣ",m_home_d:"Мисли барномаи оддӣ кушоед",m_home_done:"Аллакай дар экрани асосӣ ✅",
+  tr_hint:"Намозҳои имрӯз хондаатонро қайд кунед",tr_streak:"Силсила, рӯз",tr_week:"7 рӯзи охир",
+  r_title:"Рамазон {y}",r_in:"То Рамазон",r_days:"{n} рӯз",r_iftar:"То ифтор",r_suhoor:"То анҷоми саҳарӣ",r_day:"Рӯз",r_s:"Саҳарӣ",r_i:"Ифтор",r_mub:"Рамазон муборак 🌙",r_over:"Аллоҳ рӯзаатонро қабул кунад 🤍",
+  mo_city:"Атрофи {c}",mo_near:"📍 Наздики ман",mo_load:"Ҷустуҷӯи масҷидҳо…",mo_none:"Дар наздикӣ масҷид ёфт нашуд",mo_err:"Харита бор нашуд. Баъдтар кӯшиш кунед.",mo_route:"Роҳ",mo_noname:"Масҷид",km:"км",mt:"м",
+  n_search:"Ҷустуҷӯ…",back:"Бозгашт",loading:"Боргирӣ…",err:"Маълумот бор нашуд. Баъдтар кӯшиш кунед.",need:"Аввал дар бот шаҳри худро интихоб кунед",to_bot:"Кушодани бот",open_tg:"Ин барномаро тавассути Telegram кушоед"},
+ ar:{t_today:"اليوم",t_qibla:"القبلة",t_cal:"التقويم",t_tasbih:"التسبيح",t_more:"المزيد",
+  pn:{Fajr:"الفجر",Sunrise:"الشروق",Dhuhr:"الظهر",Asr:"العصر",Maghrib:"المغرب",Isha:"العشاء"},
+  hm:["محرم","صفر","ربيع الأول","ربيع الآخر","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"],
+  gm:["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"],
+  wd:["إثن","ثلا","أرب","خمي","جمع","سبت","أحد"],
+  next_l:"الصلاة التالية",at:"الساعة {t}",h:"س",m:"د",
+  q_title:"اتجاه القبلة",q_deg:"من الشمال",q_dist:"{km} كم إلى مكة",q_turn:"أدر هاتفك حتى تصل 🕋 إلى العلامة في الأعلى",q_ok:"أنت تستقبل القبلة 🤍",q_enable:"🧭 تشغيل البوصلة",q_nocompass:"لا توجد بوصلة في هذا الجهاز. القبلة {deg}° مع عقارب الساعة من الشمال.",q_calib:"البوصلة غير دقيقة؟ حرّك هاتفك على شكل الرقم ثمانية.",q_flat:"أمسك الهاتف بشكل مستوٍ",
+  c_today:"اليوم",
+  s_goal:"من {n}",s_reset:"↺ إعادة",s_total:"المجموع",s_done:"تم بلوغ الهدف! 🤍",
+  m_tracker:"متابعة الصلوات",m_tracker_d:"سجّل صلواتك وحافظ على الاستمرار",m_ramadan:"رمضان",m_ramadan_d:"السحور والإفطار والعد التنازلي",m_mosques:"مساجد قريبة",m_mosques_d:"خريطة المساجد من حولك",m_names:"أسماء الله الحسنى",m_names_d:"٩٩ اسماً",m_home:"إضافة إلى الشاشة الرئيسية",m_home_d:"افتحه كأي تطبيق",m_home_done:"موجود على الشاشة الرئيسية ✅",
+  tr_hint:"ضع علامة على الصلوات التي أديتها اليوم",tr_streak:"أيام متتالية",tr_week:"آخر ٧ أيام",
+  r_title:"رمضان {y}",r_in:"حتى رمضان",r_days:"{n} يوم",r_iftar:"حتى الإفطار",r_suhoor:"حتى نهاية السحور",r_day:"اليوم",r_s:"السحور",r_i:"الإفطار",r_mub:"رمضان مبارك 🌙",r_over:"تقبّل الله صيامك 🤍",
+  mo_city:"حول {c}",mo_near:"📍 بالقرب مني",mo_load:"جارٍ البحث عن المساجد…",mo_none:"لم يتم العثور على مساجد قريبة",mo_err:"تعذر تحميل الخريطة. حاول لاحقاً.",mo_route:"الطريق",mo_noname:"مسجد",km:"كم",mt:"م",
+  n_search:"بحث…",back:"رجوع",loading:"جارٍ التحميل…",err:"تعذر تحميل البيانات. حاول لاحقاً.",need:"اختر مدينتك في البوت أولاً",to_bot:"فتح البوت",open_tg:"افتح هذا التطبيق من خلال تيليجرام"}
+};
+
+/* 99 names: arabic, transliteration, en, ru, uz, tg */
+const NAMES = [
+["الرَّحْمَنُ","Ar-Rahman","The Most Gracious","Милостивый","Mehribon","Меҳрубон"],
+["الرَّحِيمُ","Ar-Rahim","The Most Merciful","Милосердный","Rahmli","Раҳмкунанда"],
+["الْمَلِكُ","Al-Malik","The King","Царь, Властелин","Podshoh","Подшоҳ"],
+["الْقُدُّوسُ","Al-Quddus","The Most Holy","Пресвятой","Pok","Пок"],
+["السَّلَامُ","As-Salam","The Source of Peace","Дарующий мир","Tinchlik beruvchi","Саломатибахш"],
+["الْمُؤْمِنُ","Al-Mu'min","The Giver of Security","Дарующий безопасность","Omonlik beruvchi","Амондиҳанда"],
+["الْمُهَيْمِنُ","Al-Muhaymin","The Guardian","Охраняющий","Muhofaza qiluvchi","Нигаҳбон"],
+["الْعَزِيزُ","Al-Aziz","The Almighty","Могущественный","Aziz, g'olib","Азиз, Ғолиб"],
+["الْجَبَّارُ","Al-Jabbar","The Compeller","Всепокоряющий","Jabbor","Ҷаббор"],
+["الْمُتَكَبِّرُ","Al-Mutakabbir","The Supreme","Превосходящий","Kibriyo egasi","Бартар"],
+["الْخَالِقُ","Al-Khaliq","The Creator","Творец","Yaratuvchi","Офаридгор"],
+["الْبَارِئُ","Al-Bari'","The Maker","Создатель","Paydo qiluvchi","Падидоранда"],
+["الْمُصَوِّرُ","Al-Musawwir","The Fashioner","Дающий облик","Shakl beruvchi","Сураткунанда"],
+["الْغَفَّارُ","Al-Ghaffar","The Ever-Forgiving","Всепрощающий","Ko'p mag'firat qiluvchi","Бисёр омурзанда"],
+["الْقَهَّارُ","Al-Qahhar","The Subduer","Господствующий","Qahhor","Қаҳҳор"],
+["الْوَهَّابُ","Al-Wahhab","The Bestower","Дарующий","Hadya qiluvchi","Бахшанда"],
+["الرَّزَّاقُ","Ar-Razzaq","The Provider","Наделяющий уделом","Rizq beruvchi","Рӯзидиҳанда"],
+["الْفَتَّاحُ","Al-Fattah","The Opener","Открывающий","Ochuvchi","Кушоянда"],
+["الْعَلِيمُ","Al-Alim","The All-Knowing","Всезнающий","Hamma narsani biluvchi","Донандаи ҳама"],
+["الْقَابِضُ","Al-Qabid","The Withholder","Сжимающий","Toraytiruvchi","Қабзкунанда"],
+["الْبَاسِطُ","Al-Basit","The Extender","Расширяющий","Kengaytiruvchi","Васеъкунанда"],
+["الْخَافِضُ","Al-Khafid","The Abaser","Понижающий","Pastlatuvchi","Пасткунанда"],
+["الرَّافِعُ","Ar-Rafi'","The Exalter","Возвышающий","Yuksaltiruvchi","Баландкунанда"],
+["الْمُعِزُّ","Al-Mu'izz","The Bestower of Honour","Возвеличивающий","Aziz qiluvchi","Иззатдиҳанда"],
+["الْمُذِلُّ","Al-Mudhill","The Humiliator","Унижающий","Xor qiluvchi","Хоркунанда"],
+["السَّمِيعُ","As-Sami'","The All-Hearing","Всеслышащий","Eshituvchi","Шунаво"],
+["الْبَصِيرُ","Al-Basir","The All-Seeing","Всевидящий","Ko'ruvchi","Бино"],
+["الْحَكَمُ","Al-Hakam","The Judge","Судья","Hakam","Довар"],
+["الْعَدْلُ","Al-Adl","The Just","Справедливый","Adolatli","Одил"],
+["اللَّطِيفُ","Al-Latif","The Subtle, the Kind","Добрый, Проницательный","Latif","Латиф"],
+["الْخَبِيرُ","Al-Khabir","The All-Aware","Сведущий","Xabardor","Огоҳ"],
+["الْحَلِيمُ","Al-Halim","The Forbearing","Сдержанный","Halim","Бурдбор"],
+["الْعَظِيمُ","Al-Azim","The Magnificent","Великий","Ulug'","Бузург"],
+["الْغَفُورُ","Al-Ghafur","The All-Forgiving","Прощающий","Kechiruvchi","Омурзанда"],
+["الشَّكُورُ","Ash-Shakur","The Appreciative","Благодарный","Shukrni qabul qiluvchi","Шукрпазир"],
+["الْعَلِيُّ","Al-Aliyy","The Most High","Высочайший","Oliy","Олӣ"],
+["الْكَبِيرُ","Al-Kabir","The Most Great","Величайший","Ulkan","Кабир"],
+["الْحَفِيظُ","Al-Hafiz","The Preserver","Хранитель","Saqlovchi","Ҳофиз"],
+["الْمُقِيتُ","Al-Muqit","The Sustainer","Питающий","Quvvat beruvchi","Қуватдиҳанда"],
+["الْحَسِيبُ","Al-Hasib","The Reckoner","Учитывающий","Hisob oluvchi","Ҳисобгир"],
+["الْجَلِيلُ","Al-Jalil","The Majestic","Величественный","Jalil","Ҷалил"],
+["الْكَرِيمُ","Al-Karim","The Most Generous","Щедрый","Karim","Карим"],
+["الرَّقِيبُ","Ar-Raqib","The Watchful","Наблюдающий","Kuzatuvchi","Назоратгар"],
+["الْمُجِيبُ","Al-Mujib","The Responsive","Отвечающий на мольбы","Duolarni ijobat qiluvchi","Иҷобаткунанда"],
+["الْوَاسِعُ","Al-Wasi'","The All-Encompassing","Объемлющий","Keng qamrovli","Фарох"],
+["الْحَكِيمُ","Al-Hakim","The All-Wise","Мудрый","Hikmatli","Ҳаким"],
+["الْوَدُودُ","Al-Wadud","The Most Loving","Любящий","Do'st tutuvchi","Дӯстдор"],
+["الْمَجِيدُ","Al-Majid","The Glorious","Славный","Majid","Шарафманд"],
+["الْبَاعِثُ","Al-Ba'ith","The Resurrector","Воскрешающий","Qayta tiriltiruvchi","Барангезанда"],
+["الشَّهِيدُ","Ash-Shahid","The Witness","Свидетель","Guvoh","Шоҳид"],
+["الْحَقُّ","Al-Haqq","The Truth","Истина","Haq","Ҳақ"],
+["الْوَكِيلُ","Al-Wakil","The Trustee","Попечитель","Vakil","Вакил"],
+["الْقَوِيُّ","Al-Qawiyy","The All-Strong","Сильный","Kuchli","Пурқувват"],
+["الْمَتِينُ","Al-Matin","The Firm","Непоколебимый","Mustahkam","Устувор"],
+["الْوَلِيُّ","Al-Waliyy","The Protecting Friend","Покровитель","Homiy","Ҳомӣ"],
+["الْحَمِيدُ","Al-Hamid","The Praiseworthy","Достохвальный","Hamdga loyiq","Ситудашуда"],
+["الْمُحْصِي","Al-Muhsi","The All-Counting","Исчисляющий","Hisoblovchi","Шуморанда"],
+["الْمُبْدِئُ","Al-Mubdi'","The Originator","Начинающий творение","Boshlovchi","Ибтидокунанда"],
+["الْمُعِيدُ","Al-Mu'id","The Restorer","Возвращающий","Qaytaruvchi","Баргардонанда"],
+["الْمُحْيِي","Al-Muhyi","The Giver of Life","Оживляющий","Hayot beruvchi","Зиндагибахш"],
+["الْمُمِيتُ","Al-Mumit","The Bringer of Death","Умерщвляющий","O'lim beruvchi","Миронанда"],
+["الْحَيُّ","Al-Hayy","The Ever-Living","Живой","Tirik","Зинда"],
+["الْقَيُّومُ","Al-Qayyum","The Self-Sustaining","Вседержитель","Barqaror","Пойдор"],
+["الْوَاجِدُ","Al-Wajid","The Finder","Находящий","Topuvchi","Ёбанда"],
+["الْمَاجِدُ","Al-Majid","The Noble","Благородный","Olijanob","Олиҷаноб"],
+["الْوَاحِدُ","Al-Wahid","The One","Единственный","Yagona","Ягона"],
+["الأَحَدُ","Al-Ahad","The Unique","Единый","Yakka","Якто"],
+["الصَّمَدُ","As-Samad","The Eternal Refuge","Самодостаточный","Behojat","Бениёз"],
+["الْقَادِرُ","Al-Qadir","The Able","Всемогущий","Qodir","Қодир"],
+["الْمُقْتَدِرُ","Al-Muqtadir","The All-Powerful","Всевластный","Qudrat egasi","Тавоно"],
+["الْمُقَدِّمُ","Al-Muqaddim","The Expediter","Выдвигающий вперёд","Oldinga suruvchi","Пешгузоранда"],
+["الْمُؤَخِّرُ","Al-Mu'akhkhir","The Delayer","Отодвигающий назад","Ortga suruvchi","Ақибгузоранда"],
+["الأَوَّلُ","Al-Awwal","The First","Первый","Avval","Аввал"],
+["الآخِرُ","Al-Akhir","The Last","Последний","Oxir","Охир"],
+["الظَّاهِرُ","Az-Zahir","The Manifest","Явный","Zohir","Зоҳир"],
+["الْبَاطِنُ","Al-Batin","The Hidden","Скрытый","Botin","Ботин"],
+["الْوَالِي","Al-Wali","The Governor","Правитель","Hokim","Ҳоким"],
+["الْمُتَعَالِي","Al-Muta'ali","The Most Exalted","Превышний","Juda yuksak","Баландмартаба"],
+["الْبَرُّ","Al-Barr","The Source of Goodness","Благостный","Yaxshilik qiluvchi","Накӯкор"],
+["التَّوَّابُ","At-Tawwab","The Acceptor of Repentance","Принимающий покаяние","Tavbalarni qabul qiluvchi","Тавбапазир"],
+["الْمُنْتَقِمُ","Al-Muntaqim","The Avenger","Взыскивающий","Jazolovchi","Интиқомгиранда"],
+["العَفُوُّ","Al-Afuww","The Pardoner","Снисходительный","Afv etuvchi","Афвкунанда"],
+["الرَّؤُوفُ","Ar-Ra'uf","The Most Kind","Сострадательный","Shafqatli","Шафқатманд"],
+["مَالِكُ الْمُلْكِ","Malik al-Mulk","Owner of Sovereignty","Владыка царства","Mulk egasi","Молики мулк"],
+["ذُو الْجَلَالِ وَالْإِكْرَامِ","Dhul-Jalali wal-Ikram","Lord of Majesty and Generosity","Обладатель величия и щедрости","Ulug'lik va karam egasi","Соҳиби ҷалол ва икром"],
+["الْمُقْسِطُ","Al-Muqsit","The Equitable","Беспристрастный","Adolat qiluvchi","Адолатгар"],
+["الْجَامِعُ","Al-Jami'","The Gatherer","Собирающий","Jamlovchi","Ҷамъкунанда"],
+["الْغَنِيُّ","Al-Ghaniyy","The Self-Sufficient","Богатый","G'aniy","Сарватманд"],
+["الْمُغْنِي","Al-Mughni","The Enricher","Обогащающий","Boy qiluvchi","Тавонгаркунанда"],
+["الْمَانِعُ","Al-Mani'","The Preventer","Удерживающий","To'suvchi","Боздоранда"],
+["الضَّارُّ","Ad-Darr","The Distresser","Посылающий вред","Zarar yetkazuvchi","Зараррасон"],
+["النَّافِعُ","An-Nafi'","The Benefactor","Приносящий пользу","Foyda beruvchi","Нафърасон"],
+["النُّورُ","An-Nur","The Light","Свет","Nur","Нур"],
+["الْهَادِي","Al-Hadi","The Guide","Ведущий прямым путём","Hidoyat qiluvchi","Ҳидоятгар"],
+["الْبَدِيعُ","Al-Badi'","The Incomparable Originator","Создатель небывалого","Benazir yaratuvchi","Навофар"],
+["الْبَاقِي","Al-Baqi","The Everlasting","Вечный","Boqiy","Боқӣ"],
+["الْوَارِثُ","Al-Warith","The Inheritor","Наследующий","Voris","Ворис"],
+["الرَّشِيدُ","Ar-Rashid","The Guide to the Right Path","Направляющий к истине","To'g'ri yo'lga boshlovchi","Роҳнамо"],
+["الصَّبُورُ","As-Sabur","The Most Patient","Терпеливый","Sabrli","Шикебо"]
+];
+const DHIKR = [["سُبْحَانَ ٱللَّٰهِ","SubhanAllah"],["ٱلْحَمْدُ لِلَّٰهِ","Alhamdulillah"],["ٱللَّٰهُ أَكْبَرُ","Allahu Akbar"]];
+
+/* ───────── state ───────── */
+let LANG = "en", T = LX.en, DATA = null, TZ = "UTC", QIBLA = 0;
+const tr = (k, v = {}) => String(T[k] ?? LX.en[k] ?? k).replace(/\{(\w+)\}/g, (_, x) => v[x] ?? "");
+const haptic = (kind = "light") => { try { tg?.HapticFeedback?.impactOccurred(kind); } catch (e) {} };
+const ver = v => { try { return !!tg && tg.isVersionAtLeast(v); } catch (e) { return false; } };
+
+/* ───────── time helpers (the city's time zone, not the phone's) ───────── */
+function tzOffset(at) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", {timeZone: TZ, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit"}).formatToParts(at).map(x => [x.type, x.value]));
+  return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - at.getTime();
+}
+function wall(iso, hhmm) {  // "2026-11-16" + "05:36" in TZ -> epoch ms
+  const [y, m, d] = iso.split("-").map(Number), [h, mi] = hhmm.split(":").map(Number);
+  const guess = Date.UTC(y, m - 1, d, h, mi);
+  return guess - tzOffset(new Date(guess));
+}
+function todayISO() {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit"}).formatToParts(new Date()).map(x => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}`;
+}
+const addDays = (iso, n) => { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const dmyToIso = s => { const [d, m, y] = s.split("-"); return `${y}-${m}-${d}`; };
+const pad = n => String(n).padStart(2, "0");
+function fmtLeft(ms) { const s = Math.max(0, Math.floor(ms / 1000)); return `${pad(Math.floor(s / 3600))}:${pad(Math.floor(s % 3600 / 60))}:${pad(s % 60)}`; }
+
+/* ───────── storage: Telegram cloud, local fallback ───────── */
+const store = {
+  cloud: () => ver("6.9") && tg.CloudStorage,
+  get(keys) {
+    return new Promise(res => {
+      const local = () => { const o = {}; keys.forEach(k => { try { o[k] = localStorage.getItem(k) || ""; } catch (e) { o[k] = ""; } }); res(o); };
+      if (!this.cloud()) return local();
+      try { tg.CloudStorage.getItems(keys, (err, vals) => err ? local() : res(vals || {})); } catch (e) { local(); }
+    });
+  },
+  set(k, v) {
+    try { localStorage.setItem(k, v); } catch (e) {}
+    if (this.cloud()) try { tg.CloudStorage.setItem(k, v); } catch (e) {}
+  }
+};
+
+/* ───────── API ───────── */
+async function api(path) {
+  const r = await fetch(path, {headers: {"X-Init-Data": tg?.initData || ""}});
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+/* ───────── navigation ───────── */
+let TAB = "today", SUB = null;
+function show(view) {
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + view));
+  window.scrollTo(0, 0);
+}
+function go(tab) {
+  TAB = tab; SUB = null;
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
+  show(tab);
+  try { tg?.BackButton?.hide(); } catch (e) {}
+  if (tab === "qibla") startCompass();
+  if (tab === "cal") renderCal();
+  if (tab === "tasbih") renderTasbih();
+}
+function openSub(name) {
+  SUB = name; show(name);
+  try { tg?.BackButton?.show(); } catch (e) {}
+  ({tracker: renderTracker, ramadan: renderRamadan, mosques: openMosques, names: renderNames})[name]?.();
+}
+function back() { if (SUB) go("more"); }
+
+/* ───────── TODAY ───────── */
+function eventsAround() {
+  const iso = DATA.today.date, t = DATA.today.t, tm = DATA.tomorrow.t;
+  const list = FARD.map(k => ({k, at: wall(iso, t[k])}));
+  list.unshift({k: "Isha", at: wall(addDays(iso, -1), t.Isha), prev: true});
+  list.push({k: "Fajr", at: wall(addDays(iso, 1), tm.Fajr), next: true});
+  return list;
+}
+function renderToday() {
+  const t = DATA.today.t, p = DATA.profile;
+  $("place").textContent = "📍 " + p.city;
+  const [y, m, d] = DATA.today.date.split("-").map(Number);
+  $("dates").textContent = `${d} ${T.gm[m - 1]} ${y}`;
+  $("hijriPill").textContent = `🗓 ${DATA.today.hday} ${T.hm[DATA.today.hmonth - 1]} ${DATA.today.hyear}`;
+  $("times").innerHTML = PRAYERS.map(k => `<div class="t" data-k="${k}"><div class="ico">${ICONS[k]}</div><div class="nm">${esc(T.pn[k])}</div><div class="tm">${t[k]}</div></div>`).join("");
+  tick();
+}
+function tick() {
+  if (!DATA || DATA.need_setup) return;
+  if (todayISO() !== DATA.today.date) { load(true); return; }  // new day in the city
+  const now = Date.now(), ev = eventsAround();
+  let i = ev.findIndex(e => e.at > now); if (i < 1) i = 1;
+  const prev = ev[i - 1], next = ev[i];
+  const total = next.at - prev.at, left = next.at - now;
+  const C = 2 * Math.PI * 104, ring = $("ring");
+  ring.style.strokeDasharray = C; ring.style.strokeDashoffset = C * (left / total);
+  $("untilLbl").textContent = tr("next_l");
+  $("nextName").textContent = T.pn[next.k];
+  $("left").textContent = fmtLeft(left);
+  $("nextAt").textContent = tr("at", {t: next.next ? DATA.tomorrow.t.Fajr : DATA.today.t[next.k]});
+  const t = DATA.today.t, iso = DATA.today.date;
+  document.querySelectorAll("#times .t").forEach(row => {
+    const k = row.dataset.k, at = wall(iso, t[k]);
+    row.classList.toggle("past", at <= now && !(prev.k === k && !prev.prev));
+    const fajrOver = prev.k === "Fajr" && now >= wall(iso, t.Sunrise);
+    row.classList.toggle("now", !prev.prev && prev.k === k && !fajrOver);
+    row.classList.toggle("next", !next.next && next.k === k);
+  });
+}
+
+/* ───────── QIBLA ───────── */
+function bearing(lat, lon) {
+  const r = Math.PI / 180, p1 = lat * r, p2 = KAABA[0] * r, dl = (KAABA[1] - lon) * r;
+  const y = Math.sin(dl) * Math.cos(p2), x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
+  return (Math.atan2(y, x) / r + 360) % 360;
+}
+function distanceKm(lat, lon, lat2 = KAABA[0], lon2 = KAABA[1]) {
+  const r = Math.PI / 180, dLa = (lat2 - lat) * r, dLo = (lon2 - lon) * r;
+  const a = Math.sin(dLa / 2) ** 2 + Math.cos(lat * r) * Math.cos(lat2 * r) * Math.sin(dLo / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function buildDial() {
+  const c = 150, R = 136, parts = [];
+  parts.push(`<circle cx="${c}" cy="${c}" r="${R + 10}" fill="var(--card)"/>`);
+  parts.push(`<circle cx="${c}" cy="${c}" r="${R}" fill="none" stroke="#d4af37" stroke-width="3"/>`);
+  for (let a = 0; a < 360; a += 5) {
+    const big = a % 30 === 0, r1 = R - (big ? 16 : 8), rad = a * Math.PI / 180;
+    parts.push(`<line x1="${c + r1 * Math.sin(rad)}" y1="${c - r1 * Math.cos(rad)}" x2="${c + (R - 2) * Math.sin(rad)}" y2="${c - (R - 2) * Math.cos(rad)}" stroke="${big ? "var(--text)" : "var(--hint)"}" stroke-width="${big ? 2.5 : 1.2}" opacity="${big ? .9 : .6}"/>`);
+  }
+  [["N", 0, "#e65c5c"], ["E", 90], ["S", 180], ["W", 270]].forEach(([l, a, col]) => {
+    const rad = a * Math.PI / 180, r = R - 36;
+    parts.push(`<text x="${c + r * Math.sin(rad)}" y="${c - r * Math.cos(rad)}" text-anchor="middle" dominant-baseline="central" font-size="22" font-weight="800" fill="${col || "var(--text)"}" transform="rotate(${a} ${c + r * Math.sin(rad)} ${c - r * Math.cos(rad)})">${l}</text>`);
+  });
+  const q = QIBLA * Math.PI / 180, kx = c + (R - 2) * Math.sin(q), ky = c - (R - 2) * Math.cos(q);
+  parts.push(`<line x1="${c}" y1="${c}" x2="${c + (R - 40) * Math.sin(q)}" y2="${c - (R - 40) * Math.cos(q)}" stroke="#d4af37" stroke-width="6" stroke-linecap="round"/>`);
+  parts.push(`<g transform="translate(${kx} ${ky}) rotate(${QIBLA})"><rect x="-17" y="-17" width="34" height="34" rx="4" fill="#151515" stroke="#d4af37" stroke-width="3"/><rect x="-17" y="-9" width="34" height="6" fill="#d4af37"/></g>`);
+  $("dial").innerHTML = parts.join("");
+}
+let compassOn = false, heading = null, smooth = null, lastOk = false, gotEvent = false;
+function onHeading(h) {
+  if (h == null || isNaN(h)) return;
+  gotEvent = true;
+  h = (h + 360) % 360;
+  if (smooth == null) smooth = h;
+  let d = ((h - smooth + 540) % 360) - 180; smooth = (smooth + d * 0.25 + 360) % 360;
+  heading = smooth;
+  $("dial").style.transform = `rotate(${-heading}deg)`;
+  const diff = Math.abs(((QIBLA - heading + 540) % 360) - 180), ok = diff < 5;
+  $("compass").classList.toggle("ok", ok);
+  $("qStatus").textContent = ok ? tr("q_ok") : `${Math.round(diff)}°`;
+  $("qStatus").classList.toggle("ok", ok);
+  if (ok && !lastOk) { try { tg?.HapticFeedback?.notificationOccurred("success"); } catch (e) {} }
+  lastOk = ok;
+  $("qEnableWrap").hidden = true;
+}
+function screenAngle() { return (screen.orientation && screen.orientation.angle) || window.orientation || 0; }
+function listenBrowser() {
+  window.addEventListener("deviceorientationabsolute", e => { if (e.alpha != null) onHeading(360 - e.alpha + screenAngle()); }, true);
+  window.addEventListener("deviceorientation", e => {
+    if (e.webkitCompassHeading != null) onHeading(e.webkitCompassHeading + screenAngle());
+    else if (e.absolute && e.alpha != null) onHeading(360 - e.alpha + screenAngle());
+  }, true);
+}
+function listenTelegram() {
+  if (!ver("8.0") || !tg.DeviceOrientation) return;
+  try {
+    tg.onEvent("deviceOrientationChanged", () => {
+      if (gotEvent && !tg.DeviceOrientation.absolute) return;
+      const a = tg.DeviceOrientation.alpha;
+      if (a != null && tg.DeviceOrientation.absolute) onHeading(360 - a * 180 / Math.PI);
+    });
+    tg.DeviceOrientation.start({refresh_rate: 60, need_absolute: true});
+  } catch (e) {}
+}
+function startCompass() {
+  if (compassOn) return;
+  const needPerm = typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function";
+  const begin = () => {
+    compassOn = true; listenBrowser(); listenTelegram();
+    setTimeout(() => { if (!gotEvent) { $("qStatus").textContent = ""; $("qHint").textContent = tr("q_nocompass", {deg: Math.round(QIBLA)}); $("dial").style.transform = "rotate(0deg)"; } }, 2500);
+  };
+  if (needPerm) {
+    $("qEnableWrap").hidden = false;
+    $("qEnable").onclick = () => DeviceOrientationEvent.requestPermission().then(s => { if (s === "granted") begin(); }).catch(begin);
+  } else { $("qEnableWrap").hidden = true; begin(); }
+}
+function renderQibla() {
+  const p = DATA.profile;
+  QIBLA = bearing(p.lat, p.lon);
+  $("qTitle").textContent = tr("q_title"); $("qPlace").textContent = "📍 " + p.city;
+  $("qDegL").textContent = tr("q_deg"); $("qDeg").textContent = Math.round(QIBLA) + "°";
+  $("qDist").textContent = tr("q_dist", {km: Math.round(distanceKm(p.lat, p.lon)).toLocaleString()});
+  $("qHint").textContent = tr("q_turn") + " · " + tr("q_flat");
+  $("qCalib").textContent = tr("q_calib"); $("qEnable").textContent = tr("q_enable");
+  $("qEnableWrap").hidden = true;
+  buildDial();
+}
+
+/* ───────── CALENDAR ───────── */
+let CAL = null;
+async function renderCal(y, m) {
+  if (y == null) { CAL = DATA.month; } else {
+    $("calTbl").innerHTML = `<tr><td class="muted" style="padding:20px">${tr("loading")}</td></tr>`;
+    try { const r = await api(`/api/month?y=${y}&m=${m}`); CAL = {y: r.y, m: r.m, days: r.days}; } catch (e) { $("calTbl").innerHTML = `<tr><td class="muted" style="padding:20px">${tr("err")}</td></tr>`; return; }
+  }
+  const today = todayISO(), d0 = CAL.days[0], dl = CAL.days[CAL.days.length - 1];
+  $("calTitle").textContent = `${T.gm[CAL.m - 1]} ${CAL.y}`;
+  $("calSub").textContent = d0.hmonth === dl.hmonth ? `${T.hm[d0.hmonth - 1]} ${d0.hyear}` : `${T.hm[d0.hmonth - 1]} – ${T.hm[dl.hmonth - 1]} ${dl.hyear}`;
+  const head = `<tr><th></th>${PRAYERS.map(k => `<th>${ICONS[k]}<br>${esc(T.pn[k])}</th>`).join("")}</tr>`;
+  const wdIdx = {Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6};
+  const rows = CAL.days.map(d => {
+    const iso = dmyToIso(d.date), cls = [iso === today ? "today" : "", d.wd === "Fri" ? "fri" : ""].join(" ");
+    return `<tr class="${cls}" ${iso === today ? 'id="calToday"' : ""}><td><b>${d.day}</b> ${T.wd[wdIdx[d.wd]]}<span class="h">${d.hday} ${esc(T.hm[d.hmonth - 1])}</span></td>${PRAYERS.map(k => `<td>${d.t[k]}</td>`).join("")}</tr>`;
+  }).join("");
+  $("calTbl").innerHTML = head + rows;
+  const el = $("calToday"); if (el) el.scrollIntoView({block: "center"});
+}
+function shiftMonth(n) { let y = CAL.y, m = CAL.m + n; if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; } haptic(); renderCal(y, m); }
+
+/* ───────── TASBIH ───────── */
+let TS = {c: 0, goal: 33, total: 0};
+async function loadTasbih() { const v = (await store.get(["tasbih"])).tasbih; try { if (v) TS = Object.assign(TS, JSON.parse(v)); } catch (e) {} }
+function renderTasbih() {
+  $("tCount").textContent = TS.c; $("tGoal").textContent = tr("s_goal", {n: TS.goal});
+  $("tTotal").textContent = TS.total.toLocaleString(); $("tTotalL").textContent = tr("s_total"); $("tReset").textContent = tr("s_reset");
+  const step = TS.goal >= 99 ? Math.min(2, Math.floor(Math.max(TS.c - 1, 0) / 33)) : 0;
+  $("dAr").textContent = DHIKR[step][0]; $("dTr").textContent = TS.c >= TS.goal ? tr("s_done") : DHIKR[step][1];
+  $("goals").innerHTML = [33, 99, 100].map(g => `<button class="${g === TS.goal ? "on" : ""}" data-g="${g}">${g}</button>`).join("");
+}
+let saveT = null;
+function saveTasbih() { clearTimeout(saveT); saveT = setTimeout(() => store.set("tasbih", JSON.stringify(TS)), 600); }
+function tapBead() {
+  if (TS.c >= TS.goal) TS.c = 0;
+  TS.c++; TS.total++;
+  if (TS.c === TS.goal) { try { tg?.HapticFeedback?.notificationOccurred("success"); } catch (e) {} }
+  else haptic(TS.c % 33 === 0 ? "heavy" : "light");
+  renderTasbih(); saveTasbih();
+}
+
+/* ───────── MORE ───────── */
+function renderMore() {
+  $("moreTitle").textContent = T.t_more;
+  const items = [["tracker", "✅", "m_tracker", "m_tracker_d"], ["ramadan", "🌙", "m_ramadan", "m_ramadan_d"], ["mosques", "🕌", "m_mosques", "m_mosques_d"], ["names", "📖", "m_names", "m_names_d"]];
+  let h = items.map(([id, ic, t1, t2]) => `<button class="item" data-sub="${id}"><div class="ico">${ic}</div><div><div class="tt">${tr(t1)}</div><div class="ds">${tr(t2)}</div></div><div class="ch">›</div></button>`).join("");
+  if (ver("8.0") && tg.addToHomeScreen) h += `<button class="item" id="homeBtn"><div class="ico">📲</div><div><div class="tt">${tr("m_home")}</div><div class="ds" id="homeDs">${tr("m_home_d")}</div></div></button>`;
+  $("moreMenu").innerHTML = h;
+  const hb = $("homeBtn");
+  if (hb) {
+    hb.onclick = () => { try { tg.addToHomeScreen(); } catch (e) {} };
+    try { tg.checkHomeScreenStatus(s => { if (s === "added") $("homeDs").textContent = tr("m_home_done"); }); } catch (e) {}
+  }
+  document.querySelectorAll(".lbl-back").forEach(e => e.textContent = tr("back"));
+}
+
+/* ───────── TRACKER ───────── */
+const trKey = iso => "tr_" + iso.replace(/-/g, "");
+let TRK = {};
+async function renderTracker() {
+  $("trTitle").textContent = tr("m_tracker"); $("trHint").textContent = tr("tr_hint");
+  $("trStreakL").textContent = tr("tr_streak"); $("trWeekL").textContent = tr("tr_week");
+  const today = todayISO(), days = Array.from({length: 60}, (_, i) => addDays(today, -i));
+  const vals = await store.get(days.map(trKey));
+  TRK = {}; days.forEach(d => TRK[d] = (vals[trKey(d)] || "00000").padEnd(5, "0").slice(0, 5));
+  drawTracker();
+}
+function drawTracker() {
+  const today = todayISO(), v = TRK[today] || "00000";
+  $("trChecks").innerHTML = FARD.map((k, i) => `<button class="c ${v[i] === "1" ? "on" : ""}" data-i="${i}"><div class="box">${v[i] === "1" ? "✓" : ""}</div><div class="nm">${ICONS[k]} ${esc(T.pn[k])}</div><div class="muted">${DATA.today.t[k]}</div></button>`).join("");
+  const count = iso => (TRK[iso] || "").split("").filter(x => x === "1").length;
+  let streak = 0; for (let i = (count(today) === 5 ? 0 : 1); i < 60; i++) { if (count(addDays(today, -i)) === 5) streak++; else break; }
+  $("trStreak").textContent = streak;
+  const week = Array.from({length: 7}, (_, i) => addDays(today, i - 6));
+  $("trWeekN").textContent = `${week.reduce((s, d) => s + count(d), 0)} / 35`;
+  $("trWeek").innerHTML = week.map(d => { const n = count(d), wd = (new Date(d + "T12:00:00Z").getUTCDay() + 6) % 7; return `<div class="d"><div class="lb">${n}</div><div class="bar ${n === 5 ? "full" : ""}" style="height:${Math.max(4, n * 18)}px"></div><div class="lb">${T.wd[wd]}</div></div>`; }).join("");
+}
+function toggleTrack(i) {
+  const today = todayISO(), v = (TRK[today] || "00000").split("");
+  v[i] = v[i] === "1" ? "0" : "1"; TRK[today] = v.join("");
+  store.set(trKey(today), TRK[today]);
+  if (TRK[today] === "11111") { try { tg?.HapticFeedback?.notificationOccurred("success"); } catch (e) {} } else haptic();
+  drawTracker();
+}
+
+/* ───────── RAMADAN ───────── */
+let RAM = null, ramTimer = null;
+async function renderRamadan() {
+  $("rTbl").innerHTML = `<tr><td class="muted" style="padding:20px">${tr("loading")}</td></tr>`;
+  $("rTitle").textContent = tr("m_ramadan"); $("rSub").textContent = ""; $("rCount").textContent = ""; $("rCountL").textContent = "";
+  try { RAM = RAM || await api("/api/ramadan"); } catch (e) { $("rTbl").innerHTML = `<tr><td class="muted" style="padding:20px">${tr("err")}</td></tr>`; return; }
+  $("rTitle").textContent = tr("r_title", {y: RAM.hyear});
+  const today = todayISO(), first = dmyToIso(RAM.days[0].date), last = dmyToIso(RAM.days[RAM.days.length - 1].date);
+  $("rTbl").innerHTML = `<tr><th>${tr("r_day")}</th><th></th><th>🥣 ${tr("r_s")}</th><th>🍽 ${tr("r_i")}</th></tr>` + RAM.days.map(d => {
+    const iso = dmyToIso(d.date), [y, m, dd] = iso.split("-").map(Number);
+    return `<tr class="${iso === today ? "today" : ""}" ${iso === today ? 'id="ramToday"' : ""}><td><b>${d.hday}</b></td><td>${dd} ${T.gm[m - 1].slice(0, 3)}</td><td>${d.t.Fajr}</td><td>${d.t.Maghrib}</td></tr>`;
+  }).join("");
+  const el = $("ramToday"); if (el) el.scrollIntoView({block: "center"});
+  clearInterval(ramTimer);
+  const upd = () => {
+    if (today < first) {
+      const n = Math.round((new Date(first + "T12:00:00Z") - new Date(today + "T12:00:00Z")) / 864e5);
+      $("rCountL").textContent = tr("r_in"); $("rCount").textContent = tr("r_days", {n}); $("rSub").textContent = "";
+    } else if (today <= last) {
+      $("rSub").textContent = tr("r_mub");
+      const day = RAM.days.find(d => dmyToIso(d.date) === today), now = Date.now();
+      const fajr = wall(today, day.t.Fajr), mag = wall(today, day.t.Maghrib);
+      if (now < fajr) { $("rCountL").textContent = tr("r_suhoor"); $("rCount").textContent = fmtLeft(fajr - now); }
+      else if (now < mag) { $("rCountL").textContent = tr("r_iftar"); $("rCount").textContent = fmtLeft(mag - now); }
+      else { $("rCountL").textContent = ""; $("rCount").textContent = "🤍"; $("rSub").textContent = tr("r_over"); }
+    } else { $("rCountL").textContent = ""; $("rCount").textContent = "🌙"; }
+  };
+  upd(); ramTimer = setInterval(() => { if (SUB === "ramadan") upd(); }, 1000);
+}
+
+/* ───────── MOSQUES ───────── */
+let leafletReady = null, MAP = null, MLAYER = null;
+function loadLeaflet() {
+  if (leafletReady) return leafletReady;
+  leafletReady = new Promise((ok, bad) => {
+    const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"; document.head.appendChild(css);
+    const js = document.createElement("script"); js.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"; js.onload = ok; js.onerror = bad; document.head.appendChild(js);
+  });
+  return leafletReady;
+}
+async function openMosques() {
+  const p = DATA.profile;
+  $("moTitle").textContent = tr("m_mosques"); $("moNear").textContent = tr("mo_near");
+  $("moSub").textContent = tr("mo_city", {c: p.city});
+  await findMosques(p.lat, p.lon);
+}
+async function findMosques(lat, lon) {
+  $("moList").innerHTML = `<div class="muted">${tr("mo_load")}</div>`;
+  try {
+    await loadLeaflet();
+    if (!MAP) {
+      MAP = L_.map("map", {zoomControl: false, attributionControl: true});
+      L_.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 19, attribution: "© OpenStreetMap"}).addTo(MAP);
+      MLAYER = L_.layerGroup().addTo(MAP);
+    }
+    MAP.setView([lat, lon], 14); MLAYER.clearLayers();
+    L_.circleMarker([lat, lon], {radius: 8, color: "#fff", weight: 3, fillColor: "#3b82f6", fillOpacity: 1}).addTo(MLAYER);
+    const q = `[out:json][timeout:20];nwr["amenity"="place_of_worship"]["religion"="muslim"](around:5000,${lat},${lon});out center 60;`;
+    const r = await fetch("https://overpass-api.de/api/interpreter", {method: "POST", body: "data=" + encodeURIComponent(q), headers: {"Content-Type": "application/x-www-form-urlencoded"}});
+    const j = await r.json();
+    const list = (j.elements || []).map(e => {
+      const la = e.lat ?? e.center?.lat, lo = e.lon ?? e.center?.lon, tags = e.tags || {};
+      return {la, lo, name: tags["name:" + LANG] || tags.name || tr("mo_noname"), d: distanceKm(lat, lon, la, lo)};
+    }).filter(x => x.la != null).sort((a, b) => a.d - b.d).slice(0, 40);
+    if (!list.length) { $("moList").innerHTML = `<div class="muted">${tr("mo_none")}</div>`; return; }
+    const icon = L_.divIcon({html: '<div style="font-size:24px;line-height:24px">🕌</div>', className: "", iconSize: [24, 24], iconAnchor: [12, 12]});
+    list.forEach((m, i) => { m.mk = L_.marker([m.la, m.lo], {icon}).addTo(MLAYER).bindPopup(esc(m.name)); });
+    MAP.fitBounds(L_.latLngBounds([[lat, lon], ...list.slice(0, 8).map(m => [m.la, m.lo])]), {padding: [30, 30]});
+    $("moList").innerHTML = list.map((m, i) => `<div class="m"><div style="font-size:22px">🕌</div><div class="nm"><b data-i="${i}">${esc(m.name)}</b><span class="muted">${m.d < 1 ? Math.round(m.d * 1000) + " " + tr("mt") : m.d.toFixed(1) + " " + tr("km")}</span></div><button class="go" data-la="${m.la}" data-lo="${m.lo}">${tr("mo_route")} ›</button></div>`).join("");
+    $("moList").querySelectorAll("b[data-i]").forEach(b => b.onclick = () => { const m = list[+b.dataset.i]; MAP.setView([m.la, m.lo], 16); m.mk.openPopup(); window.scrollTo({top: 0, behavior: "smooth"}); });
+    $("moList").querySelectorAll("button.go").forEach(b => b.onclick = () => openLink(`https://www.google.com/maps/dir/?api=1&destination=${b.dataset.la},${b.dataset.lo}`));
+  } catch (e) { $("moList").innerHTML = `<div class="muted">${tr("mo_err")}</div>`; }
+}
+function nearMe() {
+  haptic();
+  const fallback = () => findMosques(DATA.profile.lat, DATA.profile.lon);
+  const viaBrowser = () => navigator.geolocation ? navigator.geolocation.getCurrentPosition(p => findMosques(p.coords.latitude, p.coords.longitude), fallback, {enableHighAccuracy: true, timeout: 10000}) : fallback();
+  if (ver("8.0") && tg.LocationManager) {
+    try {
+      tg.LocationManager.init(() => {
+        if (!tg.LocationManager.isLocationAvailable) return viaBrowser();
+        tg.LocationManager.getLocation(loc => loc ? findMosques(loc.latitude, loc.longitude) : viaBrowser());
+      });
+      return;
+    } catch (e) {}
+  }
+  viaBrowser();
+}
+function openLink(u) { try { tg.openLink(u); } catch (e) { window.open(u, "_blank"); } }
+const L_ = new Proxy({}, {get: (_, k) => window.L[k]});  // Leaflet
+
+/* ───────── 99 NAMES ───────── */
+function renderNames(filter = "") {
+  $("nTitle").textContent = tr("m_names"); $("nSearch").placeholder = tr("n_search");
+  const col = {en: 2, ru: 3, uz: 4, tg: 5}[LANG], f = filter.trim().toLowerCase();
+  $("nList").innerHTML = NAMES.map((n, i) => ({n, i})).filter(({n}) => !f || n.some(x => String(x).toLowerCase().includes(f))).map(({n, i}) =>
+    `<div class="nm"><div class="no">${i + 1}</div><div class="ar">${n[0]}</div><div class="tr">${esc(n[1])}</div>${col ? `<div class="mn">${esc(n[col])}</div>` : ""}</div>`).join("");
+}
+
+/* ───────── boot ───────── */
+function applyLang() {
+  T = LX[LANG] || LX.en;
+  document.documentElement.lang = LANG;
+  document.documentElement.dir = LANG === "ar" ? "rtl" : "ltr";
+  document.querySelectorAll("[data-l]").forEach(e => e.textContent = tr(e.dataset.l));
+}
+function stateScreen(icon, text, button) {
+  $("boot").hidden = false; $("nav").hidden = true;
+  $("boot").innerHTML = `<div class="big">${icon}</div><div style="font-weight:600">${esc(text)}</div>` + (button ? `<button class="btn" id="stateBtn" style="max-width:280px">${esc(button)}</button>` : "");
+  if (button) $("stateBtn").onclick = () => { try { tg.close(); } catch (e) {} };
+}
+async function load(silent) {
+  try {
+    const d = await api("/api/me");
+    const lang = d.lang || (d.profile && d.profile.lang); LANG = lang in LX ? lang : "en"; applyLang();
+    if (d.need_setup) return stateScreen("📍", tr("need"), tr("to_bot"));
+    DATA = d; TZ = d.profile.tz;
+    $("boot").hidden = true; $("nav").hidden = false;
+    renderToday(); renderQibla(); renderMore();
+    if (!silent) { const want = new URLSearchParams(location.search).get("tab"); go(["today", "qibla", "cal", "tasbih", "more"].includes(want) ? want : "today"); }
+  } catch (e) {
+    if (!silent) stateScreen("⚠️", tr("err"));
+  }
+}
+function init() {
+  const code = String(tg?.initDataUnsafe?.user?.language_code || navigator.language || "en").slice(0, 2);
+  LANG = code in LX ? code : "en"; applyLang();
+  $("bootText").textContent = tr("loading");
+  if (!tg || !tg.initData) { stateScreen("📱", tr("open_tg")); return; }
+  try {
+    tg.ready(); tg.expand();
+    if (ver("8.0")) { try { tg.lockOrientation(); } catch (e) {} }
+    if (ver("7.7")) { try { tg.disableVerticalSwipes(); } catch (e) {} }
+    tg.BackButton.onClick(back);
+  } catch (e) {}
+  document.querySelectorAll("nav button").forEach(b => b.onclick = () => { haptic(); go(b.dataset.tab); });
+  document.addEventListener("click", e => {
+    const s = e.target.closest("[data-sub]"); if (s) { haptic(); openSub(s.dataset.sub); return; }
+    if (e.target.closest("[data-back]")) { back(); return; }
+    const g = e.target.closest("#goals button"); if (g) { TS.goal = +g.dataset.g; TS.c = 0; haptic(); renderTasbih(); saveTasbih(); return; }
+    const c = e.target.closest("#trChecks .c"); if (c) { toggleTrack(+c.dataset.i); return; }
+  });
+  $("bead").onclick = tapBead;
+  $("tReset").onclick = () => { TS.c = 0; haptic("medium"); renderTasbih(); saveTasbih(); };
+  $("calPrev").onclick = () => shiftMonth(-1); $("calNext").onclick = () => shiftMonth(1);
+  $("moNear").onclick = nearMe;
+  $("nSearch").oninput = e => renderNames(e.target.value);
+  loadTasbih();
+  load();
+  setInterval(() => { if (TAB === "today" && !SUB) tick(); }, 1000);
+}
+init();
+</script>
+</body>
+</html>
