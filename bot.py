@@ -22,6 +22,7 @@ import json
 import logging
 import math
 import os
+import re
 import time as _time
 from collections import deque
 from datetime import date, datetime, time as dtime, timedelta
@@ -46,7 +47,6 @@ from telegram import (
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
     LinkPreviewOptions,
-    SwitchInlineQueryChosenChat,
     Update,
     WebAppInfo,
 )
@@ -1413,10 +1413,16 @@ def auto_label(lang, n):
     return t(lang, "auto_off") if not n else (t(lang, "auto_1") if n == 1 else t(lang, "auto_n", n=n))
 
 
-def card_markup(u):
+async def card_markup(u):
     lang = u["lang"]
     if is_private(u):
-        return kb([qibla_btn(u), btn("🔄", "tc:refresh")], [share_times_btn(lang)], [btn(t(lang, "btn_menu"), "m:new")])
+        share = None
+        try:
+            share = await share_times_btn(u)
+        except Exception:  # noqa: BLE001
+            log.exception("share button failed")
+        rows = [[qibla_btn(u), btn("🔄", "tc:refresh")]] + ([[share]] if share else []) + [[btn(t(lang, "btn_menu"), "m:new")]]
+        return kb(*rows)
     return kb([qibla_btn(u), btn("🔄", "tc:refresh")], [btn(t(lang, "btn_menu"), "m:new")])
 
 
@@ -1449,7 +1455,12 @@ async def send_times_card(update, ctx, u):
     except Exception:  # noqa: BLE001
         log.exception("times failed")
         return await chat.send_message(t(u["lang"], "error"))
-    m = await chat.send_message(text, parse_mode=ParseMode.HTML, reply_markup=card_markup(u))
+    try:
+        m = await chat.send_message(text, parse_mode=ParseMode.HTML, reply_markup=await card_markup(u))
+    except BadRequest:  # just in case Telegram refuses the share link: send the card without it
+        log.exception("card with share link refused")
+        m = await chat.send_message(text, parse_mode=ParseMode.HTML, reply_markup=kb(
+            [qibla_btn(u), btn("🔄", "tc:refresh")], [btn(t(u["lang"], "btn_menu"), "m:new")]))
     await remember_card(chat.id, m.message_id, u["user_id"], ctx.bot)
 
 
@@ -1470,7 +1481,7 @@ async def refresh_cards(context: ContextTypes.DEFAULT_TYPE):
         drop = False
         try:
             await context.bot.edit_message_text(await card_text(u), chat_id=chat_id, message_id=msg_id,
-                                                parse_mode=ParseMode.HTML, reply_markup=card_markup(u))
+                                                parse_mode=ParseMode.HTML, reply_markup=await card_markup(u))
         except RetryAfter as e:
             log.warning("card refresh slowed down by Telegram for %ss", e.retry_after)
             return
@@ -1536,7 +1547,7 @@ async def apply_location(update, ctx, u, name, lat, lon, cc, drop_ids=()):
         if shown is not None:
             await remember_card(update.effective_chat.id, shown.message_id, tid, ctx.bot)
         return await ask_remind(update, u)
-    shown = await render(update, await card_text(u), card_markup(u))
+    shown = await render(update, await card_text(u), await card_markup(u))
     if shown is not None:
         await remember_card(update.effective_chat.id, shown.message_id, tid, ctx.bot)
 
@@ -1730,7 +1741,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if act == "tc":  # refresh this card now
         try:
             text = await card_text(u)
-            await render(update, text, card_markup(u))
+            await render(update, text, await card_markup(u))
             await POOL.execute("UPDATE times_cards SET edited_at = now() WHERE chat_id = $1 AND msg_id = $2",
                                update.effective_chat.id, q.message.message_id)
         except Exception:  # noqa: BLE001
@@ -1808,7 +1819,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 try:
                     await ctx.bot.edit_message_text(await card_text(await get_user(tid)), chat_id=card["chat_id"],
                                                     message_id=card["msg_id"], parse_mode=ParseMode.HTML,
-                                                    reply_markup=card_markup(await get_user(tid)))
+                                                    reply_markup=await card_markup(await get_user(tid)))
                 except Exception:  # noqa: BLE001
                     pass
         elif what == "daily" and parts[2] in ("off", "fajr", "sunrise"):
@@ -3928,12 +3939,25 @@ def dev_btn(lang):
     return InlineKeyboardButton(t(lang, "btn_dev"), url=f"https://t.me/{DEV_CONTACT}")
 
 
-def share_times_btn(lang):
-    """Opens the native chat picker (through the mini app) and sends the ready prayer-times message."""
-    if WEBAPP_URL:
-        return InlineKeyboardButton(t(lang, "btn_share"), web_app=WebAppInfo(url=f"{WEBAPP_URL}/?share=1"))
-    return InlineKeyboardButton(t(lang, "btn_share"), switch_inline_query_chosen_chat=SwitchInlineQueryChosenChat(
-        query="", allow_user_chats=True, allow_bot_chats=False, allow_group_chats=True, allow_channel_chats=True))
+async def share_times_text(u):
+    """Plain prayer times for today with the bot link at the bottom (for Telegram's own "share" window)."""
+    lang = u["lang"]
+    today = datetime.now(ZoneInfo(u["tz"])).date()
+    d = await get_timings(u, today)
+    lines = [f"🕌 {strip_tags(t(lang, 'times_title')).replace('🕌', '').strip()} · {u['city']}", f"📅 {today:%d.%m.%Y}", ""]
+    lines += [f"{emoji} {PN[lang][key.lower()]} — {d[key]}" for key, emoji in ROWS]
+    lines += ["", t(lang, "share_footer", bot=ref_link(u["user_id"]))]
+    return "\n".join(lines)
+
+
+async def share_times_btn(u):
+    """Telegram's own share window: pick a chat, the ready text is put in, tap send. No mini app, no @bot."""
+    text = await share_times_text(u)
+    return InlineKeyboardButton(t(u["lang"], "btn_share"), url="https://t.me/share/url?url=" + quote(text, safe=""))
+
+
+def strip_tags(x):
+    return re.sub(r"<[^>]+>", "", x)
 
 
 async def times_share_result(place, lang, madhab, sharer_id):
