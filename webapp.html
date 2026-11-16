@@ -113,6 +113,24 @@ h2{font-size:17px;margin:20px 0 10px}
 .menu .item .tt{font-weight:700}
 .menu .item .ds{color:var(--hint);font-size:13px}
 .menu .item .ch{margin-inline-start:auto;color:var(--hint);font-size:20px}
+.comm{display:flex;align-items:center;gap:12px;width:100%;text-align:start;cursor:pointer}
+.comm .ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:20px;background:var(--green-soft);flex:none}
+.comm b{color:var(--green)}
+.chc .hd{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.chc .tt{font-weight:800;font-size:16px}
+.chc .pr{height:6px;border-radius:9px;background:var(--line);margin:10px 0 6px;overflow:hidden}
+.chc .pr div{height:100%;background:var(--gold);border-radius:9px}
+.chc .mb{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.chc .mb:last-of-type{border-bottom:0}
+.chc .mb .rk{width:26px;text-align:center;font-weight:800;color:var(--hint)}
+.chc .mb .nm{flex:1;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chc .mb.me .nm{color:var(--gold)}
+.chc .dots{display:flex;gap:3px}
+.chc .dots i{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.chc .dots i.on{background:var(--green)}
+.chc .sc{font-weight:800;min-width:44px;text-align:end}
+.chc .acts{display:flex;gap:8px;margin-top:10px}
+.chc .acts .btn{padding:10px}
 .backbar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .backbar button{font-size:15px;color:var(--link);padding:6px 0}
 
@@ -315,6 +333,7 @@ nav button.on .i{filter:none;opacity:1}
       <div class="ring-in"><div class="label" id="untilLbl"></div><div class="name" id="nextName"></div><div class="left" id="left">--:--:--</div><div class="at" id="nextAt"></div></div>
     </div>
     <div class="card times" id="times"></div>
+    <button class="card comm" id="comm" data-sub="tracker" hidden></button>
     <div class="share" id="shareRow"></div>
   </section>
 
@@ -374,6 +393,19 @@ nav button.on .i{filter:none;opacity:1}
     </div>
     <h2 id="trAchL"></h2>
     <div class="achs" id="trAch"></div>
+    <button class="btn ghost" data-sub="challenges" id="trChBtn" style="margin-top:14px"></button>
+  </section>
+
+  <section class="view" id="v-challenges">
+    <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
+    <h1 id="chTitle"></h1><div class="sub" id="chSub"></div>
+    <div id="chList"></div>
+    <div class="card">
+      <div class="lbl" id="chNewL" style="font-weight:700;margin-bottom:8px"></div>
+      <input class="search" id="chName" maxlength="40" autocomplete="off" style="background:var(--bg)">
+      <div class="lbl sub" id="chDaysL" style="margin:8px 0 6px"></div><div class="chips" id="chDays"></div>
+      <button class="btn" id="chCreate" style="margin-top:12px"></button>
+    </div>
   </section>
 
   <section class="view" id="v-ramadan">
@@ -417,6 +449,7 @@ nav button.on .i{filter:none;opacity:1}
     <div class="card"><div class="lbl" id="stAutoL"></div><div class="chips" id="stAuto"></div></div>
     <div class="card"><div class="lbl" id="stQuietL"></div><div class="chips" id="stQuiet"></div></div>
     <div class="card"><div class="sw" id="stRam"></div></div>
+    <div class="card"><div class="sw" id="stAzr"></div><div class="sw" id="stWk" style="margin-top:14px"></div></div>
   </section>
 
   <section class="view" id="v-azkar">
@@ -745,7 +778,7 @@ function show(view) {
   window.scrollTo(0, 0);
 }
 function go(tab) {
-  TAB = tab; SUB = null;
+  TAB = tab; SUB = null; CH_FROM = null;
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
   show(tab);
   try { tg?.BackButton?.hide(); } catch (e) {}
@@ -758,9 +791,9 @@ function openSub(name) {
   SUB = name; show(name);
   try { tg?.BackButton?.show(); } catch (e) {}
   ({tracker: renderTracker, ramadan: renderRamadan, mosques: openMosques, names: renderNames, settings: renderSettings,
-    azkar: renderAzkar, duas: renderDuas, qada: renderQada, dates: renderDates, cities: renderCities})[name]?.();
+    azkar: renderAzkar, duas: renderDuas, challenges: renderChallenges, qada: renderQada, dates: renderDates, cities: renderCities})[name]?.();
 }
-function back() { if (SUB === "place") return returnFromPlace(); if (SUB === "admuser") return go("admin"); if (SUB) go("more"); }
+function back() { if (SUB === "place") return returnFromPlace(); if (SUB === "admuser") return go("admin"); if (SUB === "challenges" && CH_FROM === "tracker") { CH_FROM = null; return openSub("tracker"); } if (SUB) go("more"); }
 
 /* ───────── TODAY ───────── */
 function eventsAround() {
@@ -777,7 +810,7 @@ function renderToday() {
   $("dates").textContent = `${d} ${T.gm[m - 1]} ${y}`;
   $("hijriPill").textContent = `🗓 ${DATA.today.hday} ${T.hm[DATA.today.hmonth - 1]} ${DATA.today.hyear}`;
   $("times").innerHTML = PRAYERS.map(k => `<div class="t" data-k="${k}"><div class="ico">${ICONS[k]}</div><div class="nm">${esc(T.pn[k])}</div><div class="tm">${t[k]}</div></div>`).join("");
-  tick(); renderShare();
+  tick(); renderShare(); loadCommunity();
 }
 function tick() {
   if (!DATA || DATA.need_setup) return;
@@ -912,7 +945,7 @@ function shiftMonth(n) { let y = CAL.y, m = CAL.m + n; if (m < 1) { m = 12; y--;
 /* ───────── MORE ───────── */
 function renderMore() {
   $("moreTitle").textContent = T.t_more;
-  const items = [["tracker", "✅", "m_tracker", "m_tracker_d"], ["azkar", "🌅", "m_azkar", "m_azkar_d"], ["duas", "🤲", "m_duas", "m_duas_d"],
+  const items = [["tracker", "✅", "m_tracker", "m_tracker_d"], ["challenges", "🤝", "m_ch", "m_ch_d"], ["azkar", "🌅", "m_azkar", "m_azkar_d"], ["duas", "🤲", "m_duas", "m_duas_d"],
     ["qada", "🔁", "m_qada", "m_qada_d"], ["dates", "📆", "m_dates", "m_dates_d"], ["ramadan", "🌙", "m_ramadan", "m_ramadan_d"],
     ["cities", "✈️", "m_cities", "m_cities_d"], ["mosques", "🕌", "m_mosques", "m_mosques_d"], ["names", "📖", "m_names", "m_names_d"], ["settings", "⚙️", "m_settings", "m_settings_d"]];
   let h = items.map(([id, ic, t1, t2]) => `<button class="item" data-sub="${id}"><div class="ico">${ic}</div><div><div class="tt">${tr(t1)}</div><div class="ds">${tr(t2)}</div></div><div class="ch">›</div></button>`).join("");
@@ -931,7 +964,7 @@ const trKey = iso => "tr_" + iso.replace(/-/g, "");
 let TRK = {};
 async function renderTracker() {
   $("trTitle").textContent = tr("m_tracker"); $("trHint").textContent = tr("tr_hint");
-  $("trStreakL").textContent = tr("tr_streak"); $("trWeekL").textContent = tr("tr_week");
+  $("trStreakL").textContent = tr("tr_streak"); $("trWeekL").textContent = tr("tr_week"); $("trChBtn").textContent = "🤝 " + tr("m_ch");
   await loadTrackerDays(124);
   drawTracker();
 }
@@ -950,6 +983,7 @@ function toggleTrack(i) {
   const today = todayISO(), v = (TRK[today] || "00000").split("");
   v[i] = v[i] === "1" ? "0" : "1"; TRK[today] = v.join("");
   store.set(trKey(today), TRK[today]);
+  if (TR_SERVER) apiPost("/api/tracker", {day: today, mask: TRK[today]}).catch(() => toast(tr("st_err")));
   TRS.total = Math.max(0, (TRS.total || 0) + (v[i] === "1" ? 1 : -1));
   setTimeout(() => store.set("tr_stats", JSON.stringify(TRS)), 50);
   if (TRK[today] === "11111") { try { tg?.HapticFeedback?.notificationOccurred("success"); } catch (e) {} } else haptic();
@@ -1204,6 +1238,8 @@ function renderSettings() {
   chips($("stAuto"), (p.auto_options || [0, 1, 5, 15]).map(n => [n, !n ? tr("st_auto_off") : n === 1 ? tr("st_auto_1") : tr("st_min", {n})]), p.auto, v => saveSetting({auto: +v}));
   chips($("stQuiet"), (p.quiet_options || ["off"]).map(q => [q, q === "off" ? tr("st_quiet_off") : q.split("-").map(h => pad(h) + ":00").join("–")]), p.quiet, v => saveSetting({quiet: v}));
   sw($("stRam"), tr("st_ram"), p.ramadan, v => saveSetting({ramadan: v}));
+  sw($("stAzr"), tr("st_azr"), p.azkar_rem !== false, v => saveSetting({azkar_rem: v}));
+  sw($("stWk"), tr("st_wk"), p.weekly !== false, v => saveSetting({weekly: v}));
 }
 /* ───────── AZKAR ───────── */
 let AZ_MODE = null, AZ = {};
@@ -1408,13 +1444,24 @@ function toggleFav(key) {
 }
 
 /* ───────── TRACKER: month, totals, achievements ───────── */
-let TRS = {total: null, best: 0}, TRM = null;
+let TRS = {total: null, best: 0}, TRM = null, TR_SERVER = false;
 async function loadTrackerDays(n) {
   const today = todayISO(), days = Array.from({length: n}, (_, i) => addDays(today, -i)), out = {};
   for (let i = 0; i < days.length; i += 30) Object.assign(out, await store.get(days.slice(i, i + 30).map(trKey)));
-  const st = (await store.get(["tr_stats"])).tr_stats; try { if (st) TRS = Object.assign(TRS, JSON.parse(st)); } catch (e) {}
+  const st = (await store.get(["tr_stats", "tr_migrated"])); try { if (st.tr_stats) TRS = Object.assign(TRS, JSON.parse(st.tr_stats)); } catch (e) {}
   TRK = {}; days.forEach(d => TRK[d] = (out[trKey(d)] || "00000").padEnd(5, "0").slice(0, 5));
-  if (TRS.total == null) TRS.total = days.reduce((s, d) => s + TRK[d].split("").filter(x => x === "1").length, 0);
+  try {
+    if (st.tr_migrated !== "1") {  // one-time move of the old marks to the server
+      const old = {}; days.forEach(d => { if (TRK[d] !== "00000") old[d] = TRK[d]; });
+      await apiPost("/api/tracker_bulk", {days: old}); store.set("tr_migrated", "1");
+    }
+    const r = await api("/api/tracker?from=" + days[days.length - 1]);
+    days.forEach(d => TRK[d] = r.days[d] || "00000");
+    TRS.total = r.total; TR_SERVER = true;
+  } catch (e) {
+    TR_SERVER = false;
+    if (TRS.total == null) TRS.total = days.reduce((s, d) => s + TRK[d].split("").filter(x => x === "1").length, 0);
+  }
 }
 const dayCount = iso => (TRK[iso] || "").split("").filter(x => x === "1").length;
 function currentStreak() { const t = todayISO(); let s = 0; for (let i = (dayCount(t) === 5 ? 0 : 1); i < 400; i++) { if (dayCount(addDays(t, -i)) === 5) s++; else break; } return s; }
@@ -1470,6 +1517,78 @@ const LX4 = {
   pl_title:"الموقع",pl_hint:"اضغط على الخريطة أو اسحب الدبوس",pl_auto:"📍 تحديد تلقائي",pl_err_loc:"تعذر تحديد موقعك. اسمح بالوصول إلى الموقع أو اختر مكاناً على الخريطة.",pl_change:"📍 تغيير الموقع",ci_near:"📍 بالقرب مني",ci_map:"🗺 على الخريطة"}
 };
 for (const l in LX4) Object.assign(LX[l], LX4[l]);
+
+/* ═══════════ stage 4: community counter, challenges ═══════════ */
+const LX5 = {
+ en:{m_ch:"Challenges",m_ch_d:"All 5 prayers together with friends",ch_sub:"Invite friends and keep all 5 prayers together. Everyone marks prayers in their tracker.",ch_new:"➕ New challenge",ch_name_ph:"Name, e.g. Brothers 🤝",ch_days:"Duration",ch_dn:"{n} d.",ch_create:"Create",ch_invite:"📨 Invite",ch_leave:"Leave",ch_leave_q:"Tap again to leave",ch_day:"Day {d} of {n}",ch_ended:"Finished",ch_empty:"No challenges yet — create one and invite your friends.",ch_limit:"You can have up to 5 active challenges.",ch_you:"you",ch_share:"Join my challenge in Mawaqit: all 5 prayers for {n} days 🤝",ch_full_d:"full days",
+  cm_line:"<b>{n}</b> people prayed all 5 prayers today in Mawaqit",cm_marked:"<b>{n}</b> people are marking their prayers today",cm_first:"Mark your prayers — be the first today 🤍",st_azr:"🌅 Adhkar reminder (morning & evening)",st_wk:"📈 Weekly report (Mondays)"},
+ ru:{m_ch:"Вызовы",m_ch_d:"Все 5 намазов вместе с друзьями",ch_sub:"Пригласите друзей и держите все 5 намазов вместе. Каждый отмечает намазы в своём трекере.",ch_new:"➕ Новый вызов",ch_name_ph:"Название, например «Братья 🤝»",ch_days:"Длительность",ch_dn:"{n} дн.",ch_create:"Создать",ch_invite:"📨 Пригласить",ch_leave:"Выйти",ch_leave_q:"Нажмите ещё раз, чтобы выйти",ch_day:"День {d} из {n}",ch_ended:"Завершён",ch_empty:"Пока нет вызовов — создайте и пригласите друзей.",ch_limit:"Можно иметь не больше 5 активных вызовов.",ch_you:"вы",ch_share:"Присоединяйся к моему вызову в Mawaqit: все 5 намазов {n} дней 🤝",ch_full_d:"полных дней",
+  cm_line:"<b>{n}</b> чел. сегодня совершили все 5 намазов в Mawaqit",cm_marked:"<b>{n}</b> чел. сегодня отмечают намазы",cm_first:"Отмечайте намазы — будьте первым сегодня 🤍",st_azr:"🌅 Напоминание об азкарах (утро и вечер)",st_wk:"📈 Отчёт за неделю (по понедельникам)"},
+ uz:{m_ch:"Musobaqalar",m_ch_d:"Do'stlar bilan birga 5 vaqt namoz",ch_sub:"Do'stlaringizni taklif qiling va 5 vaqt namozni birga ado eting. Har kim namozlarini o'z kundaligida belgilaydi.",ch_new:"➕ Yangi musobaqa",ch_name_ph:"Nomi, masalan: Birodarlar 🤝",ch_days:"Davomiyligi",ch_dn:"{n} kun",ch_create:"Yaratish",ch_invite:"📨 Taklif qilish",ch_leave:"Chiqish",ch_leave_q:"Chiqish uchun yana bosing",ch_day:"{n} kundan {d}-kun",ch_ended:"Tugadi",ch_empty:"Hozircha musobaqa yo'q — yarating va do'stlaringizni taklif qiling.",ch_limit:"Ko'pi bilan 5 ta faol musobaqa bo'lishi mumkin.",ch_you:"siz",ch_share:"Mawaqit'dagi musobaqamga qo'shiling: {n} kun 5 vaqt namoz 🤝",ch_full_d:"to'liq kun",
+  cm_line:"Bugun Mawaqit'da <b>{n}</b> kishi 5 vaqt namozni o'qidi",cm_marked:"Bugun <b>{n}</b> kishi namozlarini belgilamoqda",cm_first:"Namozlaringizni belgilang — bugun birinchi bo'ling 🤍",st_azr:"🌅 Zikr eslatmasi (ertalab va kechqurun)",st_wk:"📈 Haftalik hisobot (dushanba kunlari)"},
+ tg:{m_ch:"Мусобиқаҳо",m_ch_d:"Ҳамаи 5 намоз якҷоя бо дӯстон",ch_sub:"Дӯстонро даъват кунед ва ҳамаи 5 намозро якҷоя адо кунед. Ҳар кас намозҳоро дар рӯйхати худ қайд мекунад.",ch_new:"➕ Мусобиқаи нав",ch_name_ph:"Ном, масалан «Бародарон 🤝»",ch_days:"Давомот",ch_dn:"{n} рӯз",ch_create:"Сохтан",ch_invite:"📨 Даъват кардан",ch_leave:"Баромадан",ch_leave_q:"Барои баромадан боз пахш кунед",ch_day:"Рӯзи {d} аз {n}",ch_ended:"Анҷом ёфт",ch_empty:"Ҳоло мусобиқа нест — созед ва дӯстонро даъват кунед.",ch_limit:"На зиёда аз 5 мусобиқаи фаъол.",ch_you:"шумо",ch_share:"Ба мусобиқаи ман дар Mawaqit ҳамроҳ шав: {n} рӯз ҳамаи 5 намоз 🤝",ch_full_d:"рӯзи пурра",
+  cm_line:"Имрӯз дар Mawaqit <b>{n}</b> нафар ҳамаи 5 намозро адо карданд",cm_marked:"Имрӯз <b>{n}</b> нафар намозҳоро қайд мекунанд",cm_first:"Намозҳоро қайд кунед — имрӯз аввалин бошед 🤍",st_azr:"🌅 Ёдоварии зикрҳо (субҳ ва шом)",st_wk:"📈 Ҳисоботи ҳафтаина (душанбеҳо)"},
+ ar:{m_ch:"التحديات",m_ch_d:"الصلوات الخمس مع الأصدقاء",ch_sub:"ادعُ أصدقاءك وحافظوا معاً على الصلوات الخمس. كلٌّ يسجّل صلواته في متابعته.",ch_new:"➕ تحدٍّ جديد",ch_name_ph:"الاسم، مثلاً: الإخوة 🤝",ch_days:"المدة",ch_dn:"{n} يوماً",ch_create:"إنشاء",ch_invite:"📨 دعوة",ch_leave:"مغادرة",ch_leave_q:"اضغط مرة أخرى للمغادرة",ch_day:"اليوم {d} من {n}",ch_ended:"انتهى",ch_empty:"لا توجد تحديات بعد — أنشئ واحداً وادعُ أصدقاءك.",ch_limit:"يمكنك امتلاك 5 تحديات نشطة كحد أقصى.",ch_you:"أنت",ch_share:"انضم إلى تحدّيَّ في مواقيت: الصلوات الخمس لمدة {n} يوماً 🤝",ch_full_d:"أيام كاملة",
+  cm_line:"<b>{n}</b> شخصاً أدّوا الصلوات الخمس اليوم في مواقيت",cm_marked:"<b>{n}</b> شخصاً يسجّلون صلواتهم اليوم",cm_first:"سجّل صلواتك — كن الأول اليوم 🤍",st_azr:"🌅 تذكير الأذكار (صباحاً ومساءً)",st_wk:"📈 التقرير الأسبوعي (أيام الاثنين)"}
+};
+for (const l in LX5) Object.assign(LX[l], LX5[l]);
+
+let COMM_AT = 0;
+async function loadCommunity() {
+  const el = $("comm"); if (!el || Date.now() - COMM_AT < 60000) return;
+  COMM_AT = Date.now();
+  try {
+    const r = await api("/api/community?day=" + DATA.today.date);
+    const html = r.full > 0 ? tr("cm_line", {n: r.full}) : r.marked > 0 ? tr("cm_marked", {n: r.marked}) : esc(tr("cm_first"));
+    el.innerHTML = `<div class="ic">🌍</div><div style="flex:1">${html}</div><div class="muted" style="font-size:20px">›</div>`;
+    el.hidden = false;
+  } catch (e) { el.hidden = true; }
+}
+
+let CH = [], CH_DAYS = 7, CH_FROM = null, CH_LEAVE = null;
+async function renderChallenges() {
+  $("chTitle").textContent = tr("m_ch"); $("chSub").textContent = tr("ch_sub");
+  $("chNewL").textContent = tr("ch_new"); $("chName").placeholder = tr("ch_name_ph"); $("chDaysL").textContent = tr("ch_days"); $("chCreate").textContent = tr("ch_create");
+  chips($("chDays"), [7, 14, 30, 40].map(n => [n, tr("ch_dn", {n})]), CH_DAYS, v => { CH_DAYS = +v; renderChallenges(); });
+  if (!CH.length) $("chList").innerHTML = `<div class="card muted center">${tr("loading")}</div>`;
+  try { CH = (await api("/api/challenges")).items; } catch (e) { $("chList").innerHTML = `<div class="card muted center">${esc(tr("err"))}</div>`; return; }
+  drawChallenges();
+}
+function drawChallenges() {
+  const me = tg?.initDataUnsafe?.user?.id;
+  if (!CH.length) { $("chList").innerHTML = `<div class="card muted center">${esc(tr("ch_empty"))}</div>`; return; }
+  $("chList").innerHTML = CH.map(c => {
+    const pct = Math.round(100 * c.day_no / c.days);
+    const rows = c.members.map((m, i) => `<div class="mb ${m.id === me ? "me" : ""}"><div class="rk">${i < 3 && m.full_days ? ["🥇", "🥈", "🥉"][i] : i + 1}</div>`
+      + `<div class="nm">${esc(m.name)}${m.id === me ? ` <span class="muted">· ${esc(tr("ch_you"))}</span>` : ""}</div>`
+      + (m.today != null ? `<div class="dots">${m.today.split("").map(x => `<i class="${x === "1" ? "on" : ""}"></i>`).join("")}</div>` : "")
+      + `<div class="sc" dir="ltr">${m.full_days}/${c.ended ? c.days : c.day_no}</div></div>`).join("");
+    return `<div class="card chc"><div class="hd"><div><div class="tt">${esc(c.title)}</div><div class="sub">${c.ended ? "🏁 " + esc(tr("ch_ended")) : esc(tr("ch_day", {d: c.day_no, n: c.days}))} · 👥 ${c.members.length}</div></div><div class="pill">🟢 ${esc(tr("ch_full_d"))}</div></div>`
+      + `<div class="pr"><div style="width:${pct}%"></div></div>${rows}`
+      + `<div class="acts">${c.ended ? "" : `<button class="btn" data-chinv="${c.id}">${esc(tr("ch_invite"))}</button>`}<button class="btn ghost" style="background:var(--bg)" data-chleave="${c.id}">${esc(CH_LEAVE === c.id ? tr("ch_leave_q") : tr("ch_leave"))}</button></div></div>`;
+  }).join("");
+  $("chList").querySelectorAll("[data-chinv]").forEach(b => b.onclick = () => {
+    const c = CH.find(x => x.id === +b.dataset.chinv); haptic();
+    const u = `https://t.me/share/url?url=${encodeURIComponent(c.invite)}&text=${encodeURIComponent(tr("ch_share", {n: c.days}) + (c.title ? " — " + c.title : ""))}`;
+    try { tg.openTelegramLink(u); } catch (e) { openLink(u); }
+  });
+  $("chList").querySelectorAll("[data-chleave]").forEach(b => b.onclick = async () => {
+    const id = +b.dataset.chleave; haptic();
+    if (CH_LEAVE !== id) { CH_LEAVE = id; drawChallenges(); setTimeout(() => { if (CH_LEAVE === id) { CH_LEAVE = null; drawChallenges(); } }, 4000); return; }
+    CH_LEAVE = null;
+    try { await apiPost("/api/challenges/leave", {id}); CH = CH.filter(x => x.id !== id); drawChallenges(); } catch (e) { toast(tr("st_err")); }
+  });
+}
+async function createChallenge() {
+  const b = $("chCreate"); if (b.disabled) return; b.disabled = true; haptic("medium");
+  try {
+    const r = await fetch("/api/challenges", {method: "POST", headers: {"Content-Type": "application/json", "X-Init-Data": tg?.initData || ""}, body: JSON.stringify({title: $("chName").value.trim(), days: CH_DAYS})});
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 409) toast(tr("ch_limit"));
+    else if (!r.ok || !d.ok) toast(tr("st_err"));
+    else { $("chName").value = ""; CH.unshift(d.item); drawChallenges(); try { tg?.HapticFeedback?.notificationOccurred("success"); } catch (e) {} }
+  } finally { b.disabled = false; }
+}
 
 /* ───────── location helpers ───────── */
 function getMyLocation() {
@@ -1944,7 +2063,14 @@ async function load(silent) {
     DATA = d; TZ = d.profile.tz; HSHIFT = null;
     $("boot").hidden = true; $("nav").hidden = false; $("navAdmin").hidden = !d.is_admin;
     renderToday(); renderQibla(); renderMore();
-    if (!silent) { const want = new URLSearchParams(location.search).get("tab"); go(["today", "qibla", "cal", "tasbih", "more"].concat(d.is_admin ? ["admin"] : []).includes(want) ? want : "today"); }
+    if (!silent) {
+      const qs = new URLSearchParams(location.search), want = qs.get("tab"), sub = qs.get("sub"), az = qs.get("az");
+      go(["today", "qibla", "cal", "tasbih", "more"].concat(d.is_admin ? ["admin"] : []).includes(want) ? want : "today");
+      if (want === "more" && ["tracker", "challenges", "azkar", "duas", "qada", "dates", "ramadan", "cities", "mosques", "names", "settings"].includes(sub)) {
+        if (sub === "azkar" && (az === "m" || az === "e")) AZ_MODE = az;
+        openSub(sub);
+      }
+    }
   } catch (e) {
     if (!silent) stateScreen("⚠️", tr("err"));
   }
@@ -1993,6 +2119,8 @@ function init() {
   $("qdAdd").onclick = qdAddDays;
   $("ciFind").onclick = findOther;
   $("ciQ").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); findOther(); } };
+  $("chCreate").onclick = createChallenge;
+  $("trChBtn").addEventListener("click", () => { CH_FROM = "tracker"; });
   $("trPrev").onclick = () => shiftTrMonth(-1); $("trNext").onclick = () => shiftTrMonth(1);
   ["cvDate", "cvHd", "cvHm", "cvHy"].forEach(id => $(id).addEventListener("input", convert));
   loadTasbih();

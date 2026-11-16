@@ -37,6 +37,9 @@ from telegram import (
     ForceReply,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    InlineQueryResultArticle,
+    InlineQueryResultsButton,
+    InputTextMessageContent,
     KeyboardButton,
     MenuButtonCommands,
     MenuButtonWebApp,
@@ -54,6 +57,7 @@ from telegram.ext import (
     ChatMemberHandler,
     CommandHandler,
     ContextTypes,
+    InlineQueryHandler,
     MessageHandler,
     TypeHandler,
     filters,
@@ -635,6 +639,71 @@ EXTRA3 = {
 for _l, _d in EXTRA3.items():
     T[_l].update(_d)
 
+EXTRA4 = {
+    "en": {"btn_azr_on": "🌅 Adhkar reminder: ON ✅", "btn_azr_off": "🌅 Adhkar reminder: OFF ❌",
+           "btn_wk_on": "📈 Weekly report: ON ✅", "btn_wk_off": "📈 Weekly report: OFF ❌",
+           "az_rem_m": "🌅 <b>Time for the morning adhkar</b>\nStart your day with the remembrance of Allah 🤍",
+           "az_rem_e": "🌙 <b>Time for the evening adhkar</b>\nEnd your day with the remembrance of Allah 🤍",
+           "btn_open_azkar": "📖 Open the adhkar", "btn_open_tracker": "✅ Open the tracker", "btn_open_ch": "🤝 Open the challenge",
+           "wk_title": "📈 <b>Your week</b> · {range}", "wk_prayers": "✅ Prayers: <b>{n} of 35</b> ({p}%)",
+           "wk_full": "🟢 Complete days: <b>{d} of 7</b>", "wk_streak": "🔥 Current streak: <b>{s}</b> d.",
+           "wk_great": "MashaAllah, keep it up! 🤍", "wk_good": "A good week — let's make the next one even better 🤍",
+           "wk_start": "Every prayer counts. Let's make this week better together 🤍",
+           "in_open": "🕌 Open the bot", "in_hint": "Type a city name",
+           "ch_joined": "🤝 You joined the challenge <b>{t}</b>!\n\n{d} days of all 5 prayers — together with friends. Mark your prayers in the tracker 🤍",
+           "ch_nf": "😔 This challenge was not found or has already ended.", "ch_full": "😔 This challenge is already full."},
+    "ru": {"btn_azr_on": "🌅 Напоминание об азкарах: ВКЛ ✅", "btn_azr_off": "🌅 Напоминание об азкарах: ВЫКЛ ❌",
+           "btn_wk_on": "📈 Отчёт за неделю: ВКЛ ✅", "btn_wk_off": "📈 Отчёт за неделю: ВЫКЛ ❌",
+           "az_rem_m": "🌅 <b>Время утренних азкаров</b>\nНачните день с поминания Аллаха 🤍",
+           "az_rem_e": "🌙 <b>Время вечерних азкаров</b>\nЗавершите день поминанием Аллаха 🤍",
+           "btn_open_azkar": "📖 Открыть азкары", "btn_open_tracker": "✅ Открыть трекер", "btn_open_ch": "🤝 Открыть вызов",
+           "wk_title": "📈 <b>Твоя неделя</b> · {range}", "wk_prayers": "✅ Намазов: <b>{n} из 35</b> ({p}%)",
+           "wk_full": "🟢 Полных дней: <b>{d} из 7</b>", "wk_streak": "🔥 Текущая серия: <b>{s}</b> дн.",
+           "wk_great": "Машаллах, так держать! 🤍", "wk_good": "Хорошая неделя — пусть следующая будет ещё лучше 🤍",
+           "wk_start": "Каждый намаз важен. Давай сделаем эту неделю лучше 🤍",
+           "in_open": "🕌 Открыть бота", "in_hint": "Напишите название города",
+           "ch_joined": "🤝 Ты присоединился к вызову <b>{t}</b>!\n\n{d} дней все 5 намазов — вместе с друзьями. Отмечай намазы в трекере 🤍",
+           "ch_nf": "😔 Вызов не найден или уже закончился.", "ch_full": "😔 В этом вызове уже нет мест."},
+    "uz": {"btn_azr_on": "🌅 Zikr eslatmasi: YOQILGAN ✅", "btn_azr_off": "🌅 Zikr eslatmasi: O'CHIQ ❌",
+           "btn_wk_on": "📈 Haftalik hisobot: YOQILGAN ✅", "btn_wk_off": "📈 Haftalik hisobot: O'CHIQ ❌",
+           "az_rem_m": "🌅 <b>Tong zikrlari vaqti</b>\nKuningizni Allohni zikr qilish bilan boshlang 🤍",
+           "az_rem_e": "🌙 <b>Kech zikrlari vaqti</b>\nKuningizni Allohni zikr qilish bilan yakunlang 🤍",
+           "btn_open_azkar": "📖 Zikrlarni ochish", "btn_open_tracker": "✅ Kundalikni ochish", "btn_open_ch": "🤝 Musobaqani ochish",
+           "wk_title": "📈 <b>Haftangiz</b> · {range}", "wk_prayers": "✅ Namozlar: <b>35 tadan {n} ta</b> ({p}%)",
+           "wk_full": "🟢 To'liq kunlar: <b>7 dan {d}</b>", "wk_streak": "🔥 Joriy ketma-ketlik: <b>{s}</b> kun",
+           "wk_great": "Mashaalloh, shunday davom eting! 🤍", "wk_good": "Yaxshi hafta — keyingisi bundan ham yaxshi bo'lsin 🤍",
+           "wk_start": "Har bir namoz muhim. Bu haftani yaxshiroq qilaylik 🤍",
+           "in_open": "🕌 Botni ochish", "in_hint": "Shahar nomini yozing",
+           "ch_joined": "🤝 Siz <b>{t}</b> musobaqasiga qo'shildingiz!\n\n{d} kun barcha 5 namoz — do'stlar bilan birga. Namozlarni kundalikda belgilang 🤍",
+           "ch_nf": "😔 Musobaqa topilmadi yoki tugagan.", "ch_full": "😔 Bu musobaqada joy qolmadi."},
+    "tg": {"btn_azr_on": "🌅 Ёдоварии зикрҳо: ФАЪОЛ ✅", "btn_azr_off": "🌅 Ёдоварии зикрҳо: ХОМӮШ ❌",
+           "btn_wk_on": "📈 Ҳисоботи ҳафтаина: ФАЪОЛ ✅", "btn_wk_off": "📈 Ҳисоботи ҳафтаина: ХОМӮШ ❌",
+           "az_rem_m": "🌅 <b>Вақти зикрҳои субҳ</b>\nРӯзи худро бо зикри Аллоҳ оғоз кунед 🤍",
+           "az_rem_e": "🌙 <b>Вақти зикрҳои шом</b>\nРӯзи худро бо зикри Аллоҳ анҷом диҳед 🤍",
+           "btn_open_azkar": "📖 Кушодани зикрҳо", "btn_open_tracker": "✅ Кушодани рӯйхат", "btn_open_ch": "🤝 Кушодани мусобиқа",
+           "wk_title": "📈 <b>Ҳафтаи шумо</b> · {range}", "wk_prayers": "✅ Намозҳо: <b>{n} аз 35</b> ({p}%)",
+           "wk_full": "🟢 Рӯзҳои пурра: <b>{d} аз 7</b>", "wk_streak": "🔥 Силсилаи ҷорӣ: <b>{s}</b> рӯз",
+           "wk_great": "Мошоаллоҳ, ҳамин тавр идома диҳед! 🤍", "wk_good": "Ҳафтаи хуб — бигзор ояндааш боз беҳтар бошад 🤍",
+           "wk_start": "Ҳар намоз муҳим аст. Биёед ин ҳафтаро беҳтар кунем 🤍",
+           "in_open": "🕌 Кушодани бот", "in_hint": "Номи шаҳрро нависед",
+           "ch_joined": "🤝 Шумо ба мусобиқаи <b>{t}</b> ҳамроҳ шудед!\n\n{d} рӯз ҳамаи 5 намоз — якҷоя бо дӯстон. Намозҳоро дар рӯйхат қайд кунед 🤍",
+           "ch_nf": "😔 Мусобиқа ёфт нашуд ё ба охир расидааст.", "ch_full": "😔 Дар ин мусобиқа ҷой намонд."},
+    "ar": {"btn_azr_on": "🌅 تذكير الأذكار: مفعّل ✅", "btn_azr_off": "🌅 تذكير الأذكار: متوقف ❌",
+           "btn_wk_on": "📈 التقرير الأسبوعي: مفعّل ✅", "btn_wk_off": "📈 التقرير الأسبوعي: متوقف ❌",
+           "az_rem_m": "🌅 <b>حان وقت أذكار الصباح</b>\nابدأ يومك بذكر الله 🤍",
+           "az_rem_e": "🌙 <b>حان وقت أذكار المساء</b>\nاختم يومك بذكر الله 🤍",
+           "btn_open_azkar": "📖 فتح الأذكار", "btn_open_tracker": "✅ فتح متابعة الصلوات", "btn_open_ch": "🤝 فتح التحدي",
+           "wk_title": "📈 <b>أسبوعك</b> · {range}", "wk_prayers": "✅ الصلوات: <b>{n} من 35</b> ({p}%)",
+           "wk_full": "🟢 الأيام الكاملة: <b>{d} من 7</b>", "wk_streak": "🔥 السلسلة الحالية: <b>{s}</b> يوم",
+           "wk_great": "ما شاء الله، استمر! 🤍", "wk_good": "أسبوع جيد — لنجعل القادم أفضل 🤍",
+           "wk_start": "كل صلاة مهمة. لنجعل هذا الأسبوع أفضل 🤍",
+           "in_open": "🕌 فتح البوت", "in_hint": "اكتب اسم المدينة",
+           "ch_joined": "🤝 انضممت إلى تحدي <b>{t}</b>!\n\n{d} يوماً كل الصلوات الخمس — مع الأصدقاء. سجّل صلواتك في المتابعة 🤍",
+           "ch_nf": "😔 لم يتم العثور على التحدي أو انتهى.", "ch_full": "😔 لا توجد أماكن في هذا التحدي."},
+}
+for _l, _d in EXTRA4.items():
+    T[_l].update(_d)
+
 GROUP_WELCOME = ("🕌 <b>Assalamu alaikum!</b>\n\n"
                  "I'll post prayer times and reminders here. Group admins, please set me up 👇\n\n" + LANG_PICK_TEXT)
 
@@ -703,6 +772,31 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS at_time   BOOLEAN NOT NULL DEFAULT TR
 ALTER TABLE users ADD COLUMN IF NOT EXISTS auto_mode INT NOT NULL DEFAULT 5;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS username  TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS azkar_rem BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS weekly    BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_weekly DATE;
+CREATE TABLE IF NOT EXISTS tracker (
+    user_id BIGINT NOT NULL,
+    day     DATE NOT NULL,
+    mask    TEXT NOT NULL,
+    PRIMARY KEY (user_id, day)
+);
+CREATE INDEX IF NOT EXISTS tracker_day ON tracker (day);
+CREATE TABLE IF NOT EXISTS challenges (
+    id         SERIAL PRIMARY KEY,
+    code       TEXT UNIQUE NOT NULL,
+    owner      BIGINT NOT NULL,
+    title      TEXT NOT NULL,
+    days       INT NOT NULL,
+    start_day  DATE NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS challenge_members (
+    challenge_id INT NOT NULL REFERENCES challenges (id) ON DELETE CASCADE,
+    user_id      BIGINT NOT NULL,
+    joined_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (challenge_id, user_id)
+);
 CREATE TABLE IF NOT EXISTS daily_active (
     day     DATE NOT NULL,
     user_id BIGINT NOT NULL,
@@ -1081,8 +1175,11 @@ def screen_settings(u):
     if not is_private(u):
         lines.append(f"📅 {daily_label(lang, u['daily'])}")
         rows.append([btn(t(lang, "btn_daily"), "s:daily")])
-    elif ADMINS:
-        rows.append([btn(t(lang, "btn_support"), "s:support")])
+    else:
+        rows.append([btn(t(lang, "btn_azr_on" if u["azkar_rem"] else "btn_azr_off"), "s:azr")])
+        rows.append([btn(t(lang, "btn_wk_on" if u["weekly"] else "btn_wk_off"), "s:wk")])
+        if ADMINS:
+            rows.append([btn(t(lang, "btn_support"), "s:support")])
     rows.append([btn(t(lang, "btn_back"), "m:home")])
     return "\n".join(lines), kb(*rows)
 
@@ -1311,6 +1408,8 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             ctx.user_data.pop(k, None)
     elif _time.time() - ctx.chat_data.get("welcomed", 0) < 20:
         return  # the bot was just added and already greeted the group
+    if chat.type == "private" and ctx.args and ctx.args[0].startswith("ch_"):
+        await join_challenge(update, ctx, ctx.args[0][3:])
     u = await target_for(update, ctx)
     await resume(update, ctx, u)
 
@@ -1518,6 +1617,10 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             text, markup = screen_daily(u)
         elif sub == "auto":
             text, markup = screen_auto(u)
+        elif sub in ("azr", "wk") and is_private(u):
+            col = "azkar_rem" if sub == "azr" else "weekly"
+            await save(tid, **{col: not u[col]})
+            text, markup = screen_settings(await get_user(tid))
         elif sub == "attime":
             await save(tid, at_time=not u["at_time"])
             text, markup = screen_settings(await get_user(tid))
@@ -1764,9 +1867,10 @@ def in_quiet(hour, qs, qe):
     return (qs <= hour < qe) if qs <= qe else (hour >= qs or hour < qe)
 
 
-async def send_reminder(bot, u, text):
+async def send_reminder(bot, u, text, markup=None):
     lang = u["lang"]
-    markup = kb([btn(t(lang, "btn_menu"), "m:home")]) if is_private(u) else None
+    if markup is None:
+        markup = kb([btn(t(lang, "btn_menu"), "m:home")]) if is_private(u) else None
     for attempt in range(2):
         try:
             await bot.send_message(u["user_id"], text, parse_mode=ParseMode.HTML, reply_markup=markup)
@@ -1805,6 +1909,24 @@ async def process_user(bot, u):
             text, _ = await screen_times(u, onboarding=True)
             await send_reminder(bot, u, text)
 
+    # morning adhkar after Fajr (before sunrise), evening adhkar after Asr
+    if is_private(u) and u["azkar_rem"]:
+        fh, fm = map(int, data["Fajr"].split(":"))
+        sh, sm = map(int, data["Sunrise"].split(":"))
+        ah, am = map(int, data["Asr"].split(":"))
+        fajr = datetime.combine(d, dtime(fh, fm), tzinfo=tz)
+        sunrise = datetime.combine(d, dtime(sh, sm), tzinfo=tz)
+        plan = (("m", min(fajr + timedelta(minutes=15), sunrise - timedelta(minutes=10))),
+                ("e", datetime.combine(d, dtime(ah, am), tzinfo=tz) + timedelta(minutes=15)))
+        for mode, when in plan:
+            sk = (u["user_id"], d.isoformat(), "az_" + mode)
+            if due(now, when) and sk not in SENT:
+                SENT[sk] = _time.time()
+                if in_quiet(when.hour, u["quiet_start"], u["quiet_end"]):
+                    continue
+                rows = [[webapp_btn(t(lang, "btn_open_azkar"), f"more&sub=azkar&az={mode}")]] if WEBAPP_URL else []
+                await send_reminder(bot, u, t(lang, "az_rem_" + mode), kb(*rows, [btn(t(lang, "btn_menu"), "m:home")]))
+
     if not u["remind"]:
         return
     ramadan = u["ramadan"] and data["hmonth"] == 9
@@ -1840,7 +1962,8 @@ async def process_user(bot, u):
 async def tick(context: ContextTypes.DEFAULT_TYPE):
     try:
         rows = await POOL.fetch(
-            "SELECT * FROM users WHERE (remind OR daily <> 'off') AND NOT banned AND NOT blocked "
+            "SELECT * FROM users WHERE (remind OR daily <> 'off' OR (azkar_rem AND chat_type = 'private')) "
+            "AND NOT banned AND NOT blocked "
             "AND lat IS NOT NULL AND tz IS NOT NULL AND lang IS NOT NULL")
     except Exception:  # noqa: BLE001
         log.exception("tick: db error")
@@ -2584,6 +2707,7 @@ def profile_json(u, lang):
     return {"lang": lang, "city": u["city"], "lat": u["lat"], "lon": u["lon"], "tz": u["tz"],
             "madhab": u["madhab"], "country": u["country"], "lead": u["lead_min"], "at_time": u["at_time"],
             "remind": u["remind"], "auto": u["auto_mode"], "ramadan": u["ramadan"], "quiet": quiet,
+            "azkar_rem": u["azkar_rem"], "weekly": u["weekly"],
             "lead_options": LEAD_OPTIONS, "auto_options": AUTO_OPTIONS,
             "quiet_options": ["off"] + [f"{a}-{b}" for a, b in QUIET_PRESETS]}
 
@@ -2613,7 +2737,8 @@ async def api_settings(request):
         fields["lead_min"] = body["lead"]
     if isinstance(body.get("auto"), int) and body["auto"] in AUTO_OPTIONS:
         fields["auto_mode"] = body["auto"]
-    for key, col in (("at_time", "at_time"), ("remind", "remind"), ("ramadan", "ramadan")):
+    for key, col in (("at_time", "at_time"), ("remind", "remind"), ("ramadan", "ramadan"),
+                     ("azkar_rem", "azkar_rem"), ("weekly", "weekly")):
         if isinstance(body.get(key), bool):
             fields[col] = body[key]
     q = body.get("quiet")
@@ -2763,7 +2888,11 @@ async def start_web(application=None):
                     web.get("/api/admin/person", api_admin_person), web.post("/api/admin/ban", api_admin_ban),
                     web.post("/api/admin/message", api_admin_message), web.get("/api/admin/bc_count", api_admin_bc_count),
                     web.post("/api/admin/broadcast", api_admin_broadcast), web.get("/api/admin/health", api_admin_health),
-                    web.post("/api/admin/export", api_admin_export)])
+                    web.post("/api/admin/export", api_admin_export),
+                    web.get("/api/tracker", api_tracker), web.post("/api/tracker", api_tracker_set),
+                    web.post("/api/tracker_bulk", api_tracker_bulk), web.get("/api/community", api_community),
+                    web.get("/api/challenges", api_challenges), web.post("/api/challenges", api_challenge_new),
+                    web.post("/api/challenges/leave", api_challenge_leave)])
     WEB_RUNNER = web.AppRunner(app, access_log=None)
     await WEB_RUNNER.setup()
     port = int(os.getenv("PORT", "8080"))
@@ -3334,6 +3463,296 @@ async def api_admin_export(request):
     return web.json_response({"ok": True, "rows": len(rows)})
 
 
+# ───────────────────────── prayer times in any chat (inline mode) ─────────────────────────
+# Needs inline mode switched on once in @BotFather (/setinline).
+
+INLINE_GEO = {}
+
+
+async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    iq = update.inline_query
+    u = await get_user(iq.from_user.id)
+    lang = (u or {}).get("lang") or str(iq.from_user.language_code or "en")[:2]
+    lang = lang if lang in LANGS else "en"
+    q = iq.query.strip()[:80]
+    hint = InlineQueryResultsButton(text=t(lang, "in_hint"), start_parameter="inline")
+    place = None
+    try:
+        if not q and u and u["city"] and u["lat"] is not None:
+            place = (u["city"], u["lat"], u["lon"], u["country"] or "")
+        elif len(q) >= 3:
+            key = (q.lower(), lang)
+            if key not in INLINE_GEO:
+                if len(INLINE_GEO) > 2000:
+                    INLINE_GEO.clear()
+                INLINE_GEO[key] = await geocode(q, lang)
+            place = INLINE_GEO[key]
+        if not place:
+            return await iq.answer([], cache_time=5, is_personal=True, button=hint)
+        name, lat, lon, cc = place
+        pu = {"user_id": 0, "chat_type": "private", "lat": lat, "lon": lon, "country": cc, "lang": lang, "city": name,
+              "madhab": (u or {}).get("madhab") or "std", "ramadan": True, "tz": None}
+        first = await get_timings(pu, datetime.utcnow().date())
+        pu["tz"] = first["tz"]
+        day = await get_timings(pu, datetime.now(ZoneInfo(pu["tz"])).date())
+        text, _ = await screen_times(pu, onboarding=True)
+        desc = " · ".join(f"{PN[lang][k.lower()]} {day[k]}" for k in EVENTS)
+        open_btn = InlineKeyboardMarkup([[InlineKeyboardButton(t(lang, "in_open"), url=f"https://t.me/{BOT_USERNAME}?start=inline")]])
+        result = InlineQueryResultArticle(
+            id=hashlib.md5(f"{lat:.3f},{lon:.3f},{lang},{pu['madhab']}".encode()).hexdigest(),
+            title=f"🕌 {name}", description=desc,
+            input_message_content=InputTextMessageContent(text, parse_mode=ParseMode.HTML),
+            reply_markup=open_btn)
+        await iq.answer([result], cache_time=120, is_personal=not q, button=hint)
+    except BadRequest as e:
+        log.info("inline answer skipped: %s", e)  # the query expired while the user kept typing
+    except Exception:  # noqa: BLE001
+        log.exception("inline query failed")
+
+
+# ───────────────────────── tracker on the server, community, challenges ─────────────────────────
+
+def mask_ok(m):
+    return isinstance(m, str) and len(m) == 5 and set(m) <= {"0", "1"}
+
+
+def iso_day(s):
+    try:
+        return datetime.strptime(str(s), "%Y-%m-%d").date()
+    except ValueError:
+        raise web.HTTPBadRequest(text="bad day")
+
+
+async def api_tracker(request):
+    tg_user, u, _ = await api_auth(request)
+    uid = int(tg_user["id"])
+    since = iso_day(request.query.get("from") or (datetime.utcnow().date() - timedelta(days=130)).isoformat())
+    rows = await POOL.fetch("SELECT day, mask FROM tracker WHERE user_id = $1 AND day >= $2", uid, since)
+    total = await POOL.fetchval("SELECT coalesce(sum(length(replace(mask, '0', ''))), 0) FROM tracker WHERE user_id = $1", uid)
+    return web.json_response({"ok": True, "days": {r["day"].isoformat(): r["mask"] for r in rows}, "total": total})
+
+
+async def api_tracker_set(request):
+    tg_user, u, _ = await api_auth(request)
+    body = await read_json(request)
+    day, mask = iso_day(body.get("day")), body.get("mask")
+    if not mask_ok(mask) or abs((day - datetime.utcnow().date()).days) > 400:
+        raise web.HTTPBadRequest(text="bad mark")
+    await POOL.execute("INSERT INTO tracker (user_id, day, mask) VALUES ($1, $2, $3) "
+                       "ON CONFLICT (user_id, day) DO UPDATE SET mask = EXCLUDED.mask", int(tg_user["id"]), day, mask)
+    return web.json_response({"ok": True})
+
+
+async def api_tracker_bulk(request):
+    """One-time move of old marks from Telegram cloud storage. Never overwrites marks already on the server."""
+    tg_user, u, _ = await api_auth(request)
+    body = await read_json(request)
+    days = body.get("days") if isinstance(body.get("days"), dict) else {}
+    rows = []
+    for k, v in list(days.items())[:400]:
+        try:
+            d = iso_day(k)
+        except web.HTTPBadRequest:
+            continue
+        if mask_ok(v) and v != "00000":
+            rows.append((int(tg_user["id"]), d, v))
+    if rows:
+        await POOL.executemany("INSERT INTO tracker (user_id, day, mask) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING", rows)
+    return web.json_response({"ok": True, "saved": len(rows)})
+
+
+async def api_community(request):
+    await api_auth(request)
+    day = iso_day(request.query.get("day") or datetime.utcnow().date().isoformat())
+    r = await POOL.fetchrow("SELECT count(*) FILTER (WHERE mask = '11111') AS full, "
+                            "count(*) FILTER (WHERE mask <> '00000') AS marked FROM tracker WHERE day = $1", day)
+    return web.json_response({"ok": True, "full": r["full"], "marked": r["marked"]})
+
+
+CH_MAX_MEMBERS = 50
+
+
+async def challenge_view(ch, today):
+    members = await POOL.fetch(
+        "SELECT m.user_id, u.full_name, u.username FROM challenge_members m LEFT JOIN users u ON u.user_id = m.user_id "
+        "WHERE m.challenge_id = $1 ORDER BY m.joined_at", ch["id"])
+    end = ch["start_day"] + timedelta(days=ch["days"] - 1)
+    upto = min(today, end)
+    marks = await POOL.fetch("SELECT user_id, day, mask FROM tracker WHERE day >= $1 AND day <= $2 AND user_id = ANY($3::bigint[])",
+                             ch["start_day"], upto, [m["user_id"] for m in members])
+    by = {}
+    for r in marks:
+        by.setdefault(r["user_id"], {})[r["day"]] = r["mask"]
+    out = []
+    for m in members:
+        mine = by.get(m["user_id"], {})
+        out.append({"id": m["user_id"], "name": m["full_name"] or (("@" + m["username"]) if m["username"] else "👤"),
+                    "full_days": sum(1 for v in mine.values() if v == "11111"),
+                    "today": mine.get(today, "00000") if today <= end else None})
+    out.sort(key=lambda x: (-x["full_days"], x["name"] or ""))
+    return {"id": ch["id"], "code": ch["code"], "title": ch["title"], "days": ch["days"], "owner": ch["owner"],
+            "start": ch["start_day"].isoformat(), "end": end.isoformat(),
+            "day_no": max(0, min(ch["days"], (today - ch["start_day"]).days + 1)), "ended": today > end,
+            "invite": f"https://t.me/{BOT_USERNAME}?start=ch_{ch['code']}", "members": out}
+
+
+def user_today(u):
+    try:
+        return datetime.now(ZoneInfo(u["tz"])).date() if u and u["tz"] else datetime.utcnow().date()
+    except Exception:  # noqa: BLE001
+        return datetime.utcnow().date()
+
+
+async def api_challenges(request):
+    tg_user, u, _ = await api_auth(request)
+    uid, today = int(tg_user["id"]), user_today(u)
+    rows = await POOL.fetch("SELECT c.* FROM challenges c JOIN challenge_members m ON m.challenge_id = c.id "
+                            "WHERE m.user_id = $1 AND c.start_day + c.days > $2::date - 30 ORDER BY c.created_at DESC", uid, today)
+    return web.json_response({"ok": True, "items": [await challenge_view(r, today) for r in rows]})
+
+
+async def api_challenge_new(request):
+    import secrets
+    tg_user, u, _ = await api_auth(request)
+    uid = int(tg_user["id"])
+    body = await read_json(request)
+    days = body.get("days") if body.get("days") in (7, 14, 30, 40) else 7
+    title = str(body.get("title") or "").strip()[:40] or f"{days} 🤝"
+    today = user_today(u)
+    active = await POOL.fetchval("SELECT count(*) FROM challenges WHERE owner = $1 AND start_day + days > $2", uid, today)
+    if active >= 5:
+        return web.json_response({"ok": False, "error": "limit"}, status=409)
+    code = secrets.token_urlsafe(6).replace("-", "x").replace("_", "y")
+    cid = await POOL.fetchval("INSERT INTO challenges (code, owner, title, days, start_day) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+                              code, uid, title, days, today)
+    await POOL.execute("INSERT INTO challenge_members (challenge_id, user_id) VALUES ($1, $2)", cid, uid)
+    ch = await POOL.fetchrow("SELECT * FROM challenges WHERE id = $1", cid)
+    return web.json_response({"ok": True, "item": await challenge_view(ch, today)})
+
+
+async def api_challenge_leave(request):
+    tg_user, u, _ = await api_auth(request)
+    body = await read_json(request)
+    try:
+        cid = int(body["id"])
+    except (KeyError, ValueError, TypeError):
+        raise web.HTTPBadRequest(text="bad id")
+    await POOL.execute("DELETE FROM challenge_members WHERE challenge_id = $1 AND user_id = $2", cid, int(tg_user["id"]))
+    await POOL.execute("DELETE FROM challenges c WHERE id = $1 AND NOT EXISTS "
+                       "(SELECT 1 FROM challenge_members m WHERE m.challenge_id = c.id)", cid)
+    return web.json_response({"ok": True})
+
+
+async def join_challenge(update, ctx, code):
+    """/start ch_<code> — join a friend's challenge."""
+    uid = update.effective_user.id
+    u = await ensure_user(uid)
+    lang = u["lang"] or (update.effective_user.language_code or "en")[:2]
+    lang = lang if lang in LANGS else "en"
+    ch = await POOL.fetchrow("SELECT * FROM challenges WHERE code = $1", code[:20])
+    if not ch or user_today(u) > ch["start_day"] + timedelta(days=ch["days"] - 1):
+        return await update.effective_message.reply_text(t(lang, "ch_nf"))
+    n = await POOL.fetchval("SELECT count(*) FROM challenge_members WHERE challenge_id = $1", ch["id"])
+    already = await POOL.fetchval("SELECT 1 FROM challenge_members WHERE challenge_id = $1 AND user_id = $2", ch["id"], uid)
+    if not already and n >= CH_MAX_MEMBERS:
+        return await update.effective_message.reply_text(t(lang, "ch_full"))
+    await POOL.execute("INSERT INTO challenge_members (challenge_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", ch["id"], uid)
+    markup = kb([webapp_btn(t(lang, "btn_open_ch"), "more&sub=challenges")]) if WEBAPP_URL else None
+    await update.effective_message.reply_text(t(lang, "ch_joined", t=esc(ch["title"]), d=ch["days"]),
+                                              parse_mode=ParseMode.HTML, reply_markup=markup)
+
+
+# ───────────────────────── weekly report & admin summary ─────────────────────────
+
+def week_squares(masks, days):
+    return "".join("🟩" if masks.get(d) == "11111" else ("🟨" if masks.get(d, "00000") != "00000" else "⬜") for d in days)
+
+
+async def send_weekly(bot, u, today):
+    days = [today - timedelta(days=i) for i in range(7, 0, -1)]  # last Monday … Sunday
+    rows = await POOL.fetch("SELECT day, mask FROM tracker WHERE user_id = $1 AND day >= $2", u["user_id"], today - timedelta(days=400))
+    masks = {r["day"]: r["mask"] for r in rows}
+    n = sum(masks.get(d, "").count("1") for d in days)
+    full = sum(1 for d in days if masks.get(d) == "11111")
+    streak, d = 0, today - timedelta(days=1)
+    while masks.get(d) == "11111":
+        streak += 1
+        d -= timedelta(days=1)
+    lang = u["lang"]
+    p = round(100 * n / 35)
+    text = "\n".join([
+        t(lang, "wk_title", range=f"{days[0]:%d.%m}–{days[-1]:%d.%m}"), "",
+        week_squares(masks, days), "",
+        t(lang, "wk_prayers", n=n, p=p), t(lang, "wk_full", d=full), t(lang, "wk_streak", s=streak), "",
+        t(lang, "wk_great" if p >= 85 else ("wk_good" if p >= 50 else "wk_start"))])
+    markup = kb([webapp_btn(t(lang, "btn_open_tracker"), "more&sub=tracker")]) if WEBAPP_URL else None
+    try:
+        await bot.send_message(u["user_id"], text, parse_mode=ParseMode.HTML, reply_markup=markup)
+    except Forbidden:
+        await POOL.execute("UPDATE users SET blocked = TRUE WHERE user_id = $1", u["user_id"])
+    except Exception:  # noqa: BLE001
+        log.exception("weekly report failed for %s", u["user_id"])
+
+
+async def admin_summary_text():
+    y = datetime.utcnow().date() - timedelta(days=1)
+    r = await POOL.fetchrow(
+        "SELECT count(*) FILTER (WHERE chat_type = 'private') AS users, "
+        "count(*) FILTER (WHERE chat_type = 'private' AND created_at::date = $1) AS new_users, "
+        "count(*) FILTER (WHERE chat_type <> 'private' AND created_at::date = $1) AS new_chats, "
+        "count(*) FILTER (WHERE chat_type = 'private' AND blocked) AS blocked FROM users", y)
+    active = await POOL.fetchval("SELECT count(*) FROM daily_active WHERE day = $1", y)
+    stats = {x["stat_key"]: x["stat_value"] for x in await POOL.fetch("SELECT stat_key, stat_value FROM daily_stats WHERE stat_day = $1", y)}
+    full = await POOL.fetchval("SELECT count(*) FROM tracker WHERE day = $1 AND mask = '11111'", y)
+    return (f"📬 <b>Сводка за {y:%d.%m.%Y}</b>\n\n"
+            f"👥 Всего пользователей: <b>{r['users']}</b>\n"
+            f"🆕 Новых: <b>{r['new_users']}</b> · 👥📢 новых групп и каналов: <b>{r['new_chats']}</b>\n"
+            f"👁 Активных: <b>{active}</b>\n"
+            f"📬 Напоминаний: <b>{stats.get('reminders_sent', 0)}</b> (ошибок {stats.get('reminders_failed', 0)})\n"
+            f"📩 Сообщений в поддержку: <b>{stats.get('support_msgs', 0)}</b>\n"
+            f"✅ Отметили все 5 намазов: <b>{full}</b>\n"
+            f"🧱 Заблокировали бота (всего): {r['blocked']}")
+
+
+async def periodic(context: ContextTypes.DEFAULT_TYPE):
+    """Every 10 minutes: Monday 09:00 weekly reports (user's own time), 09:00 summary for admins."""
+    bot = context.bot
+    try:
+        rows = await POOL.fetch(
+            "SELECT u.* FROM users u WHERE chat_type = 'private' AND weekly AND NOT banned AND NOT blocked "
+            "AND tz IS NOT NULL AND lang IS NOT NULL "
+            "AND EXISTS (SELECT 1 FROM tracker t WHERE t.user_id = u.user_id AND t.day > CURRENT_DATE - 14)")
+        for r in rows:
+            u = dict(r)
+            now = datetime.now(ZoneInfo(u["tz"]))
+            if now.weekday() == 0 and now.hour == 9 and u["last_weekly"] != now.date():
+                await POOL.execute("UPDATE users SET last_weekly = $2 WHERE user_id = $1", u["user_id"], now.date())
+                await send_weekly(bot, u, now.date())
+                await asyncio.sleep(0.05)
+    except Exception:  # noqa: BLE001
+        log.exception("weekly reports failed")
+    try:
+        for admin in sorted(ADMINS):
+            a = await get_user(admin)
+            tz = (a or {}).get("tz") or "Asia/Tashkent"
+            now = datetime.now(ZoneInfo(tz))
+            if now.hour != 9:
+                continue
+            done = await POOL.fetchval("SELECT 1 FROM daily_stats WHERE stat_day = $1 AND stat_key = $2",
+                                       now.date(), f"admin_summary_{admin}")
+            if done:
+                continue
+            await POOL.execute("INSERT INTO daily_stats (stat_day, stat_key, stat_value) VALUES ($1, $2, 1) "
+                               "ON CONFLICT DO NOTHING", now.date(), f"admin_summary_{admin}")
+            markup = kb([webapp_btn("🛠 Админка", "admin")]) if WEBAPP_URL else None
+            try:
+                await bot.send_message(admin, await admin_summary_text(), parse_mode=ParseMode.HTML, reply_markup=markup)
+            except Exception:  # noqa: BLE001
+                log.exception("admin summary to %s failed (has this admin started the bot?)", admin)
+    except Exception:  # noqa: BLE001
+        log.exception("admin summary failed")
+
+
 # ───────────────────────── app ─────────────────────────
 
 
@@ -3439,6 +3858,8 @@ def main():
     app.add_error_handler(on_error)
     app.job_queue.run_repeating(tick, interval=30, first=10)
     app.job_queue.run_repeating(refresh_cards, interval=60, first=40)
+    app.job_queue.run_repeating(periodic, interval=600, first=90)
+    app.add_handler(InlineQueryHandler(on_inline), group=1)
     app.run_polling(drop_pending_updates=True)
 
 
