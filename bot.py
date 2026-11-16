@@ -1352,18 +1352,27 @@ async def show_city_prompt(update, ctx, u):
             reply_markup=ForceReply(input_field_placeholder=t(lang, "city_ph")))
         await remember_prompt(update, ctx, m)
         return
-    text, markup = screen_city(u)
-    await remember_prompt(update, ctx, await render(update, text, markup))
+    # One message: the question with the location button (and "Back" for those who already have a city)
+    # under the input field. A reply keyboard can't sit on an edited message, so a new one is sent.
+    text, _ = screen_city(u)
+    rows = [[KeyboardButton(t(lang, "loc_btn"), request_location=True)]]
+    if u["onboarded"]:
+        rows.append([KeyboardButton(t(lang, "btn_back"))])
+    q = update.callback_query
+    if q and q.message:
+        try:
+            await q.message.delete()
+        except Exception:  # noqa: BLE001
+            pass
     old_helper = ctx.user_data.pop("loc_msg", None)
     if old_helper:
         await drop_message(update, old_helper)
-    helper = await update.effective_chat.send_message(
-        t(lang, "loc_hint"),
-        reply_markup=ReplyKeyboardMarkup(
-            [[KeyboardButton(t(lang, "loc_btn"), request_location=True)]],
-            resize_keyboard=True, one_time_keyboard=True),
-    )
-    ctx.user_data["loc_msg"] = helper.message_id
+    m = await update.effective_chat.send_message(
+        text, parse_mode=ParseMode.HTML,
+        reply_markup=ReplyKeyboardMarkup(rows, resize_keyboard=True, one_time_keyboard=True,
+                                         input_field_placeholder=t(lang, "city_ph")))
+    await remember_prompt(update, ctx, m)
+    ctx.user_data["loc_msg"] = m.message_id
 
 
 async def remember_prompt(update, ctx, msg):
@@ -1753,6 +1762,13 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not (u["lang"] and u["madhab"]) or not (u["awaiting_city"] or not u["city"]):
         return await resume(update, ctx, u)
     lang = u["lang"]
+    if chat.type == "private" and u["city"] and msg.text.strip() == t(lang, "btn_back"):  # "Back" under the input field
+        await save(u["user_id"], awaiting_city=False)
+        await drop_message(update, msg.message_id)
+        await cleanup_city_prompt(update, ctx)
+        await cleanup_loc_kb(update, ctx)
+        text, markup = screen_settings(await get_user(u["user_id"]))
+        return await render(update, text, markup)
     try:
         res = await geocode(msg.text.strip()[:100], lang)
     except Exception:  # noqa: BLE001
