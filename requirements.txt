@@ -4,3 +4,5 @@ httpx
 aiohttp>=3.9
 Pillow>=10.1
 tzdata
+arabic-reshaper>=3.0
+python-bidi>=0.4

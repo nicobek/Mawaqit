@@ -31,6 +31,8 @@ from urllib.parse import parse_qsl, quote
 from zoneinfo import ZoneInfo
 
 import asyncpg
+import art
+from ayahs import AYAHS
 import httpx
 from aiohttp import web
 from telegram import (
@@ -41,6 +43,7 @@ from telegram import (
     InlineKeyboardMarkup,
     InlineQueryResultArticle,
     InlineQueryResultsButton,
+    InputMediaPhoto,
     InputTextMessageContent,
     KeyboardButton,
     LabeledPrice,
@@ -1060,6 +1063,36 @@ EXTRA10 = {
 for _l, _d in EXTRA10.items():
     T[_l].update(_d)
 
+EXTRA11 = {
+    "en": {"ayah_btn": "📖 Ayah of the day", "ayah_title": "Ayah of the day", "ayah_hdr": "AYAH OF THE DAY", "quran": "Qur'an",
+           "pic_btn": "🖼 Share as a picture", "pic_bg": "🎨 Background {i}/{n}", "pic_done": "✅ Done",
+           "pic_tip": "Now tap the picture → Forward. You can pick several chats at once ✨",
+           "st_ayah": "📖 Ayah of the day at 9:00: {v}", "sb_ayah_on": "📖 Ayah at 9:00: ON", "sb_ayah_off": "📖 Ayah at 9:00: OFF",
+           "ayah_err": "😔 Couldn't load the ayah right now. Please try a little later."},
+    "ru": {"ayah_btn": "📖 Аят дня", "ayah_title": "Аят дня", "ayah_hdr": "АЯТ ДНЯ", "quran": "Коран",
+           "pic_btn": "🖼 Поделиться картинкой", "pic_bg": "🎨 Фон {i}/{n}", "pic_done": "✅ Готово",
+           "pic_tip": "Теперь нажмите на картинку → «Переслать». Можно выбрать сразу несколько чатов ✨",
+           "st_ayah": "📖 Аят дня в 9:00: {v}", "sb_ayah_on": "📖 Аят в 9:00: ВКЛ", "sb_ayah_off": "📖 Аят в 9:00: ВЫКЛ",
+           "ayah_err": "😔 Сейчас не получилось загрузить аят. Попробуйте чуть позже."},
+    "uz": {"ayah_btn": "📖 Kun oyati", "ayah_title": "Kun oyati", "ayah_hdr": "KUN OYATI", "quran": "Qur'on",
+           "pic_btn": "🖼 Rasm qilib ulashish", "pic_bg": "🎨 Fon {i}/{n}", "pic_done": "✅ Tayyor",
+           "pic_tip": "Endi rasmni bosing → «Uzatish». Bir nechta chatni birdan tanlash mumkin ✨",
+           "st_ayah": "📖 Kun oyati soat 9:00 da: {v}", "sb_ayah_on": "📖 Oyat 9:00 da: YOQILGAN", "sb_ayah_off": "📖 Oyat 9:00 da: O'CHIQ",
+           "ayah_err": "😔 Hozir oyatni yuklab bo'lmadi. Birozdan so'ng urinib ko'ring."},
+    "tg": {"ayah_btn": "📖 Ояти рӯз", "ayah_title": "Ояти рӯз", "ayah_hdr": "ОЯТИ РӮЗ", "quran": "Қуръон",
+           "pic_btn": "🖼 Ҳамчун расм фиристодан", "pic_bg": "🎨 Замина {i}/{n}", "pic_done": "✅ Тайёр",
+           "pic_tip": "Акнун расмро пахш кунед → «Фиристодан». Якбора якчанд чатро интихоб кардан мумкин ✨",
+           "st_ayah": "📖 Ояти рӯз соати 9:00: {v}", "sb_ayah_on": "📖 Оят соати 9:00: ФАЪОЛ", "sb_ayah_off": "📖 Оят соати 9:00: ХОМӮШ",
+           "ayah_err": "😔 Ҳоло оятро бор карда нашуд. Каме баъдтар кӯшиш кунед."},
+    "ar": {"ayah_btn": "📖 آية اليوم", "ayah_title": "آية اليوم", "ayah_hdr": "آية اليوم", "quran": "القرآن الكريم",
+           "pic_btn": "🖼 مشاركة كصورة", "pic_bg": "🎨 الخلفية {i}/{n}", "pic_done": "✅ تم",
+           "pic_tip": "الآن اضغط على الصورة ← «إعادة توجيه». يمكنك اختيار عدة محادثات معاً ✨",
+           "st_ayah": "📖 آية اليوم الساعة 9:00: {v}", "sb_ayah_on": "📖 الآية 9:00: مفعّلة", "sb_ayah_off": "📖 الآية 9:00: متوقفة",
+           "ayah_err": "😔 تعذر تحميل الآية الآن. حاول بعد قليل."},
+}
+for _l, _d in EXTRA11.items():
+    T[_l].update(_d)
+
 # ───────────────────────── Uzbek in Cyrillic ─────────────────────────
 # The Cyrillic Uzbek texts are produced from the Latin ones by the official spelling rules,
 # so both stay in sync. Words that the rules can't get right are listed in CYR_WORDS.
@@ -1251,6 +1284,11 @@ CREATE TABLE IF NOT EXISTS ai_usage (
     PRIMARY KEY (user_id, day)
 );
 ALTER TABLE users ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ayah_rem BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_ayah DATE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS share_bg INT NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS share_font INT NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS ayah_cache (ref TEXT PRIMARY KEY, data JSONB NOT NULL);
 CREATE TABLE IF NOT EXISTS ai_credits (
     user_id         BIGINT PRIMARY KEY,
     credits         INT NOT NULL DEFAULT 0,
@@ -1741,7 +1779,7 @@ def screen_menu(u):
         [btn(t(lang, "btn_settings"), "m:settings")],
     ]
     if is_private(u) and WEBAPP_URL:  # quick ways into the app: adhkar, tracker, qibla
-        rows[1:2] = [[webapp_btn(t(lang, "mb_azkar"), "more&sub=azkar"), qibla_btn(u)],
+        rows[1:2] = [[webapp_btn(t(lang, "mb_azkar"), "more&sub=azkar"), btn(t(lang, "ayah_btn"), "ay:show"), qibla_btn(u)],
                      [btn(t(lang, "btn_rem_s_on" if u["remind"] else "btn_rem_s_off"), "m:toggle"),
                       btn(t(lang, "btn_settings"), "m:settings")]]
         rows = rows[:3]
@@ -1788,7 +1826,9 @@ def screen_settings(u):
         rows.append([ram, btn(t(lang, "btn_daily"), "s:daily")])
     else:
         lines.append(t(lang, "st_wk", v=t(lang, "on" if u["weekly"] else "off")))
+        lines.append(t(lang, "st_ayah", v=t(lang, "on" if u["ayah_rem"] else "off")))
         rows.append([ram, btn(t(lang, "sb_wk_on" if u["weekly"] else "sb_wk_off"), "s:wk")])
+        rows.append([btn(t(lang, "sb_ayah_on" if u["ayah_rem"] else "sb_ayah_off"), "s:ayah")])
         if AZANS:
             lines.append(t(lang, "st_azan", v=esc(azan_label(lang, u))))
             rows.append([btn(t(lang, "sb_azan", v=azan_label(lang, u)), "s:azan")])
@@ -2189,6 +2229,8 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return await don_button(update, ctx, parts)
     if act == "buy" and chat.type == "private":
         return await buy_button(update, ctx, parts)
+    if act in ("pic", "ay") and chat.type == "private":
+        return await pic_button(update, ctx, parts)
     if chat.type == "private":
         ctx.user_data.pop("ai_mode", None)  # any other button leaves the AI conversation
     if chat.type == "private":
@@ -2349,6 +2391,9 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             text, markup = screen_azan(u)
         elif sub == "wk" and is_private(u):
             await save(tid, weekly=not u["weekly"])
+            text, markup = screen_settings(await get_user(tid))
+        elif sub == "ayah" and is_private(u):
+            await save(tid, ayah_rem=not u["ayah_rem"])
             text, markup = screen_settings(await get_user(tid))
         elif sub == "attime":
             await save(tid, at_time=not u["at_time"])
@@ -3863,166 +3908,237 @@ def _font(size, bold=False):
     return FONTS[key]
 
 
-def render_share(u, data, day_iso):
-    """A 1080×1920 story picture with the day's prayer times (night sky, mosque skyline, glass cards)."""
-    import random
-    from PIL import Image, ImageDraw, ImageFilter
-    lang = u["lang"] or "en"
-    rtl = lang == "ar"
-    W, H = 1080, 1920
-    gold, white, hint = (226, 190, 92), (244, 246, 250), (170, 180, 205)
-
-    # sky: vertical gradient + soft glows + stars
-    img = Image.new("RGB", (W, H))
-    d = ImageDraw.Draw(img)
-    top, mid, bot_ = (10, 16, 40), (33, 24, 66), (14, 22, 44)
-    for y in range(H):
-        k = y / H
-        a, b, kk = (top, mid, k / 0.45) if k < 0.45 else (mid, bot_, (k - 0.45) / 0.55)
-        d.line([(0, y), (W, y)], fill=tuple(int(a[i] + (b[i] - a[i]) * kk) for i in range(3)))
-    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    g = ImageDraw.Draw(glow)
-    g.ellipse([W // 2 - 420, 40, W // 2 + 420, 760], fill=(226, 190, 92, 46))
-    g.ellipse([-300, 1100, 520, 1900], fill=(110, 70, 160, 60))
-    g.ellipse([700, 900, 1400, 1600], fill=(40, 120, 140, 40))
-    img.paste(glow.filter(ImageFilter.GaussianBlur(110)), (0, 0), glow.filter(ImageFilter.GaussianBlur(110)))
-    d = ImageDraw.Draw(img)
-    rnd = random.Random(7)
-    for _ in range(140):
-        x, y, r = rnd.randint(0, W), rnd.randint(0, 600), rnd.choice((1, 1, 1, 2, 2, 3))
-        if 120 < x < W - 120 and 310 < y < 590:  # keep the title area clean
-            continue
-        c = rnd.randint(150, 255)
-        d.ellipse([x - r, y - r, x + r, y + r], fill=(c, c, min(255, c + 10)))
-
-    # crescent with a soft halo
-    halo = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    ImageDraw.Draw(halo).ellipse([W // 2 - 130, 70, W // 2 + 130, 330], fill=(226, 190, 92, 90))
-    halo = halo.filter(ImageFilter.GaussianBlur(40))
-    img.paste(halo, (0, 0), halo)
-    d = ImageDraw.Draw(img)
-    cx, cy, r = W // 2, 200, 82
-    moon = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    md = ImageDraw.Draw(moon)
-    md.ellipse([cx - r, cy - r, cx + r, cy + r], fill=gold + (255,))
-    md.ellipse([cx - r + 44, cy - r - 22, cx + r + 44, cy + r - 22], fill=(0, 0, 0, 0))
-    img.paste(moon, (0, 0), moon)
-    d = ImageDraw.Draw(img)
-    d.polygon([(cx + 70, 128), (cx + 78, 150), (cx + 101, 150), (cx + 83, 164), (cx + 90, 186), (cx + 70, 173),
-               (cx + 50, 186), (cx + 57, 164), (cx + 39, 150), (cx + 62, 150)], fill=gold)
-
-    def text(xy, s, font, fill, anchor="mm"):
-        kw = {"direction": "rtl"} if rtl and any("؀" <= ch <= "ۿ" for ch in s) else {}
-        try:
-            d.text(xy, s, font=font, fill=fill, anchor=anchor, **kw)
-        except Exception:  # noqa: BLE001
-            d.text(xy, s, font=font, fill=fill, anchor=anchor)
-
-    title = t(lang, "times_title").replace("🕌 ", "").replace("<b>", "").replace("</b>", "")
-    text((W // 2, 375), title, _font(76, True), white)
-    text((W // 2, 455), u["city"] or "", _font(44, True), gold)
-    y0, m0, dd = (int(x) for x in day_iso.split("-"))
-    hij = f"{data['hday']} {HM[lang][data['hmonth'] - 1]} {data['hyear']}"
-    pill = f"{dd:02d}.{m0:02d}.{y0}  ·  {hij}"
-    f = _font(34)
-    pw = d.textlength(pill, font=f) + 70
-    d.rounded_rectangle([W // 2 - pw / 2, 500, W // 2 + pw / 2, 566], radius=33, outline=(226, 190, 92), width=2)
-    text((W // 2, 533), pill, f, hint)
-
-    # mosque skyline (domes and minarets) along the horizon behind the cards
-    sky = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    sd = ImageDraw.Draw(sky)
-    base, col = 830, (226, 190, 92, 44)
-    sd.rectangle([0, base - 30, W, base], fill=col)
-
-    def dome(cx_, w, h):  # body + onion dome + crescent tip
-        sd.rectangle([cx_ - w / 2, base - h * 0.45, cx_ + w / 2, base], fill=col)
-        sd.ellipse([cx_ - w * 0.42, base - h, cx_ + w * 0.42, base - h * 0.3], fill=col)
-        sd.polygon([(cx_ - w * 0.12, base - h * 0.93), (cx_ + w * 0.12, base - h * 0.93), (cx_, base - h - 34)], fill=col)
-        sd.rectangle([cx_ - 3, base - h - 52, cx_ + 3, base - h - 26], fill=col)
-
-    def minaret(mx, mh):
-        sd.rectangle([mx - 14, base - mh, mx + 14, base], fill=col)
-        sd.rectangle([mx - 22, base - mh * 0.62, mx + 22, base - mh * 0.62 + 14], fill=col)
-        sd.rectangle([mx - 20, base - mh * 0.9, mx + 20, base - mh * 0.9 + 12], fill=col)
-        sd.polygon([(mx - 18, base - mh), (mx + 18, base - mh), (mx, base - mh - 56)], fill=col)
-
-    dome(150, 170, 120)
-    dome(395, 210, 165)
-    dome(W // 2 + 40, 300, 215)
-    dome(935, 190, 135)
-    for mx, mh in ((40, 150), (270, 205), (720, 225), (1045, 170)):
-        minaret(mx, mh)
-    img.paste(sky, (0, 0), sky)
-    d = ImageDraw.Draw(img)
-
-    # glass cards
-    names = PN[lang]
-    icons_y, top_y, step, ch = [], 850, 150, 124
-    card_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    cd = ImageDraw.Draw(card_layer)
-    for i, key in enumerate(("Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha")):
-        y = top_y + i * step
-        cd.rounded_rectangle([80, y, W - 80, y + ch], radius=40, fill=(255, 255, 255, 20 if key == "Sunrise" else 30),
-                             outline=(255, 255, 255, 45), width=2)
-        icons_y.append(y)
-    img.paste(card_layer, (0, 0), card_layer)
-    d = ImageDraw.Draw(img)
-
-    def icon(kind, x, y):  # little drawn symbols: sun, half sun, moon
-        import math as _m
-        if kind == "sun":
-            d.ellipse([x - 20, y - 20, x + 20, y + 20], fill=gold)
-            for k in range(8):
-                a = _m.pi * k / 4
-                d.line([(x + 28 * _m.cos(a), y + 28 * _m.sin(a)), (x + 37 * _m.cos(a), y + 37 * _m.sin(a))], fill=gold, width=5)
-        elif kind == "half":  # the sun on the horizon
-            hy = y + 10
-            d.pieslice([x - 21, hy - 21, x + 21, hy + 21], 180, 360, fill=gold)
-            for k in range(5):
-                a = _m.pi + _m.pi * (k + 0.5) / 5
-                d.line([(x + 28 * _m.cos(a), hy + 28 * _m.sin(a)), (x + 37 * _m.cos(a), hy + 37 * _m.sin(a))], fill=gold, width=5)
-            d.line([(x - 34, hy + 2), (x + 34, hy + 2)], fill=gold, width=4)
-        else:
-            d.ellipse([x - 24, y - 24, x + 24, y + 24], fill=gold)
-            d.ellipse([x - 12, y - 32, x + 34, y + 14], fill=(40, 34, 74))
-
-    kinds = {"Fajr": "moon", "Sunrise": "half", "Dhuhr": "sun", "Asr": "sun", "Maghrib": "half", "Isha": "moon"}
-    for i, key in enumerate(("Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha")):
-        y = icons_y[i] + ch // 2
-        ix = W - 170 if rtl else 170
-        d.ellipse([ix - 46, y - 46, ix + 46, y + 46], fill=(40, 34, 74), outline=(226, 190, 92), width=2)
-        icon(kinds[key], ix, y)
-        name_col = hint if key == "Sunrise" else white
-        if rtl:
-            text((W - 250, y), names[key.lower()], _font(52, True), name_col, "rm")
-            d.text((150, y), data[key], font=_font(64, True), fill=gold if key != "Sunrise" else hint, anchor="lm")
-        else:
-            text((250, y), names[key.lower()], _font(52, True), name_col, "lm")
-            d.text((W - 150, y), data[key], font=_font(64, True), fill=gold if key != "Sunrise" else hint, anchor="rm")
-
-    if BOT_USERNAME:
-        f = _font(40, True)
-        label = f"@{BOT_USERNAME}"
-        tw = d.textlength(label, font=f) + 90
-        d.rounded_rectangle([W // 2 - tw / 2, H - 150, W // 2 + tw / 2, H - 70], radius=40, fill=gold)
-        d.text((W // 2, H - 110), label, font=f, fill=(30, 22, 6), anchor="mm")
-    buf = io.BytesIO()
-    img.save(buf, "PNG", optimize=True)
-    return buf.getvalue()
-
-
 async def share_png_for(u, day_iso):
-    key = (u["user_id"], day_iso, u["lang"], u["city"], u["madhab"])
-    if key in SHARE_CACHE:
-        return SHARE_CACHE[key]
+    return await pic_bytes(u, "t", day_iso, u["share_bg"], u["share_font"])
+
+
+# ───────────────────────── ayah of the day, share pictures ─────────────────────────
+
+QURAN_API = "https://api.alquran.cloud/v1/ayah/{ref}/editions/{eds}"
+AYAH_EDITIONS = {"ar": "quran-simple", "en": "en.sahih", "ru": "ru.kuliev", "uz": "uz.sodik", "tg": "tg.ayati"}
+AYAH_CACHE = {}
+PIC_CACHE = {}
+_LAT = {"а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "yo", "ж": "j", "з": "z", "и": "i", "й": "y",
+        "к": "k", "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u", "ф": "f",
+        "х": "x", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "sh", "ъ": "ʼ", "ы": "i", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+        "ў": "oʻ", "қ": "q", "ғ": "gʻ", "ҳ": "h"}
+
+
+def to_lat(text):
+    """Cyrillic Uzbek → Latin Uzbek (for translations that come in Cyrillic)."""
+    out = []
+    for i, ch in enumerate(text):
+        low = ch.lower()
+        if low not in _LAT:
+            out.append(ch)
+            continue
+        v = _LAT[low]
+        if low == "е" and (i == 0 or not text[i - 1].isalpha() or text[i - 1].lower() in "аеёиоуўэюя"):
+            v = "ye"
+        if ch.isupper() and v:
+            v = v[0].upper() + v[1:]
+        out.append(v)
+    return "".join(out)
+
+
+def name_cyr(name):
+    """"Al-Baqara" → "Аль-Бакара" (sura names come in Latin)."""
+    parts = []
+    for w in name.replace("'", "").replace("`", "").split("-"):
+        low = w.lower()
+        if low == "al":
+            parts.append("аль" if w[:1].islower() else "Аль")
+            continue
+        for a, b in (("kh", "х"), ("sh", "ш"), ("th", "с"), ("dh", "з"), ("gh", "г"), ("ch", "ч"), ("aa", "а"), ("ee", "и"),
+                     ("oo", "у"), ("ii", "и"), ("uu", "у"), ("j", "дж")):
+            low = low.replace(a, b)
+        low = "".join({"a": "а", "b": "б", "c": "к", "d": "д", "e": "е", "f": "ф", "g": "г", "h": "х", "i": "и", "k": "к",
+                       "l": "л", "m": "м", "n": "н", "o": "о", "p": "п", "q": "к", "r": "р", "s": "с", "t": "т", "u": "у",
+                       "v": "в", "w": "в", "y": "й", "z": "з"}.get(c, c) for c in low)
+        parts.append(low[:1].upper() + low[1:] if w[:1].isupper() else low)
+    return "-".join(parts)
+
+
+async def fetch_ayah(ref):
+    """Arabic text + translations for "s:a" or "s:a-b" (alquran.cloud), kept in the database."""
+    if ref in AYAH_CACHE:
+        return AYAH_CACHE[ref]
+    row = await POOL.fetchval("SELECT data FROM ayah_cache WHERE ref = $1", ref)
+    if row:
+        AYAH_CACHE[ref] = json.loads(row) if isinstance(row, str) else row
+        return AYAH_CACHE[ref]
+    s_no, rng = ref.split(":")
+    a0, a1 = (int(x) for x in rng.split("-")) if "-" in rng else (int(rng), int(rng))
+    out = {"s": int(s_no), "a": f"{a0}" if a0 == a1 else f"{a0}–{a1}"}
+    texts = {k: [] for k in AYAH_EDITIONS}
+    for n in range(a0, a1 + 1):
+        got = {}
+        r = await HTTP.get(QURAN_API.format(ref=f"{s_no}:{n}", eds=",".join(AYAH_EDITIONS.values())), timeout=20)
+        if r.status_code == 200:
+            for item in r.json().get("data") or []:
+                got[item["edition"]["identifier"]] = item
+        else:  # one edition name may be wrong: ask for them one by one
+            for ed in AYAH_EDITIONS.values():
+                rr = await HTTP.get(QURAN_API.format(ref=f"{s_no}:{n}", eds=ed), timeout=20)
+                if rr.status_code == 200:
+                    for item in rr.json().get("data") or []:
+                        got[item["edition"]["identifier"]] = item
+        ar = got.get(AYAH_EDITIONS["ar"])
+        if not ar:
+            raise RuntimeError(f"no arabic text for {s_no}:{n}")
+        out["name"], out["ar_name"] = ar["surah"]["englishName"], ar["surah"]["name"]
+        for k, ed in AYAH_EDITIONS.items():
+            txt = (got.get(ed) or {}).get("text", "").strip()
+            if k == "ar" and n == 1 and int(s_no) not in (1, 9):
+                words = txt.split()
+                if len(words) > 4 and words[0].startswith("بِسْمِ"):
+                    txt = " ".join(words[4:])
+            if txt:
+                texts[k].append(txt)
+    for k, v in texts.items():
+        out[k] = (" ۝ " if k == "ar" else " ").join(v)
+    await POOL.execute("INSERT INTO ayah_cache (ref, data) VALUES ($1, $2) ON CONFLICT (ref) DO UPDATE SET data = EXCLUDED.data",
+                       ref, json.dumps(out, ensure_ascii=False))
+    AYAH_CACHE[ref] = out
+    return out
+
+
+async def prefetch_ayahs(context):
+    """Load all ayahs into the database slowly, so the first person each day doesn't wait."""
+    have = {r["ref"] for r in await POOL.fetch("SELECT ref FROM ayah_cache")}
+    todo = [x for x in AYAHS if x not in have]
+    ok = 0
+    for ref in todo:
+        try:
+            await fetch_ayah(ref)
+            ok += 1
+        except Exception as e:  # noqa: BLE001
+            log.warning("ayah %s: %r", ref, e)
+        await asyncio.sleep(1.5)
+    if todo:
+        log.info("ayahs loaded: %d of %d", ok, len(todo))
+
+
+def ayah_ref_for(uid, day):
+    """Each person has their own order of ayahs: a new one every day, no repeats until all are shown."""
+    import random
+    order = random.Random(uid * 7919 + 13).sample(range(len(AYAHS)), len(AYAHS))
+    return AYAHS[order[day.toordinal() % len(AYAHS)]]
+
+
+def ayah_parts(a, lang):
+    """(arabic, translation, reference line) in the person's language."""
+    tr = ""
+    if lang != "ar":
+        tr = a.get("uz" if lang in ("uz", "uzc") else lang) or a.get("ru" if lang in ("tg", "uz", "uzc") else "en") or a.get("en", "")
+        is_cyr = bool(re.search("[а-яА-ЯёЁ]", tr))
+        if lang == "uz" and is_cyr:
+            tr = to_lat(tr)
+        elif lang == "uzc" and not is_cyr:
+            tr = to_cyr(tr)
+    num = f"{a['s']}:{a['a']}"
+    if lang == "ar":
+        ref = f"{a['ar_name']} · {num}"
+    elif lang in ("ru", "tg", "uzc"):
+        ref = f"{t(lang, 'quran')} · {name_cyr(a['name'])} {num}"
+    else:
+        ref = f"{t(lang, 'quran')} · {a['name']} {num}"
+    return a["ar"], tr, ref
+
+
+async def screen_ayah(u, day=None):
+    lang = u["lang"]
+    day = day or datetime.now(ZoneInfo(u["tz"] or "UTC")).date()
+    a = await fetch_ayah(ayah_ref_for(u["user_id"], day))
+    ar, tr, ref = ayah_parts(a, lang)
+    text = f"📖 <b>{t(lang, 'ayah_title')}</b>\n\n{esc(ar)}\n\n" + (f"<i>{esc(tr)}</i>\n\n" if tr else "") + f"— {esc(ref)}"
+    return text, kb([btn(t(lang, "pic_btn"), f"pic:a:new:{day.isoformat()}")], [btn(t(lang, "btn_menu"), "m:new")])
+
+
+def times_rows(lang, data):
+    kinds = {"Fajr": "moon", "Sunrise": "half", "Dhuhr": "sun", "Asr": "sun", "Maghrib": "half", "Isha": "moon"}
+    return [(kinds[k], PN[lang][k.lower()], data[k], k == "Sunrise") for k, _ in ROWS]
+
+
+async def pic_bytes(u, kind, day_iso, bg, fs):
+    lang = u["lang"]
+    key = (kind, u["user_id"], day_iso, lang, u["city"], u["madhab"], bg, fs)
+    if key in PIC_CACHE:
+        return PIC_CACHE[key]
+    loop = asyncio.get_running_loop()
+    label = f"@{BOT_USERNAME}" if BOT_USERNAME else "Mawaqit"
     y, m, dd = (int(x) for x in day_iso.split("-"))
-    data = await get_timings(u, datetime(y, m, dd).date())
-    png = await asyncio.get_running_loop().run_in_executor(None, render_share, u, data, day_iso)
-    if len(SHARE_CACHE) > 200:
-        SHARE_CACHE.clear()
-    SHARE_CACHE[key] = png
-    return png
+    if kind == "a":
+        ar, tr, ref = ayah_parts(await fetch_ayah(ayah_ref_for(u["user_id"], date(y, m, dd))), lang)
+        jpg = await loop.run_in_executor(None, art.render_ayah, ar, tr, ref, t(lang, "ayah_hdr"), label, bg, fs)
+    else:
+        data = await get_timings(u, date(y, m, dd))
+        title = strip_tags(t(lang, "times_title")).replace("🕌 ", "")
+        date_line = f"{dd:02d}.{m:02d}.{y}  ·  {data['hday']} {HM[lang][data['hmonth'] - 1]} {data['hyear']}"
+        jpg = await loop.run_in_executor(None, lambda: art.render_times(title, u["city"] or "", date_line, times_rows(lang, data),
+                                                                        label, bg, fs, rtl=lang == "ar"))
+    if len(PIC_CACHE) > 120:
+        PIC_CACHE.clear()
+    PIC_CACHE[key] = jpg
+    return jpg
+
+
+def pic_markup(lang, kind, day_iso, bg, fs):
+    names = art.FONT_NAMES.get(lang, art.FONT_NAMES["en"])
+    cb = f"pic:{kind}:{{}}:{day_iso}"
+    return kb([btn("◀️", cb.format("b-")), btn(t(lang, "pic_bg", i=bg % art.N_BG + 1, n=art.N_BG), cb.format("b+")), btn("▶️", cb.format("b+"))],
+              [btn("◀️", cb.format("f-")), btn("🔤 " + names[fs % art.N_FONT], cb.format("f+")), btn("▶️", cb.format("f+"))],
+              [btn(t(lang, "pic_done"), cb.format("ok"))])
+
+
+async def pic_button(update, ctx, parts):
+    """ay:show — the ayah of the day; pic:<a|t>:<new|b+|b-|f+|f-|ok>:<day> — the share picture and its picker."""
+    q = update.callback_query
+    u = await get_user(q.from_user.id)
+    if not u or not u["lang"] or not u["tz"]:
+        return await q.answer()
+    lang = u["lang"]
+    if parts[0] == "ay":
+        await q.answer()
+        try:
+            text, markup = await screen_ayah(u)
+        except Exception:  # noqa: BLE001
+            log.exception("ayah failed")
+            return await update.effective_chat.send_message(t(lang, "ayah_err"))
+        return await update.effective_chat.send_message(text, parse_mode=ParseMode.HTML, reply_markup=markup)
+    kind = parts[1] if len(parts) > 1 and parts[1] in ("a", "t") else "t"
+    op = parts[2] if len(parts) > 2 else "new"
+    day_iso = parts[3] if len(parts) > 3 and re.match(r"^\d{4}-\d\d-\d\d$", parts[3]) else \
+        datetime.now(ZoneInfo(u["tz"])).date().isoformat()
+    if op == "ok":
+        await q.answer(t(lang, "pic_tip"), show_alert=True)
+        try:
+            await q.edit_message_reply_markup(None)
+        except BadRequest:
+            pass
+        return
+    bg, fs = u["share_bg"] % art.N_BG, u["share_font"] % art.N_FONT
+    if op in ("b+", "b-"):
+        bg = (bg + (1 if op == "b+" else -1)) % art.N_BG
+    elif op in ("f+", "f-"):
+        fs = (fs + (1 if op == "f+" else -1)) % art.N_FONT
+    if (bg, fs) != (u["share_bg"], u["share_font"]):
+        await save(u["user_id"], share_bg=bg, share_font=fs)
+    await q.answer()
+    try:
+        jpg = await pic_bytes(u, kind, day_iso, bg, fs)
+    except Exception:  # noqa: BLE001
+        log.exception("share picture failed")
+        return await update.effective_chat.send_message(t(lang, "ayah_err" if kind == "a" else "error"))
+    markup = pic_markup(lang, kind, day_iso, bg, fs)
+    if op == "new":
+        await update.effective_chat.send_action("upload_photo")
+        return await update.effective_chat.send_photo(jpg, reply_markup=markup)
+    try:
+        await q.edit_message_media(InputMediaPhoto(jpg), reply_markup=markup)
+    except BadRequest as e:
+        if "not modified" not in str(e).lower():
+            raise
 
 
 async def page_share(request):
@@ -4042,7 +4158,7 @@ async def page_share(request):
     except Exception:  # noqa: BLE001
         log.exception("share image failed")
         raise web.HTTPServiceUnavailable()
-    return web.Response(body=png, content_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
+    return web.Response(body=png, content_type="image/jpeg", headers={"Cache-Control": "public, max-age=3600"})
 
 
 async def api_share_send(request):
@@ -4052,9 +4168,8 @@ async def api_share_send(request):
         raise web.HTTPBadRequest(text="no city")
     day_iso = datetime.now(ZoneInfo(u["tz"])).date().isoformat()
     try:
-        png = await share_png_for(u, day_iso)
-        await request.app["bot"].send_photo(u["user_id"], png, caption=f"🕌 {esc(u['city'])}\n\n" + t(u["lang"], "share_footer", bot=f'<a href="{ref_link(u["user_id"])}">@{BOT_USERNAME}</a>'),
-                                            parse_mode=ParseMode.HTML)
+        png = await pic_bytes(u, "t", day_iso, u["share_bg"], u["share_font"])
+        await request.app["bot"].send_photo(u["user_id"], png, reply_markup=pic_markup(u["lang"], "t", day_iso, u["share_bg"], u["share_font"]))
     except Exception:  # noqa: BLE001
         log.exception("share send failed")
         return web.json_response({"ok": False}, status=502)
@@ -4814,6 +4929,25 @@ async def periodic(context: ContextTypes.DEFAULT_TYPE):
                 await asyncio.sleep(0.05)
     except Exception:  # noqa: BLE001
         log.exception("weekly reports failed")
+    try:  # ayah of the day at 09:00 local time
+        rows = await POOL.fetch("SELECT * FROM users WHERE chat_type = 'private' AND ayah_rem AND NOT banned AND NOT blocked "
+                                "AND tz IS NOT NULL AND lang IS NOT NULL")
+        for r in rows:
+            u = dict(r)
+            now = datetime.now(ZoneInfo(u["tz"]))
+            if now.hour == 9 and u["last_ayah"] != now.date():
+                await POOL.execute("UPDATE users SET last_ayah = $2 WHERE user_id = $1", u["user_id"], now.date())
+                try:
+                    text, markup = await screen_ayah(u, now.date())
+                    await bot.send_message(u["user_id"], text, parse_mode=ParseMode.HTML, reply_markup=markup,
+                                           disable_notification=True)
+                except Forbidden:
+                    await save(u["user_id"], blocked=True)
+                except Exception:  # noqa: BLE001
+                    log.exception("ayah of the day failed for %s", u["user_id"])
+                await asyncio.sleep(0.05)
+    except Exception:  # noqa: BLE001
+        log.exception("ayah of the day failed")
     try:  # places saved while the geocoder was down: get the real city name and country
         rows = await POOL.fetch("SELECT user_id, lang, tz, city FROM users WHERE lat IS NOT NULL AND lang IS NOT NULL "
                                 "AND (country IS NULL OR country = '' OR city ~ '^-?[0-9]+[.][0-9]+, -?[0-9]+[.][0-9]+$') LIMIT 5")
@@ -4873,9 +5007,8 @@ async def share_times_text(u):
 
 
 async def share_times_btn(u):
-    """Telegram's own share window: pick a chat, the ready text is put in, tap send. No mini app, no @bot."""
-    text = await share_times_text(u)
-    return InlineKeyboardButton(t(u["lang"], "btn_share"), url="https://t.me/share/url?url=" + quote(text, safe=""))
+    """A picture of today's times (10 backgrounds, 7 fonts) that people forward to as many chats as they like."""
+    return btn(t(u["lang"], "btn_share"), "pic:t:new")
 
 
 def strip_tags(x):
@@ -6802,7 +6935,7 @@ async def post_init(app: Application):
         await start_web(app)
     except Exception:  # noqa: BLE001
         log.exception("mini app server failed to start (the bot keeps working)")
-    log.info("Bot is ready")
+    log.info("Bot is ready (arabic shaping: %s)", "raqm" if art.RAQM else "reshaper")
 
 
 async def post_shutdown(app: Application):
@@ -6842,6 +6975,7 @@ def main():
     app.job_queue.run_repeating(periodic, interval=600, first=90)
     app.job_queue.run_repeating(cleanup_job, interval=60, first=30)
     app.job_queue.run_repeating(menu_buttons_job, interval=120, first=120)
+    app.job_queue.run_once(prefetch_ayahs, 60)
     app.add_handler(InlineQueryHandler(on_inline), group=1)
     app.add_handler(PreCheckoutQueryHandler(on_precheckout), group=1)
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, on_paid), group=1)
