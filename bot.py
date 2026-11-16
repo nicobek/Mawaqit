@@ -42,6 +42,7 @@ from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     InlineQueryResultArticle,
+    InlineQueryResultCachedPhoto,
     InlineQueryResultsButton,
     InputMediaPhoto,
     InputTextMessageContent,
@@ -1289,6 +1290,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS last_ayah DATE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS share_bg INT NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS share_font INT NOT NULL DEFAULT 0;
 CREATE TABLE IF NOT EXISTS ayah_cache (ref TEXT PRIMARY KEY, data JSONB NOT NULL);
+CREATE TABLE IF NOT EXISTS share_pics (id TEXT PRIMARY KEY, file_id TEXT NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS ayah_pool (ref TEXT PRIMARY KEY, source TEXT NOT NULL DEFAULT 'base',
                                       removed BOOLEAN NOT NULL DEFAULT FALSE, added_at TIMESTAMPTZ NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS ayah_seen (user_id BIGINT NOT NULL, ref TEXT NOT NULL, PRIMARY KEY (user_id, ref));
@@ -4251,11 +4253,20 @@ async def pic_button(update, ctx, parts):
             day_iso = parts[3].replace(".", ":")
         else:
             day_iso = await today_ayah_ref(dict(u), date.fromisoformat(day_iso))
-    if op == "ok":
-        await q.answer(t(lang, "pic_tip"), show_alert=True)
+    if op == "ok":  # the finished picture: @bot under it and a share button
+        await q.answer()
+        msg = q.message
+        photo = msg.photo[-1].file_id if msg and msg.photo else None
+        if not photo:
+            return
+        pid = hashlib.md5(f"{photo}:{_time.time()}".encode()).hexdigest()[:12]
+        await POOL.execute("INSERT INTO share_pics (id, file_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", pid, photo)
+        caption = f"@{BOT_USERNAME}" if BOT_USERNAME else None
+        share = InlineKeyboardButton(t(lang, "btn_share"), switch_inline_query=f"pic {pid}")
+        await update.effective_chat.send_photo(photo, caption=caption, reply_markup=kb([share]))
         try:
-            await q.edit_message_reply_markup(None)
-        except BadRequest:
+            await msg.delete()
+        except Exception:  # noqa: BLE001
             pass
         return
     bg, fs = u["share_bg"] % art.N_BG, u["share_font"] % art.N_FONT
@@ -4824,6 +4835,15 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     lang = (u or {}).get("lang") or str(iq.from_user.language_code or "en")[:2]
     lang = lang if lang in LANGS else "en"
     q = iq.query.strip()[:80]
+    m = re.match(r"^pic ([0-9a-f]{12})$", q)
+    if m:  # the "Share" button under a finished picture
+        fid = await POOL.fetchval("SELECT file_id FROM share_pics WHERE id = $1", m.group(1))
+        res = [InlineQueryResultCachedPhoto(id=m.group(1), photo_file_id=fid, caption=f"@{BOT_USERNAME}")] if fid else []
+        try:
+            await iq.answer(res, cache_time=3600, is_personal=False)
+        except BadRequest as e:
+            log.info("inline answer skipped: %s", e)
+        return
     hint = InlineQueryResultsButton(text=t(lang, "in_hint"), start_parameter="inline")
     place = None
     try:
@@ -5102,6 +5122,7 @@ async def periodic(context: ContextTypes.DEFAULT_TYPE):
         log.exception("place fix failed")
     try:
         await POOL.execute("DELETE FROM ai_log WHERE at < now() - interval '90 days'")
+        await POOL.execute("DELETE FROM share_pics WHERE at < now() - interval '60 days'")
     except Exception:  # noqa: BLE001
         pass
     try:
