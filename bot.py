@@ -8,6 +8,7 @@ Env vars:
   BOT_TOKEN     - token from @BotFather
   DATABASE_URL  - PostgreSQL URL (Railway sets it for you)
   ADMIN_ID      - your Telegram user ID (enables the admin panel)
+  ADMIN_IDS     - (optional) more admins, comma-separated Telegram IDs
   WEBAPP_URL    - (optional) mini app address; on Railway it is detected automatically
   CONTACT       - (optional) your email/@username, sent to the geocoder as required by its usage policy
 """
@@ -62,6 +63,9 @@ BOT_TOKEN = os.environ["BOT_TOKEN"]
 DATABASE_URL = os.environ["DATABASE_URL"]
 CONTACT = os.getenv("CONTACT", "prayer-times-bot")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0") or 0)  # your Telegram ID; 0 = admin panel disabled
+ADMINS = {ADMIN_ID} | {int(x) for x in os.getenv("ADMIN_IDS", "").replace(";", ",").replace(" ", ",").split(",")
+                       if x.strip().lstrip("-").isdigit()}
+ADMINS.discard(0)
 START_TS = _time.time()
 
 logging.basicConfig(format="%(asctime)s %(levelname)s %(name)s: %(message)s", level=logging.INFO)
@@ -1072,7 +1076,7 @@ def screen_settings(u):
     if not is_private(u):
         lines.append(f"📅 {daily_label(lang, u['daily'])}")
         rows.append([btn(t(lang, "btn_daily"), "s:daily")])
-    elif ADMIN_ID:
+    elif ADMINS:
         rows.append([btn(t(lang, "btn_support"), "s:support")])
     rows.append([btn(t(lang, "btn_back"), "m:home")])
     return "\n".join(lines), kb(*rows)
@@ -1493,7 +1497,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         sub = parts[1]
         if sub == "city":
             return await show_city_prompt(update, ctx, u)
-        if sub == "support" and is_private(u) and ADMIN_ID:
+        if sub == "support" and is_private(u) and ADMINS:
             ctx.user_data["support_mode"] = True
             ctx.user_data.pop("sup_last_mg", None)
             return await render(update, t(lang, "support_prompt"), kb([btn(t(lang, "btn_cancel"), "sup:cancel")]))
@@ -1662,7 +1666,7 @@ async def support_msg(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if is_admin(uid) and ctx.user_data.get("reply_to"):
         await admin_reply(update, ctx)
         raise ApplicationHandlerStop
-    if ctx.user_data.get("support_mode") and ADMIN_ID:
+    if ctx.user_data.get("support_mode") and ADMINS:
         await user_support(update, ctx)
         raise ApplicationHandlerStop
 
@@ -1694,14 +1698,23 @@ async def user_support(update: Update, ctx):
                       f"🔗 Username: {esc(uname)}\n"
                       f"🆔 ID: <code>{user.id}</code>\n"
                       f"{where}🌐 {LANG_BUTTONS.get(lang, lang)}")
-            await ctx.bot.send_message(ADMIN_ID, header, parse_mode=ParseMode.HTML)
-        try:
-            await msg.copy(ADMIN_ID, reply_markup=markup)
-        except BadRequest:  # some messages (e.g. polls) can't be copied with buttons
-            await msg.forward(ADMIN_ID)
-            await ctx.bot.send_message(ADMIN_ID, "👆", reply_markup=markup)
+        delivered = 0
+        for admin in sorted(ADMINS):  # every admin gets it; any of them can reply
+            try:
+                if first:
+                    await ctx.bot.send_message(admin, header, parse_mode=ParseMode.HTML)
+                try:
+                    await msg.copy(admin, reply_markup=markup)
+                except BadRequest:  # some messages (e.g. polls) can't be copied with buttons
+                    await msg.forward(admin)
+                    await ctx.bot.send_message(admin, "👆", reply_markup=markup)
+                delivered += 1
+            except Exception:  # noqa: BLE001
+                log.exception("support forward to admin %s failed (has this admin started the bot?)", admin)
+        if not delivered:
+            raise RuntimeError("no admin reachable")
     except Exception:  # noqa: BLE001
-        log.exception("support forward failed (has the admin started the bot?)")
+        log.exception("support forward failed")
         await msg.reply_text(t(lang, "error"))
         return
     if first:
@@ -1849,7 +1862,7 @@ async def tick(context: ContextTypes.DEFAULT_TYPE):
 
 
 # ───────────────────────── admin panel ─────────────────────────
-# One admin (ADMIN_ID). The admin UI is in Russian and fully button-driven.
+# Admins: ADMIN_ID plus ADMIN_IDS. The admin UI is in Russian and fully button-driven.
 
 ADMIN_BACK = [btn("⬅️ Назад", "a:home")]
 CSV_COLUMNS = ("user_id", "full_name", "username", "chat_type", "title", "owner_id", "members", "lang", "madhab", "city", "country", "tz", "remind", "lead_min", "at_time", "quiet_start",
@@ -1858,7 +1871,7 @@ MADHAB_RU = {"std": "Шафиитский / Маликитский / Ханба�
 
 
 def is_admin(uid):
-    return bool(ADMIN_ID) and uid == ADMIN_ID
+    return uid in ADMINS
 
 
 def flag(cc):
