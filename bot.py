@@ -125,12 +125,21 @@ METHOD_BY_COUNTRY = {
     "ru": 14, "tr": 13, "sa": 4, "ae": 16, "kw": 9, "qa": 10, "eg": 5, "pk": 1, "in": 1,
     "bd": 1, "af": 1, "us": 2, "ca": 2, "sg": 11, "my": 17, "id": 20, "ma": 21, "dz": 19,
     "tn": 18, "fr": 12, "jo": 23,
+    "uz": "ca",  # tuned to the official calendar of Uzbekistan (used only if namozvaqti.uz can't be read)
 }
 DEFAULT_METHOD = 3
+# Custom settings for Aladhan: twilight angles Fajr/Isha + minute adjustments (Imsak,Fajr,Sunrise,Dhuhr,Asr,Maghrib,Sunset,Isha,Midnight)
+CUSTOM_METHODS = {
+    "ca": {"method": 99, "methodSettings": "15.5,null,15", "tune": "0,0,0,3,0,2,2,0,0"},
+}
 
 
 def method_for(country):
     return METHOD_BY_COUNTRY.get((country or "").lower(), DEFAULT_METHOD)
+
+
+def method_params(method):
+    return dict(CUSTOM_METHODS.get(method) or {"method": method})
 
 
 # ───────────────────────── names ─────────────────────────
@@ -901,6 +910,14 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS last_summary DATE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by BIGINT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS azan TEXT;
 CREATE INDEX IF NOT EXISTS users_referred_by ON users (referred_by);
+CREATE TABLE IF NOT EXISTS nv_months (
+    slug       TEXT NOT NULL,
+    y          INT NOT NULL,
+    m          INT NOT NULL,
+    data       TEXT NOT NULL,
+    fetched_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (slug, y, m)
+);
 CREATE TABLE IF NOT EXISTS badges (
     user_id BIGINT NOT NULL,
     code    TEXT NOT NULL,
@@ -984,7 +1001,7 @@ _nomi_last = 0.0
 
 async def fetch_timings(lat, lon, d, method, school):
     url = f"https://api.aladhan.com/v1/timings/{d.strftime('%d-%m-%Y')}"
-    params = {"latitude": lat, "longitude": lon, "method": method, "school": school}
+    params = {"latitude": lat, "longitude": lon, **method_params(method), "school": school}
     last_exc = None
     for attempt in range(2):
         try:
@@ -1007,13 +1024,11 @@ async def get_timings(u, d):
     school = 1 if u["madhab"] == "hanafi" else 0
     key = (round(u["lat"], 2), round(u["lon"], 2), method, school, d)
     if key in CACHE:
-        return CACHE[key]
+        return await local_times(u, d, CACHE[key])
     async with SEM:
-        if key in CACHE:
-            return CACHE[key]
-        data = await fetch_timings(u["lat"], u["lon"], d, method, school)
-    CACHE[key] = data
-    return data
+        if key not in CACHE:
+            CACHE[key] = await fetch_timings(u["lat"], u["lon"], d, method, school)
+    return await local_times(u, d, CACHE[key])
 
 
 async def nominatim(endpoint, params):
@@ -2837,14 +2852,14 @@ async def api_auth(request):
     return tg_user, u, (lang if lang in LANGS else "en")
 
 
-async def fetch_month(u, y, m):
+async def _calc_month(u, y, m):
     method, school = method_for(u["country"]), (1 if u["madhab"] == "hanafi" else 0)
     key = (round(u["lat"], 2), round(u["lon"], 2), method, school, y, m)
     if key in MONTH_CACHE:
         return MONTH_CACHE[key]
     async with SEM:
         r = await HTTP.get(f"https://api.aladhan.com/v1/calendar/{y}/{m}",
-                           params={"latitude": u["lat"], "longitude": u["lon"], "method": method, "school": school})
+                           params={"latitude": u["lat"], "longitude": u["lon"], **method_params(method), "school": school})
     r.raise_for_status()
     days = []
     for item in r.json()["data"]:
@@ -2858,14 +2873,14 @@ async def fetch_month(u, y, m):
     return days
 
 
-async def fetch_hijri_month(u, hy, hm):
+async def _calc_hijri_month(u, hy, hm):
     method, school = method_for(u["country"]), (1 if u["madhab"] == "hanafi" else 0)
     key = ("h", round(u["lat"], 2), round(u["lon"], 2), method, school, hy, hm)
     if key in MONTH_CACHE:
         return MONTH_CACHE[key]
     async with SEM:
         r = await HTTP.get(f"https://api.aladhan.com/v1/hijriCalendar/{hy}/{hm}",
-                           params={"latitude": u["lat"], "longitude": u["lon"], "method": method, "school": school})
+                           params={"latitude": u["lat"], "longitude": u["lon"], **method_params(method), "school": school})
     r.raise_for_status()
     days = []
     for item in r.json()["data"]:
@@ -2874,6 +2889,24 @@ async def fetch_hijri_month(u, hy, hm):
                      "t": {k: tm[k].split()[0] for k in TIMING_KEYS}})
     MONTH_CACHE[key] = days
     return days
+
+
+async def _local_days(u, days):
+    if not nv_city(u):
+        return days
+    out = []
+    for x in days:
+        dd, mm, yy = (int(v) for v in x["date"].split("-"))
+        out.append(dict(x, t=await local_times(u, date(yy, mm, dd), x["t"])))
+    return out
+
+
+async def fetch_month(u, y, m):
+    return await _local_days(u, await _calc_month(u, y, m))
+
+
+async def fetch_hijri_month(u, hy, hm):
+    return await _local_days(u, await _calc_hijri_month(u, hy, hm))
 
 
 def profile_json(u, lang):
@@ -4323,6 +4356,125 @@ async def periodic_summaries(bot):
             await send_summary(bot, u, now.date())
             await asyncio.sleep(0.05)
 
+
+
+# ───────────────────────── official local calendars ─────────────────────────
+# Uzbekistan: the official calendar published on namozvaqti.uz (monthly tables for ~75 towns).
+# Each user gets the table of the nearest town. If the site can't be read, the bot falls back to its own
+# calculation tuned to the same calendar ("ca" method below), so reminders never stop.
+
+NV_CITIES = [  # slug, lat, lon
+    ("toshkent", 41.311, 69.280), ("angren", 41.017, 70.144), ("bekobod", 40.221, 69.270), ("olmaliq", 40.845, 69.598),
+    ("yangiyol", 41.112, 69.047), ("gazalkent", 41.558, 69.771), ("parkent", 41.294, 69.677), ("piskent", 40.897, 69.350),
+    ("boka", 40.811, 69.198), ("nurafshon", 41.040, 69.358),
+    ("andijon", 40.783, 72.344), ("asaka", 40.641, 72.239), ("shahrixon", 40.712, 72.057), ("xojaobod", 40.668, 72.562),
+    ("marhamat", 40.500, 72.333), ("paytug", 40.897, 72.245), ("xonobod", 40.802, 72.973),
+    ("fargona", 40.384, 71.786), ("qoqon", 40.529, 70.943), ("margilon", 40.471, 71.725), ("quva", 40.522, 72.072),
+    ("rishton", 40.357, 71.284), ("bogdod", 40.502, 71.217), ("oltiariq", 40.391, 71.474),
+    ("samarqand", 39.654, 66.975), ("kattaqorgon", 39.899, 66.257), ("urgut", 39.402, 67.243), ("ishtixon", 39.966, 66.486),
+    ("buxoro", 39.768, 64.421), ("gijduvon", 40.100, 64.683), ("qorakol", 39.500, 63.853), ("gazli", 40.133, 63.450),
+    ("guliston", 40.490, 68.784), ("sirdaryo", 40.844, 68.661),
+    ("jizzax", 40.116, 67.842), ("zomin", 39.960, 68.396), ("gallaorol", 40.022, 67.592), ("dostlik", 40.524, 68.036),
+    ("navoiy", 40.084, 65.379), ("zarafshon", 41.573, 64.204), ("konimex", 40.267, 65.155), ("nurota", 40.565, 65.689),
+    ("uchquduq", 42.157, 63.556),
+    ("nukus", 42.460, 59.603), ("moynoq", 43.768, 59.022), ("taxtakopir", 43.017, 60.367), ("tortkol", 41.550, 61.000),
+    ("qongirot", 43.043, 58.844),
+    ("termiz", 37.224, 67.278), ("boysun", 38.206, 67.199), ("denov", 38.267, 67.900), ("sherobod", 37.667, 67.000),
+    ("shorchi", 38.000, 67.783),
+    ("qarshi", 38.861, 65.790), ("muborak", 39.255, 65.153), ("shahrisabz", 39.058, 66.834), ("guzor", 38.621, 66.248),
+    ("namangan", 40.998, 71.672), ("chortoq", 41.069, 71.824), ("chust", 41.003, 71.238), ("pop1", 40.874, 71.110),
+    ("uchqorgon", 41.114, 72.079),
+    ("urganch", 41.550, 60.631), ("hazorasp", 41.320, 61.074), ("xonqa", 41.474, 60.787), ("shovot", 41.653, 60.304),
+    ("xiva", 41.378, 60.364),
+]
+NV_MAX_KM = 150
+NV_DATA = {}   # (slug, y, m) -> {day: {Fajr…Isha}} or None (not available)
+NV_FAIL = {}   # (slug, y, m) -> time of the last failed attempt
+NV_LOCK = asyncio.Lock()
+_NV_ROW = re.compile(r"(?<![\d:])(\d{1,2})\s+(?:[^\d\s]{1,12}\s+){0,2}((?:\d{1,2}:\d{2}\s+){5}\d{1,2}:\d{2})")
+
+
+def km(lat1, lon1, lat2, lon2):
+    p = math.pi / 180
+    a = (math.sin((lat2 - lat1) * p / 2) ** 2 + math.cos(lat1 * p) * math.cos(lat2 * p) * math.sin((lon2 - lon1) * p / 2) ** 2)
+    return 12742 * math.asin(math.sqrt(a))
+
+
+def nv_city(u):
+    if (u.get("country") or "").lower() != "uz" or u.get("lat") is None:
+        return None
+    dist, slug = min((km(u["lat"], u["lon"], la, lo), s) for s, la, lo in NV_CITIES)
+    return slug if dist <= NV_MAX_KM else None
+
+
+def nv_parse(page, y, m):
+    """Monthly table → {day: {Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha}}. None if it doesn't look right."""
+    text = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", page)))
+    n = (date(y + (m == 12), m % 12 + 1, 1) - timedelta(days=1)).day
+    out = {}
+    for mt in _NV_ROW.finditer(text):
+        day = int(mt.group(1))
+        times = [f"{int(x.split(':')[0]):02d}:{x.split(':')[1]}" for x in mt.group(2).split()]
+        if 1 <= day <= n and day not in out and times == sorted(times):
+            out[day] = dict(zip(TIMING_KEYS, times))
+    return out if len(out) == n else None
+
+
+async def nv_month(slug, y, m):
+    key = (slug, y, m)
+    if key in NV_DATA:
+        return NV_DATA[key]
+    if _time.time() - NV_FAIL.get(key, 0) < 1800:
+        return None
+    async with NV_LOCK:
+        if key in NV_DATA:
+            return NV_DATA[key]
+        try:
+            row = await POOL.fetchval("SELECT data FROM nv_months WHERE slug = $1 AND y = $2 AND m = $3", slug, y, m)
+            if row:
+                NV_DATA[key] = {int(k): v for k, v in json.loads(row).items()}
+                return NV_DATA[key]
+            r = await HTTP.get(f"https://namozvaqti.uz/oylik/{m}/{slug}", follow_redirects=True,
+                               headers={"User-Agent": "MawaqitTimeBot/1.0 (+https://t.me/MawaqitTimeBot)"})
+            r.raise_for_status()
+            data = nv_parse(r.text, y, m)
+            if not data:
+                raise ValueError("table not recognised")
+            await POOL.execute("INSERT INTO nv_months (slug, y, m, data) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+                               slug, y, m, json.dumps(data))
+            NV_DATA[key] = data
+            log.info("namozvaqti.uz: %s %d-%02d loaded (%d days)", slug, y, m, len(data))
+            return data
+        except Exception as e:  # noqa: BLE001
+            NV_FAIL[key] = _time.time()
+            log.warning("namozvaqti.uz: %s %d-%02d not available (%s), using own calculation", slug, y, m, e)
+            return None
+
+
+def _mins(hhmm):
+    h, mm = hhmm.split(":")
+    return int(h) * 60 + int(mm)
+
+
+async def local_times(u, d, calc):
+    """Times for day d from the official local calendar, merged over the calculated ones (calc)."""
+    slug = nv_city(u)
+    if not slug:
+        return calc
+    data = await nv_month(slug, d.year, d.month)
+    day = data and data.get(d.day)
+    if not day:
+        return calc
+    # sanity check against the calculation: the official table never differs by more than ~25 min
+    if any(abs(_mins(day[k]) - _mins(calc[k])) > 25 for k in TIMING_KEYS if k != "Asr"):
+        log.warning("namozvaqti.uz: %s %s looks wrong, ignored", slug, d)
+        return calc
+    out = dict(calc)
+    for k in TIMING_KEYS:
+        if k == "Asr" and u.get("madhab") != "hanafi":
+            continue  # the official table gives the Hanafi Asr
+        out[k] = day[k]
+    return out
 
 # ───────────────────────── app ─────────────────────────
 
