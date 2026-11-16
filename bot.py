@@ -1289,6 +1289,11 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS last_ayah DATE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS share_bg INT NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS share_font INT NOT NULL DEFAULT 0;
 CREATE TABLE IF NOT EXISTS ayah_cache (ref TEXT PRIMARY KEY, data JSONB NOT NULL);
+CREATE TABLE IF NOT EXISTS ayah_pool (ref TEXT PRIMARY KEY, source TEXT NOT NULL DEFAULT 'base',
+                                      removed BOOLEAN NOT NULL DEFAULT FALSE, added_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS ayah_seen (user_id BIGINT NOT NULL, ref TEXT NOT NULL, PRIMARY KEY (user_id, ref));
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ayah_day DATE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ayah_ref TEXT;
 CREATE TABLE IF NOT EXISTS ai_credits (
     user_id         BIGINT PRIMARY KEY,
     credits         INT NOT NULL DEFAULT 0,
@@ -3300,7 +3305,7 @@ async def run_broadcast(app, chat_id, text, bc):
 ADMIN_PERM_OF = {"stats": "stats", "geo": "stats", "health": "health", "test": "health", "bans": "bans", "ban": "bans",
                  "unban": "bans", "azan": "azan", "card": "users", "users": "users", "usearch": "users", "chats": "users",
                  "user": "users", "export": "export", "bc": "bc", "bcl": "bc", "adm": "main", "ai": "ai",
-                 "grant": "ai", "hide": "main", "hidden": "main"}
+                 "grant": "ai", "hide": "main", "hidden": "main", "ayrm": "main"}
 
 
 async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
@@ -3319,6 +3324,11 @@ async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
     if sub == "grant" and len(parts) > 2 and parts[2].lstrip("-").isdigit():
         ctx.user_data["admin_state"] = f"ai_grant:{parts[2]}"
         return await render(update, AI_ASK["grant"], kb([btn("⬅️ Назад", f"a:card:{parts[2]}")]))
+    if sub == "ayrm" and len(parts) > 2:  # remove an ayah added automatically
+        ref = parts[2].replace(".", ":")
+        await POOL.execute("UPDATE ayah_pool SET removed = TRUE WHERE ref = $1", ref)
+        await load_ayah_pool()
+        return await update.effective_chat.send_message(f"🗑 Аят {esc(ref)} убран. Осталось аятов: {len(AYAH_POOL)}.")
     if sub == "hide" and len(parts) > 2 and parts[2].lstrip("-").isdigit():
         await POOL.execute("UPDATE users SET hidden = NOT hidden WHERE user_id = $1", int(parts[2]))
         card = await user_card(int(parts[2]), parts[3] if len(parts) > 3 and parts[3] else None, viewer=uid)
@@ -4005,8 +4015,9 @@ async def fetch_ayah(ref):
 
 async def prefetch_ayahs(context):
     """Load all ayahs into the database slowly, so the first person each day doesn't wait."""
+    await load_ayah_pool()
     have = {r["ref"] for r in await POOL.fetch("SELECT ref FROM ayah_cache")}
-    todo = [x for x in AYAHS if x not in have]
+    todo = [x for x in AYAH_POOL if x not in have]
     ok = 0
     for ref in todo:
         try:
@@ -4019,11 +4030,134 @@ async def prefetch_ayahs(context):
         log.info("ayahs loaded: %d of %d", ok, len(todo))
 
 
-def ayah_ref_for(uid, day):
-    """Each person has their own order of ayahs: a new one every day, no repeats until all are shown."""
+AYAH_POOL = list(AYAHS)  # base list + ayahs added every week (from the ayah_pool table)
+SURA_AYAHS = [7, 286, 200, 176, 120, 165, 206, 75, 129, 109, 123, 111, 43, 52, 99, 128, 111, 110, 98, 135, 112, 78, 118, 64,
+              77, 227, 93, 88, 69, 60, 34, 30, 73, 54, 45, 83, 182, 88, 75, 85, 54, 53, 89, 59, 37, 35, 38, 29, 18, 45, 60,
+              49, 62, 55, 78, 96, 29, 22, 24, 13, 14, 11, 11, 18, 12, 12, 30, 52, 52, 44, 28, 28, 20, 56, 40, 31, 50, 40, 46,
+              42, 29, 19, 36, 25, 22, 17, 19, 26, 30, 20, 15, 21, 11, 8, 8, 19, 5, 8, 8, 11, 11, 8, 3, 9, 5, 4, 7, 3, 6, 3, 5,
+              4, 5, 6]
+
+
+async def load_ayah_pool():
+    await POOL.executemany("INSERT INTO ayah_pool (ref) VALUES ($1) ON CONFLICT DO NOTHING", [(x,) for x in AYAHS])
+    rows = await POOL.fetch("SELECT ref FROM ayah_pool WHERE NOT removed ORDER BY added_at, ref")
+    AYAH_POOL[:] = [r["ref"] for r in rows] or list(AYAHS)
+
+
+async def today_ayah_ref(u, day):
+    """Each person gets an ayah they haven't seen yet; it stays the same all day. After all of them — from the start."""
     import random
-    order = random.Random(uid * 7919 + 13).sample(range(len(AYAHS)), len(AYAHS))
-    return AYAHS[order[day.toordinal() % len(AYAHS)]]
+    uid = u["user_id"]
+    if u.get("ayah_day") == day and u.get("ayah_ref"):
+        return u["ayah_ref"]
+    seen = {r["ref"] for r in await POOL.fetch("SELECT ref FROM ayah_seen WHERE user_id = $1", uid)}
+    left = [x for x in AYAH_POOL if x not in seen]
+    if not left:
+        await POOL.execute("DELETE FROM ayah_seen WHERE user_id = $1", uid)
+        left = list(AYAH_POOL)
+    ref = random.Random(uid * 7919 + day.toordinal()).choice(left)
+    await save(uid, ayah_day=day, ayah_ref=ref)
+    await POOL.execute("INSERT INTO ayah_seen (user_id, ref) VALUES ($1, $2) ON CONFLICT DO NOTHING", uid, ref)
+    u["ayah_day"], u["ayah_ref"] = day, ref
+    return ref
+
+
+AYAH_PICK = """You help choose verses for an "Ayah of the day" card in a Muslim app. Below are Qur'an verses (id | English meaning).
+Pick up to {n} that read well ON THEIR OWN for an ordinary Muslim: guidance, mercy, hope, patience, gratitude, prayer, duas,
+reminders of Allah and the Hereafter, good character. Skip verses that are fragments of a story, need the previous verse to make
+sense, are detailed legal rulings (inheritance, divorce, debts, war), or are about punishment only.
+Answer with JSON only: a list of the chosen ids, e.g. ["2:153", "39:53"]."""
+
+
+async def add_weekly_ayahs(bot, n=7):
+    """Every week: random short verses not in the list yet → the AI picks the good ones → added for everyone."""
+    import random
+    have = {r["ref"] for r in await POOL.fetch("SELECT ref FROM ayah_pool")}
+    covered = set()
+    for x in have:
+        sno, rng = x.split(":")
+        a0, a1 = (int(v) for v in rng.split("-")) if "-" in rng else (int(rng), int(rng))
+        covered |= {f"{sno}:{k}" for k in range(a0, a1 + 1)}
+    rnd = random.Random()
+    cands = []
+    for _ in range(400):
+        if len(cands) >= 40:
+            break
+        sno = rnd.randint(1, 114)
+        ref = f"{sno}:{rnd.randint(1, SURA_AYAHS[sno - 1])}"
+        if ref in covered or ref in [c[0] for c in cands] or ref in ("9:1",):
+            continue
+        try:
+            r = await HTTP.get(QURAN_API.format(ref=ref, eds="quran-simple,en.sahih"), timeout=20)
+            data = {i["edition"]["identifier"]: i["text"] for i in r.json().get("data") or []} if r.status_code == 200 else {}
+        except Exception:  # noqa: BLE001
+            data = {}
+        ar, en = data.get("quran-simple", ""), data.get("en.sahih", "")
+        if 20 <= len(ar) <= 260 and en:
+            cands.append((ref, en))
+        await asyncio.sleep(0.4)
+    if not cands:
+        return []
+    prompt = "\n".join(f"{ref} | {en}" for ref, en in cands)
+    system = AYAH_PICK.format(n=n)
+    text = None
+    if AI["key"]:
+        text, _, _ = await gemini_answer(system, [{"role": "user", "parts": [{"text": prompt}]}], False, AI["cfg"])
+    if not text:
+        for p in PROVIDERS:
+            if AI["pkeys"].get(p):
+                text, _ = await backup_answer(p, [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+                                              AI["cfg"])
+                if text:
+                    break
+    if not text:
+        return None  # no AI right now: try again later
+    ids = re.findall(r"\d{1,3}:\d{1,3}", text)
+    ok = {c[0] for c in cands}
+    chosen = []
+    for ref in ids:
+        if ref in ok and ref not in chosen:
+            chosen.append(ref)
+        if len(chosen) >= n:
+            break
+    added = []
+    for ref in chosen:
+        try:
+            await fetch_ayah(ref)
+            await POOL.execute("INSERT INTO ayah_pool (ref, source) VALUES ($1, 'auto') ON CONFLICT DO NOTHING", ref)
+            added.append(ref)
+        except Exception as e:  # noqa: BLE001
+            log.warning("weekly ayah %s: %r", ref, e)
+        await asyncio.sleep(1)
+    await load_ayah_pool()
+    log.info("weekly ayahs added: %s", ", ".join(added) or "none")
+    if added and ADMIN_ID:
+        en = dict(cands)
+        lines = [f"📖 <b>Добавлено {len(added)} новых аятов</b> (всего {len(AYAH_POOL)})", ""]
+        lines += [f"• <b>{r}</b> — {esc(en.get(r, '')[:160])}" for r in added]
+        lines += ["", "Если какой-то не подходит — нажмите ❌, он больше не будет показываться."]
+        rows = [[btn(f"❌ {r}", f"a:ayrm:{r.replace(':', '.')}") for r in added[i:i + 3]] for i in range(0, len(added), 3)]
+        try:
+            await bot.send_message(ADMIN_ID, "\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=kb(*rows),
+                                   disable_notification=True)
+        except Exception:  # noqa: BLE001
+            log.exception("weekly ayahs: admin message failed")
+    return added
+
+
+async def weekly_ayahs_job(bot):
+    """Once a week (Monday night in Tashkent): add new ayahs. Retries next run if the AI was busy."""
+    now = datetime.now(ZoneInfo("Asia/Tashkent"))
+    week = f"{now.isocalendar()[0]}-{now.isocalendar()[1]}"
+    if now.weekday() != 0 or now.hour < 22 or await kv_get("ayah_week", "") == week:
+        return
+    await kv_set("ayah_week", week)
+    try:
+        if await add_weekly_ayahs(bot) is None:
+            await kv_set("ayah_week", "")
+    except Exception:  # noqa: BLE001
+        log.exception("weekly ayahs failed")
+        await kv_set("ayah_week", "")
 
 
 def ayah_parts(a, lang):
@@ -4048,11 +4182,13 @@ def ayah_parts(a, lang):
 
 async def screen_ayah(u, day=None):
     lang = u["lang"]
+    u = dict(u)
     day = day or datetime.now(ZoneInfo(u["tz"] or "UTC")).date()
-    a = await fetch_ayah(ayah_ref_for(u["user_id"], day))
+    aref = await today_ayah_ref(u, day)
+    a = await fetch_ayah(aref)
     ar, tr, ref = ayah_parts(a, lang)
     text = f"📖 <b>{t(lang, 'ayah_title')}</b>\n\n{esc(ar)}\n\n" + (f"<i>{esc(tr)}</i>\n\n" if tr else "") + f"— {esc(ref)}"
-    return text, kb([btn(t(lang, "pic_btn"), f"pic:a:new:{day.isoformat()}")], [btn(t(lang, "btn_menu"), "m:new")])
+    return text, kb([btn(t(lang, "pic_btn"), f"pic:a:new:{aref.replace(':', '.')}")], [btn(t(lang, "btn_menu"), "m:new")])
 
 
 def times_rows(lang, data):
@@ -4067,11 +4203,11 @@ async def pic_bytes(u, kind, day_iso, bg, fs):
         return PIC_CACHE[key]
     loop = asyncio.get_running_loop()
     label = f"@{BOT_USERNAME}" if BOT_USERNAME else "Mawaqit"
-    y, m, dd = (int(x) for x in day_iso.split("-"))
-    if kind == "a":
-        ar, tr, ref = ayah_parts(await fetch_ayah(ayah_ref_for(u["user_id"], date(y, m, dd))), lang)
+    if kind == "a":  # day_iso is the ayah reference here
+        ar, tr, ref = ayah_parts(await fetch_ayah(day_iso), lang)
         jpg = await loop.run_in_executor(None, art.render_ayah, ar, tr, ref, t(lang, "ayah_hdr"), label, bg, fs)
     else:
+        y, m, dd = (int(x) for x in day_iso.split("-"))
         data = await get_timings(u, date(y, m, dd))
         title = strip_tags(t(lang, "times_title")).replace("🕌 ", "")
         date_line = f"{dd:02d}.{m:02d}.{y}  ·  {data['hday']} {HM[lang][data['hmonth'] - 1]} {data['hyear']}"
@@ -4085,7 +4221,7 @@ async def pic_bytes(u, kind, day_iso, bg, fs):
 
 def pic_markup(lang, kind, day_iso, bg, fs):
     names = art.FONT_NAMES.get(lang, art.FONT_NAMES["en"])
-    cb = f"pic:{kind}:{{}}:{day_iso}"
+    cb = f"pic:{kind}:{{}}:{day_iso.replace(':', '.')}"
     return kb([btn("◀️", cb.format("b-")), btn(t(lang, "pic_bg", i=bg % art.N_BG + 1, n=art.N_BG), cb.format("b+")), btn("▶️", cb.format("b+"))],
               [btn("◀️", cb.format("f-")), btn("🔤 " + names[fs % art.N_FONT], cb.format("f+")), btn("▶️", cb.format("f+"))],
               [btn(t(lang, "pic_done"), cb.format("ok"))])
@@ -4110,6 +4246,11 @@ async def pic_button(update, ctx, parts):
     op = parts[2] if len(parts) > 2 else "new"
     day_iso = parts[3] if len(parts) > 3 and re.match(r"^\d{4}-\d\d-\d\d$", parts[3]) else \
         datetime.now(ZoneInfo(u["tz"])).date().isoformat()
+    if kind == "a":  # the ayah reference ("94.5-6"); older buttons carry a day
+        if len(parts) > 3 and re.match(r"^\d{1,3}\.\d{1,3}(-\d{1,3})?$", parts[3]):
+            day_iso = parts[3].replace(".", ":")
+        else:
+            day_iso = await today_ayah_ref(dict(u), date.fromisoformat(day_iso))
     if op == "ok":
         await q.answer(t(lang, "pic_tip"), show_alert=True)
         try:
@@ -4948,6 +5089,10 @@ async def periodic(context: ContextTypes.DEFAULT_TYPE):
                 await asyncio.sleep(0.05)
     except Exception:  # noqa: BLE001
         log.exception("ayah of the day failed")
+    try:
+        await weekly_ayahs_job(bot)
+    except Exception:  # noqa: BLE001
+        log.exception("weekly ayahs failed")
     try:  # places saved while the geocoder was down: get the real city name and country
         rows = await POOL.fetch("SELECT user_id, lang, tz, city FROM users WHERE lat IS NOT NULL AND lang IS NOT NULL "
                                 "AND (country IS NULL OR country = '' OR city ~ '^-?[0-9]+[.][0-9]+, -?[0-9]+[.][0-9]+$') LIMIT 5")
@@ -6943,6 +7088,7 @@ async def post_init(app: Application):
     await load_azans()
     await load_admins()
     await load_ai()
+    await load_ayah_pool()
     if AI["key"]:  # check the key and pick the models in the background
         asyncio.get_running_loop().create_task(ai_models())
     global BOT_USERNAME
