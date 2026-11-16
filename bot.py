@@ -5642,7 +5642,7 @@ AI_CFG_DEFAULT = {"enabled": True, "access": "admins", "selected": [], "banned":
                   "disc_on": True, "disc": ""}
 DEFAULT_PACKS = [{"id": "q50", "q": 50, "stars": 50}, {"id": "q200", "q": 200, "stars": 150},
                  {"id": "u30", "days": 30, "stars": 300}]
-DEFAULT_CARDS = {"owner": "Abdurahmon Boborajabov",
+DEFAULT_CARDS = {"owner": "",
                  "cards": [{"label": "VISA", "number": "4466 1369 0003 3243"},
                            {"label": "VISA", "number": "4097 8402 1478 0988"},
                            {"label": "HUMO", "number": "9860 3501 4472 5404"}]}
