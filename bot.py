@@ -1468,8 +1468,13 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if act == "m":
         sub = parts[1]
-        if sub == "times":
-            return await send_times_card(update, ctx, u)
+        if sub == "times":  # the menu closes and the card takes its place
+            await send_times_card(update, ctx, u)
+            try:
+                await q.message.delete()
+            except Exception:  # noqa: BLE001  (older than 48 h: leave it)
+                pass
+            return
         if sub == "new":
             text, markup = screen_menu(u)
             return await update.effective_chat.send_message(text, parse_mode=ParseMode.HTML, reply_markup=markup)
