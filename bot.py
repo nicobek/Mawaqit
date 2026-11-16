@@ -1741,8 +1741,7 @@ def screen_menu(u):
         [btn(t(lang, "btn_settings"), "m:settings")],
     ]
     if is_private(u) and WEBAPP_URL:  # quick ways into the app: adhkar, tracker, qibla
-        rows[1:2] = [[webapp_btn(t(lang, "mb_azkar"), "more&sub=azkar"), webapp_btn(t(lang, "mb_tracker"), "more&sub=tracker"),
-                      qibla_btn(u)],
+        rows[1:2] = [[webapp_btn(t(lang, "mb_azkar"), "more&sub=azkar"), qibla_btn(u)],
                      [btn(t(lang, "btn_rem_s_on" if u["remind"] else "btn_rem_s_off"), "m:toggle"),
                       btn(t(lang, "btn_settings"), "m:settings")]]
         rows = rows[:3]
@@ -5671,7 +5670,21 @@ GEMINI_PREFER = ("gemini-3-flash", "gemini-3-flash-preview", "gemini-flash-lates
                  "gemini-flash-lite-latest", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite")
 AI_CFG_DEFAULT = {"enabled": True, "access": "admins", "selected": [], "banned": [], "daily_free": 20,
                   "global_free": 350, "model": "auto", "length": "medium", "memory": 8, "extra": "",
-                  "disc_on": True, "disc": ""}
+                  "disc_on": True, "disc": "", "prov": {"groq": True, "cerebras": True, "openrouter": True},
+                  "gem_limit": 550, "reserve": 200}
+# Backup AI providers (OpenAI-style API). They answer Russian/English/Arabic when Gemini's free quota runs low;
+# Uzbek and Tajik are always answered by Gemini (the backups write those languages poorly).
+PROVIDERS = {
+    "groq": {"name": "Groq", "base": "https://api.groq.com/openai/v1", "env": "GROQ_API_KEY", "site": "console.groq.com/keys",
+             "prefer": ("openai/gpt-oss-120b", "llama-3.3-70b-versatile", "meta-llama/llama-4-maverick-17b-128e-instruct")},
+    "cerebras": {"name": "Cerebras", "base": "https://api.cerebras.ai/v1", "env": "CEREBRAS_API_KEY", "site": "cloud.cerebras.ai",
+                 "prefer": ("gpt-oss-120b", "llama-3.3-70b", "qwen-3-235b-a22b-instruct-2507", "llama3.1-8b")},
+    "openrouter": {"name": "OpenRouter", "base": "https://openrouter.ai/api/v1", "env": "OPENROUTER_API_KEY",
+                   "site": "openrouter.ai/keys",
+                   "prefer": ("openai/gpt-oss-120b:free", "meta-llama/llama-3.3-70b-instruct:free",
+                              "deepseek/deepseek-chat-v3-0324:free", "qwen/qwen3-235b-a22b:free")},
+}
+GEMINI_ONLY_LANGS = ("uz", "uzc", "tg")
 DEFAULT_PACKS = [{"id": "q50", "q": 50, "stars": 50}, {"id": "q200", "q": 200, "stars": 150},
                  {"id": "u30", "days": 30, "stars": 300}]
 DEFAULT_CARDS = {"owner": "",
@@ -5679,7 +5692,7 @@ DEFAULT_CARDS = {"owner": "",
                            {"label": "VISA", "number": "4097 8402 1478 0988"},
                            {"label": "HUMO", "number": "9860 3501 4472 5404"}]}
 AI = {"cfg": dict(AI_CFG_DEFAULT), "key": GEMINI_KEY, "models": [], "cool": {}, "packs": list(DEFAULT_PACKS),
-      "cards": json.loads(json.dumps(DEFAULT_CARDS))}
+      "cards": json.loads(json.dumps(DEFAULT_CARDS)), "pkeys": {}, "pmodel": {}}
 AI_HISTORY = {}  # user_id -> list of (role, text)
 LANG_NAMES = {"en": "English", "ru": "Russian", "uz": "Uzbek (Latin script)", "uzc": "Uzbek (Cyrillic script)",
               "tg": "Tajik (Cyrillic script)", "ar": "Arabic"}
@@ -5725,6 +5738,12 @@ async def load_ai():
         cfg["access"] = "all"
     AI["cfg"] = {**AI_CFG_DEFAULT, **cfg}
     AI["key"] = (await kv_get("gemini_key", "") or "").strip() or GEMINI_KEY
+    AI["cfg"]["prov"] = {**AI_CFG_DEFAULT["prov"], **(AI["cfg"].get("prov") or {})}
+    try:
+        saved = json.loads(await kv_get("ai_pkeys", "{}") or "{}")
+    except ValueError:
+        saved = {}
+    AI["pkeys"] = {p: (saved.get(p) or os.getenv(v["env"], "")).strip() for p, v in PROVIDERS.items()}
     for k, default in (("packs", DEFAULT_PACKS), ("cards", DEFAULT_CARDS)):
         try:
             v = json.loads(await kv_get("ai_" + k, "") or "null")
@@ -5740,7 +5759,7 @@ async def save_ai_cfg(**changes):
 
 def ai_allowed_now(uid):
     c = AI["cfg"]
-    if not AI["key"] or not c["enabled"] or uid in c["banned"]:
+    if not (AI["key"] or any(AI["pkeys"].values())) or not c["enabled"] or uid in c["banned"]:
         return False
     if is_admin(uid) or c["access"] == "all":
         return True
@@ -5833,12 +5852,108 @@ async def ai_answer(u, question, cheap=False, keep=True):
     hist = AI_HISTORY.setdefault(u["user_id"], []) if keep else []
     mem = int(c["memory"])
     contents = [{"role": r, "parts": [{"text": x}]} for r, x in (hist[-mem:] if mem else [])]
-    contents.append({"role": "user", "parts": [{"text": question[:2000]}]})
+    contents = contents + [{"role": "user", "parts": [{"text": question[:2000]}]}]
     system = AI_SYSTEM.format(lang=LANG_NAMES.get(lang, "English"), length=AI_LENGTH.get(c["length"], AI_LENGTH["medium"]),
                               madhab="Hanafi" if u["madhab"] == "hanafi" else "Shafi'i/Maliki/Hanbali")
     if c["extra"].strip():
         system += ("\n\nAdditional instructions from the app owner (follow them unless they conflict with the rules above):\n"
                    + c["extra"].strip()[:3000])
+    msgs = [{"role": "system", "content": system}] + \
+        [{"role": "assistant" if r == "model" else "user", "content": x} for r, x in (hist[-mem:] if mem else [])] + \
+        [{"role": "user", "content": question[:2000]}]
+
+    def remember(text):
+        if keep:
+            hist.extend([("user", question[:2000]), ("model", text[:4000])])
+            del hist[:-12]
+
+    backups = [p for p in PROVIDERS if c["prov"].get(p) and AI["pkeys"].get(p)] if lang not in GEMINI_ONLY_LANGS else []
+    gem_used = await gemini_used_today()
+    # Russian/English/Arabic leave the last part of Gemini's free quota to Uzbek and Tajik questions
+    gemini_first = bool(AI["key"]) and (not backups or gem_used < max(0, c["gem_limit"] - c["reserve"]))
+    if gemini_first:
+        text, model, err = await gemini_answer(system, contents, cheap, c)
+        if text or err == "ai_blocked":
+            if text:
+                remember(text)
+            return text, model, err
+    for p in backups:
+        text, model = await backup_answer(p, msgs, c)
+        if text:
+            remember(text)
+            return text, model, None
+    if not gemini_first and AI["key"]:  # backups are down: Gemini after all
+        text, model, err = await gemini_answer(system, contents, cheap, c)
+        if text or err == "ai_blocked":
+            if text:
+                remember(text)
+            return text, model, err
+    await bump("ai_errors")
+    return None, None, "ai_err"
+
+
+def gemini_day():
+    """Gemini's free quota resets at midnight Pacific time."""
+    return datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%Y%m%d")
+
+
+async def gemini_used_today():
+    try:
+        return await POOL.fetchval("SELECT coalesce(sum(stat_value), 0) FROM daily_stats WHERE stat_key = $1 "
+                                   "AND stat_day >= CURRENT_DATE - 1", "ai_gem_" + gemini_day()) or 0
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+async def provider_models(p, key=None):
+    """The provider's model to use: the first of our preferred ones it has (asked once)."""
+    if not key and AI["pmodel"].get(p):
+        return AI["pmodel"][p]
+    v = PROVIDERS[p]
+    r = await HTTP.get(v["base"] + "/models", headers={"Authorization": f"Bearer {key or AI['pkeys'][p]}"}, timeout=15)
+    r.raise_for_status()
+    have = [m.get("id") for m in r.json().get("data", [])]
+    model = next((m for m in v["prefer"] if m in have), None)
+    if not model and p == "openrouter":
+        model = next((m for m in have if m and m.endswith(":free")), None)
+    model = model or v["prefer"][0]
+    if not key:
+        AI["pmodel"][p] = model
+    return model
+
+
+async def backup_answer(p, msgs, c):
+    v = PROVIDERS[p]
+    if AI["cool"].get("p:" + p, 0) > _time.time():
+        return None, None
+    try:
+        model = await provider_models(p)
+        r = await HTTP.post(v["base"] + "/chat/completions", timeout=60,
+                            headers={"Authorization": f"Bearer {AI['pkeys'][p]}",
+                                     **({"HTTP-Referer": f"https://t.me/{BOT_USERNAME}", "X-Title": "Mawaqit"} if p == "openrouter" else {})},
+                            json={"model": model, "messages": msgs, "temperature": 0.4,
+                                  "max_tokens": 4096 if c["length"] == "long" else 2048})
+        if r.status_code in (401, 403, 404, 429) or r.status_code >= 500:
+            log.warning("%s %s: HTTP %s %s", p, model, r.status_code, r.text[:200])
+            if r.status_code == 404:
+                AI["pmodel"].pop(p, None)
+            AI["cool"]["p:" + p] = _time.time() + (3600 if r.status_code in (401, 403) else 600)
+            return None, None
+        r.raise_for_status()
+        text = ((r.json().get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+        text = re.sub(r"(?s)<think>.*?</think>", "", text).strip()
+        if not text:
+            return None, None
+        await bump("ai_p_" + p)
+        return text, f"{p}:{model.split('/')[-1]}"
+    except Exception:  # noqa: BLE001
+        log.exception("%s failed", p)
+        AI["cool"]["p:" + p] = _time.time() + 120
+        return None, None
+
+
+async def gemini_answer(system, contents, cheap, c):
+    """Returns (answer, model, error_key)."""
     body = {"systemInstruction": {"parts": [{"text": system}]}, "contents": contents,
             "generationConfig": {"temperature": 0.4, "maxOutputTokens": 8192 if c["length"] == "long" else 4096}}
     models = ai_order(await ai_models(), cheap)
@@ -5863,13 +5978,10 @@ async def ai_answer(u, question, cheap=False, keep=True):
             if not text:
                 log.warning("gemini %s: empty answer %s", model, str(j)[:300])
                 continue
-            if keep:
-                hist += [("user", question[:2000]), ("model", text[:4000])]
-                del hist[:-12]
+            await bump("ai_gem_" + gemini_day())
             return text, model, None
         except Exception:  # noqa: BLE001
             log.exception("gemini %s failed", model)
-    await bump("ai_errors")
     return None, None, "ai_err"
 
 
@@ -6228,7 +6340,10 @@ async def screen_admin_ai():
              f"Модель: {c['model'] if c['model'] != 'auto' else 'авто'} · ответы: {AI_LEN_RU[c['length']]} · память: {c['memory']}",
              "", f"📊 Сегодня: <b>{today.get('ai_questions', 0)}</b> вопросов "
              f"(бесплатных {today.get('ai_free', 0)}, купленных {today.get('ai_credit', 0) + today.get('ai_unl', 0)}, "
-             f"админов {today.get('ai_admin', 0)}) · квота Google: {today.get('ai_quota', 0)} · ошибок: {today.get('ai_errors', 0)}"]
+             f"админов {today.get('ai_admin', 0)}) · квота Google: {today.get('ai_quota', 0)} · ошибок: {today.get('ai_errors', 0)}",
+             f"♊ Gemini сегодня: {await gemini_used_today()} из ~{c['gem_limit']} · запас для uz/tg: {c['reserve']}",
+             "🔌 Запасные: " + (", ".join(f"{v['name']} {today.get('ai_p_' + k, 0)}" for k, v in PROVIDERS.items()
+                                         if c["prov"].get(k) and AI["pkeys"].get(k)) or "нет (добавьте ключи)")]
     rows = [[btn("⛔ Выключить" if c["enabled"] else "✅ Включить", "a:ai:on"), btn("🔐 Доступ", "a:ai:acc")],
             [btn(f"👥 Избранные ({len(c['selected'])})", "a:ai:list:selected"), btn(f"🚫 Бан ({len(c['banned'])})", "a:ai:list:banned")],
             [btn(f"🎁 На человека: {c['daily_free'] or '∞'}", "a:ai:opt:daily_free"), btn(f"🌍 На всех: {c['global_free'] or '∞'}", "a:ai:opt:global_free")],
@@ -6237,13 +6352,14 @@ async def screen_admin_ai():
             [btn("✏️ Текст пометки", "a:ai:ask:disc"), btn("🧪 Тест", "a:ai:ask:test")],
             [btn("📊 Статистика", "a:ai:st"), btn("📜 Журнал", "a:ai:log:0")],
             [btn("⭐ Пакеты", "a:ai:packs"), btn("💳 Карты", "a:ai:cards"), btn("💰 Продажи", "a:ai:pay:0")],
-            [btn("🔑 Ключ Gemini", "a:ai:ask:key")],
+            [btn("🔑 Ключ Gemini", "a:ai:ask:key"), btn("🔌 Запасные ИИ", "a:ai:prov")],
             ADMIN_BACK]
     return "\n".join(lines), kb(*rows)
 
 
 AI_OPTIONS = {"daily_free": [3, 5, 10, 20, 30, 50, 0], "global_free": [100, 200, 350, 450, 1000, 0],
-              "length": ["short", "medium", "long"], "memory": [0, 4, 8, 12]}
+              "length": ["short", "medium", "long"], "memory": [0, 4, 8, 12],
+              "gem_limit": [300, 450, 550, 800, 1000, 1500], "reserve": [50, 100, 200, 300, 400]}
 AI_ASK = {"extra": "✍️ <b>Свои инструкции</b>\n\nОтправьте текст — дополнительные правила для ответов. Например: «опирайся на позицию "
                    "Духовного управления мусульман Узбекистана», «в конце предлагай дуа по теме».\n\nОтправьте «-», чтобы очистить.",
           "disc": "✏️ <b>Текст пометки под ответом</b>\n\nОтправьте свой текст. Отправьте «-», чтобы вернуть стандартный (на языке человека).",
@@ -6318,6 +6434,35 @@ async def admin_ai(update, ctx, parts):
         title = "👥 <b>Избранные</b> — им доступен ИИ, когда доступ «избранные»." if field == "selected" else \
             "🚫 <b>Бан в ИИ</b> — им помощник закрыт (остальной бот работает)."
         return await render(update, title + "\n\nНажмите на человека, чтобы убрать его из списка.", kb(*rows))
+    elif op == "prov":
+        if len(parts) > 4 and parts[3] == "tog" and parts[4] in PROVIDERS:
+            await save_ai_cfg(prov={**c["prov"], parts[4]: not c["prov"].get(parts[4])})
+        if len(parts) > 4 and parts[3] == "key" and parts[4] in PROVIDERS:
+            ctx.user_data["admin_state"] = "ai_pkey:" + parts[4]
+            v = PROVIDERS[parts[4]]
+            return await render(update, f"🔑 <b>Ключ {v['name']}</b>\n\nСоздайте бесплатный ключ на <b>{v['site']}</b> и отправьте его сюда. "
+                                        "Бот сначала проверит его, а сообщение с ключом удалит.\n\nОтправьте «-», чтобы удалить ключ.",
+                                kb([btn("⬅️ Назад", "a:ai:prov")]))
+        today = await ai_stats(1)
+        lines = ["🔌 <b>Запасные ИИ</b>", "",
+                 "Отвечают на русском, английском и арабском, когда у Gemini подходит к концу бесплатный лимит. "
+                 "На узбекском и таджикском всегда отвечает только Gemini.", "",
+                 f"♊ Gemini сегодня: <b>{await gemini_used_today()}</b> из ~{c['gem_limit']} (сброс в 13:00 по Ташкенту)",
+                 f"🛡 Запас для uz/tg: {c['reserve']} — после {max(0, c['gem_limit'] - c['reserve'])} ответов Gemini "
+                 "остальные языки уходят к запасным", ""]
+        rows = []
+        for k, v in PROVIDERS.items():
+            key = AI["pkeys"].get(k)
+            on = c["prov"].get(k)
+            state = ("✅" if on else "⏸") if key else "🔑 нет ключа"
+            lines.append(f"<b>{v['name']}</b>: {state} · сегодня {today.get('ai_p_' + k, 0)}"
+                         + (f" · <code>{esc(AI['pmodel'].get(k, ''))}</code>" if AI["pmodel"].get(k) else "")
+                         + (" · ⏳ пауза" if AI["cool"].get("p:" + k, 0) > _time.time() else ""))
+            rows.append([btn(f"{'⏸ Выкл' if on else '▶️ Вкл'} {v['name']}", f"a:ai:prov:tog:{k}"),
+                         btn(f"🔑 {v['name']}" + (f" …{key[-4:]}" if key else ""), f"a:ai:prov:key:{k}")])
+        rows.append([btn(f"♊ Лимит Gemini: {c['gem_limit']}", "a:ai:opt:gem_limit"), btn(f"🛡 Запас: {c['reserve']}", "a:ai:opt:reserve")])
+        rows.append([btn("⬅️ Назад", "a:ai")])
+        return await render(update, "\n".join(lines), kb(*rows))
     elif op == "st":
         lines = ["📊 <b>Статистика ИИ</b>", ""]
         for days, name in ((1, "Сегодня"), (7, "7 дней"), (30, "30 дней")):
@@ -6447,6 +6592,26 @@ async def admin_ai_text(update, ctx, state):
             pass
         await ai_models()
         return await update.effective_chat.send_message("✅ Новый ключ сохранён и работает.", reply_markup=back)
+    if field.startswith("pkey:"):
+        p = field[5:]
+        pback = kb([btn("⬅️ К запасным ИИ", "a:ai:prov")])
+        if raw != "-":
+            try:
+                model = await provider_models(p, key=raw)
+            except Exception:  # noqa: BLE001
+                return await msg.reply_text("❌ Ключ не подошёл. Проверьте и отправьте ещё раз.", reply_markup=pback)
+        AI["pkeys"][p] = "" if raw == "-" else raw
+        AI["pmodel"].pop(p, None)
+        AI["cool"].pop("p:" + p, None)
+        saved = json.loads(await kv_get("ai_pkeys", "{}") or "{}")
+        saved[p] = AI["pkeys"][p]
+        await kv_set("ai_pkeys", json.dumps(saved))
+        try:
+            await msg.delete()  # don't leave the key in the chat
+        except Exception:  # noqa: BLE001
+            pass
+        note = "🗑 Ключ удалён." if raw == "-" else f"✅ Ключ {PROVIDERS[p]['name']} сохранён. Модель: <code>{esc(model)}</code>"
+        return await update.effective_chat.send_message(note, parse_mode=ParseMode.HTML, reply_markup=pback)
     if field in ("selected", "banned"):
         who = await find_user_id(raw)
         if not who or not await get_user(who):
