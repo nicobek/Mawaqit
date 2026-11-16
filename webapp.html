@@ -202,6 +202,26 @@ h2{font-size:17px;margin:20px 0 10px}
 .cvres{margin-top:12px;font-size:18px;font-weight:800;text-align:center;min-height:26px}
 select.search{appearance:none;-webkit-appearance:none}
 
+/* stage 2 */
+.share{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.share .btn:only-child{grid-column:1 / -1}
+.citycard b{font-size:16px}
+.cgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.cgrid div{background:var(--bg);border-radius:12px;padding:8px;text-align:center}
+.cgrid span{display:block;font-size:12px;color:var(--hint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cgrid b{font-variant-numeric:tabular-nums}
+.cgrid .nx{background:var(--gold-soft);outline:2px solid var(--gold)}
+.mcal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.mcal .hd{text-align:center;color:var(--hint);font-size:11px;font-weight:700}
+.mcal .dc{aspect-ratio:1;border-radius:10px;display:grid;place-items:center;font-size:13px;font-weight:700;background:var(--line);font-variant-numeric:tabular-nums}
+.mcal .dc.full{background:var(--green);color:#fff}
+.mcal .dc.fu{opacity:.35}
+.mcal .dc.td{outline:2px solid var(--gold)}
+.achs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ach{background:var(--card);border-radius:16px;padding:12px;display:flex;align-items:center;gap:10px;font-weight:600;font-size:13px;opacity:.45;filter:grayscale(1)}
+.ach.ok{opacity:1;filter:none;outline:2px solid var(--gold)}
+.ach .i{font-size:24px}
+
 /* nav */
 nav{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:6px 6px calc(6px + var(--safe-bottom));border-top:1px solid var(--line);z-index:10}
 nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:12px;color:var(--hint);font-size:11px;font-weight:600}
@@ -224,6 +244,7 @@ nav button.on .i{filter:none;opacity:1}
       <div class="ring-in"><div class="label" id="untilLbl"></div><div class="name" id="nextName"></div><div class="left" id="left">--:--:--</div><div class="at" id="nextAt"></div></div>
     </div>
     <div class="card times" id="times"></div>
+    <div class="share" id="shareRow"></div>
   </section>
 
   <!-- QIBLA -->
@@ -268,6 +289,13 @@ nav button.on .i{filter:none;opacity:1}
     <div class="card checks" id="trChecks"></div>
     <div class="stat"><div class="card"><span class="sub" id="trStreakL"></span><b id="trStreak">0</b></div><div class="card"><span class="sub" id="trWeekL"></span><b id="trWeekN" dir="ltr">0</b></div></div>
     <div class="card"><div class="week" id="trWeek"></div></div>
+    <div class="stat"><div class="card"><span class="sub" id="trBestL"></span><b id="trBest">0</b></div><div class="card"><span class="sub" id="trTotalL"></span><b id="trTotal" dir="ltr">0</b></div></div>
+    <div class="card">
+      <div class="calnav" style="margin:0 0 8px"><button id="trPrev">‹</button><div class="center"><b id="trMonthT"></b><div class="sub" id="trPct"></div></div><button id="trNext">›</button></div>
+      <div class="mcal" id="trCal"></div>
+    </div>
+    <h2 id="trAchL"></h2>
+    <div class="achs" id="trAch"></div>
   </section>
 
   <section class="view" id="v-ramadan">
@@ -354,6 +382,15 @@ nav button.on .i{filter:none;opacity:1}
       <div id="cvH" hidden><div class="row"><input class="search" id="cvHd" type="number" min="1" max="30" inputmode="numeric" style="margin:0;width:70px"><select class="search" id="cvHm" style="margin:0"></select><input class="search" id="cvHy" type="number" min="1300" max="1600" inputmode="numeric" style="margin:0;width:90px"></div></div>
       <div class="cvres" id="cvRes"></div>
     </div>
+  </section>
+
+  <section class="view" id="v-cities">
+    <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
+    <h1 id="ciTitle"></h1><div class="sub" id="ciHint"></div>
+    <div class="row" style="margin-top:10px"><input class="search" id="ciQ" style="margin:0" autocomplete="off"><button class="chip on" id="ciFind" style="flex:none"></button></div>
+    <div id="ciRes"></div>
+    <h2 id="ciFavL"></h2>
+    <div id="ciFavs"></div>
   </section>
 </div>
 
@@ -620,7 +657,7 @@ function openSub(name) {
   SUB = name; show(name);
   try { tg?.BackButton?.show(); } catch (e) {}
   ({tracker: renderTracker, ramadan: renderRamadan, mosques: openMosques, names: renderNames, settings: renderSettings,
-    azkar: renderAzkar, duas: renderDuas, qada: renderQada, dates: renderDates})[name]?.();
+    azkar: renderAzkar, duas: renderDuas, qada: renderQada, dates: renderDates, cities: renderCities})[name]?.();
 }
 function back() { if (SUB) go("more"); }
 
@@ -639,7 +676,7 @@ function renderToday() {
   $("dates").textContent = `${d} ${T.gm[m - 1]} ${y}`;
   $("hijriPill").textContent = `🗓 ${DATA.today.hday} ${T.hm[DATA.today.hmonth - 1]} ${DATA.today.hyear}`;
   $("times").innerHTML = PRAYERS.map(k => `<div class="t" data-k="${k}"><div class="ico">${ICONS[k]}</div><div class="nm">${esc(T.pn[k])}</div><div class="tm">${t[k]}</div></div>`).join("");
-  tick();
+  tick(); renderShare();
 }
 function tick() {
   if (!DATA || DATA.need_setup) return;
@@ -813,7 +850,7 @@ function renderMore() {
   $("moreTitle").textContent = T.t_more;
   const items = [["tracker", "✅", "m_tracker", "m_tracker_d"], ["azkar", "🌅", "m_azkar", "m_azkar_d"], ["duas", "🤲", "m_duas", "m_duas_d"],
     ["qada", "🔁", "m_qada", "m_qada_d"], ["dates", "📆", "m_dates", "m_dates_d"], ["ramadan", "🌙", "m_ramadan", "m_ramadan_d"],
-    ["mosques", "🕌", "m_mosques", "m_mosques_d"], ["names", "📖", "m_names", "m_names_d"], ["settings", "⚙️", "m_settings", "m_settings_d"]];
+    ["cities", "✈️", "m_cities", "m_cities_d"], ["mosques", "🕌", "m_mosques", "m_mosques_d"], ["names", "📖", "m_names", "m_names_d"], ["settings", "⚙️", "m_settings", "m_settings_d"]];
   let h = items.map(([id, ic, t1, t2]) => `<button class="item" data-sub="${id}"><div class="ico">${ic}</div><div><div class="tt">${tr(t1)}</div><div class="ds">${tr(t2)}</div></div><div class="ch">›</div></button>`).join("");
   if (ver("8.0") && tg.addToHomeScreen) h += `<button class="item" id="homeBtn"><div class="ico">📲</div><div><div class="tt">${tr("m_home")}</div><div class="ds" id="homeDs">${tr("m_home_d")}</div></div></button>`;
   $("moreMenu").innerHTML = h;
@@ -831,9 +868,7 @@ let TRK = {};
 async function renderTracker() {
   $("trTitle").textContent = tr("m_tracker"); $("trHint").textContent = tr("tr_hint");
   $("trStreakL").textContent = tr("tr_streak"); $("trWeekL").textContent = tr("tr_week");
-  const today = todayISO(), days = Array.from({length: 60}, (_, i) => addDays(today, -i));
-  const vals = await store.get(days.map(trKey));
-  TRK = {}; days.forEach(d => TRK[d] = (vals[trKey(d)] || "00000").padEnd(5, "0").slice(0, 5));
+  await loadTrackerDays(124);
   drawTracker();
 }
 function drawTracker() {
@@ -844,12 +879,15 @@ function drawTracker() {
   $("trStreak").textContent = streak;
   const week = Array.from({length: 7}, (_, i) => addDays(today, i - 6));
   $("trWeekN").textContent = `${week.reduce((s, d) => s + count(d), 0)} / 35`;
+  setTimeout(drawTrackerStats, 0);
   $("trWeek").innerHTML = week.map(d => { const n = count(d), wd = (new Date(d + "T12:00:00Z").getUTCDay() + 6) % 7; return `<div class="d"><div class="lb">${n}</div><div class="bar ${n === 5 ? "full" : ""}" style="height:${Math.max(4, n * 18)}px"></div><div class="lb">${T.wd[wd]}</div></div>`; }).join("");
 }
 function toggleTrack(i) {
   const today = todayISO(), v = (TRK[today] || "00000").split("");
   v[i] = v[i] === "1" ? "0" : "1"; TRK[today] = v.join("");
   store.set(trKey(today), TRK[today]);
+  TRS.total = Math.max(0, (TRS.total || 0) + (v[i] === "1" ? 1 : -1));
+  setTimeout(() => store.set("tr_stats", JSON.stringify(TRS)), 50);
   if (TRK[today] === "11111") { try { tg?.HapticFeedback?.notificationOccurred("success"); } catch (e) {} } else haptic();
   drawTracker();
 }
@@ -1244,6 +1282,131 @@ function convert() {
   else { const iso = gregOf(+$("cvHd").value, +$("cvHm").value, +$("cvHy").value); $("cvRes").textContent = iso ? "📅 " + fmtG(iso) : tr("cv_bad"); }
 }
 
+
+/* ═══════════ stage 2: other cities, share, tracker stats ═══════════ */
+const LX3 = {
+ en:{m_cities:"Other cities",m_cities_d:"Prayer times anywhere, favourites",ci_hint:"Find any city to see its prayer times",ci_add:"⭐ Add to favourites",ci_rm:"Remove",ci_local:"Local time {t}",ci_next:"Next: {n} at {t}",ci_favs:"⭐ Favourite cities",ci_empty:"Add cities to favourites to see their times here.",
+  sh_chat:"📤 Send to chat",sh_story:"📲 Share to story",sh_sent:"Picture sent to your chat with the bot ✓",sh_err:"Could not create the picture",
+  tr_month:"Month",tr_pct:"{p}% of prayers",tr_best:"Best streak",tr_total:"Prayers marked",tr_ach:"🏆 Achievements",a_day:"First complete day",a_streak:"{n} days in a row",a_total:"{n} prayers"},
+ ru:{m_cities:"Другие города",m_cities_d:"Время намаза где угодно, избранные",ci_hint:"Найдите любой город, чтобы увидеть время намаза там",ci_add:"⭐ В избранное",ci_rm:"Убрать",ci_local:"Местное время {t}",ci_next:"Следующий: {n} в {t}",ci_favs:"⭐ Избранные города",ci_empty:"Добавьте города в избранное, чтобы видеть их время здесь.",
+  sh_chat:"📤 Отправить в чат",sh_story:"📲 В сторис",sh_sent:"Картинка отправлена в чат с ботом ✓",sh_err:"Не удалось создать картинку",
+  tr_month:"Месяц",tr_pct:"{p}% намазов",tr_best:"Лучшая серия",tr_total:"Отмечено намазов",tr_ach:"🏆 Достижения",a_day:"Первый полный день",a_streak:"{n} дн. подряд",a_total:"{n} намазов"},
+ uz:{m_cities:"Boshqa shaharlar",m_cities_d:"Istalgan joyda namoz vaqti, sevimlilar",ci_hint:"Namoz vaqtini ko'rish uchun istalgan shaharni toping",ci_add:"⭐ Sevimlilarga",ci_rm:"Olib tashlash",ci_local:"Mahalliy vaqt {t}",ci_next:"Keyingisi: {n}, soat {t}",ci_favs:"⭐ Sevimli shaharlar",ci_empty:"Vaqtlarini shu yerda ko'rish uchun shaharlarni sevimlilarga qo'shing.",
+  sh_chat:"📤 Chatga yuborish",sh_story:"📲 Storisga",sh_sent:"Rasm bot bilan chatga yuborildi ✓",sh_err:"Rasm yaratib bo'lmadi",
+  tr_month:"Oy",tr_pct:"Namozlarning {p}%",tr_best:"Eng uzun ketma-ketlik",tr_total:"Belgilangan namozlar",tr_ach:"🏆 Yutuqlar",a_day:"Birinchi to'liq kun",a_streak:"Ketma-ket {n} kun",a_total:"{n} ta namoz"},
+ tg:{m_cities:"Шаҳрҳои дигар",m_cities_d:"Вақти намоз дар ҳар ҷо, дӯстдоштаҳо",ci_hint:"Барои дидани вақти намоз ҳар шаҳрро ёбед",ci_add:"⭐ Ба дӯстдоштаҳо",ci_rm:"Хориҷ кардан",ci_local:"Вақти маҳаллӣ {t}",ci_next:"Навбатӣ: {n}, соати {t}",ci_favs:"⭐ Шаҳрҳои дӯстдошта",ci_empty:"Шаҳрҳоро ба дӯстдоштаҳо илова кунед, то вақтҳояшонро ин ҷо бинед.",
+  sh_chat:"📤 Фиристодан ба чат",sh_story:"📲 Ба сторис",sh_sent:"Акс ба чат бо бот фиристода шуд ✓",sh_err:"Акс сохта нашуд",
+  tr_month:"Моҳ",tr_pct:"{p}% намозҳо",tr_best:"Беҳтарин силсила",tr_total:"Намозҳои қайдшуда",tr_ach:"🏆 Дастовардҳо",a_day:"Рӯзи пурраи аввал",a_streak:"{n} рӯз пай дар пай",a_total:"{n} намоз"},
+ ar:{m_cities:"مدن أخرى",m_cities_d:"مواقيت الصلاة في أي مكان، المفضلة",ci_hint:"ابحث عن أي مدينة لمعرفة مواقيت الصلاة فيها",ci_add:"⭐ إلى المفضلة",ci_rm:"إزالة",ci_local:"الوقت المحلي {t}",ci_next:"التالية: {n} الساعة {t}",ci_favs:"⭐ المدن المفضلة",ci_empty:"أضف مدناً إلى المفضلة لترى مواقيتها هنا.",
+  sh_chat:"📤 إرسال إلى المحادثة",sh_story:"📲 مشاركة في القصة",sh_sent:"تم إرسال الصورة إلى محادثتك مع البوت ✓",sh_err:"تعذر إنشاء الصورة",
+  tr_month:"الشهر",tr_pct:"{p}% من الصلوات",tr_best:"أطول سلسلة",tr_total:"الصلوات المسجلة",tr_ach:"🏆 الإنجازات",a_day:"أول يوم كامل",a_streak:"{n} أيام متتالية",a_total:"{n} صلاة"}
+};
+for (const l in LX3) Object.assign(LX[l], LX3[l]);
+
+/* ───────── SHARE ───────── */
+function renderShare() {
+  const box = $("shareRow"); if (!box) return;
+  const story = ver("7.8") && tg.shareToStory && DATA.share_url;
+  box.innerHTML = `<button class="btn ghost" id="shChat">${tr("sh_chat")}</button>` + (story ? `<button class="btn" id="shStory">${tr("sh_story")}</button>` : "");
+  $("shChat").onclick = async () => {
+    haptic(); $("shChat").disabled = true;
+    try { await apiPost("/api/share_send", {}); toast(tr("sh_sent")); } catch (e) { toast(tr("sh_err")); }
+    $("shChat").disabled = false;
+  };
+  if (story) $("shStory").onclick = () => {
+    haptic();
+    const opts = {text: `🕌 ${DATA.profile.city}`};
+    if (DATA.bot) opts.widget_link = {url: `https://t.me/${DATA.bot}`, name: "@" + DATA.bot};
+    try { tg.shareToStory(DATA.share_url, opts); } catch (e) { try { tg.shareToStory(DATA.share_url); } catch (e2) { toast(tr("sh_err")); } }
+  };
+}
+
+/* ───────── OTHER CITIES ───────── */
+let FAVS = [];
+async function loadFavs() { const v = (await store.get(["fav_cities"])).fav_cities; try { FAVS = v ? JSON.parse(v) : []; } catch (e) { FAVS = []; } }
+const saveFavs = () => store.set("fav_cities", JSON.stringify(FAVS.slice(0, 10)));
+const favKey = c => `${(+c.lat).toFixed(2)},${(+c.lon).toFixed(2)}`;
+function nextIn(r) {
+  const now = r.now;
+  for (const k of FARD) if (r.t[k] > now) return {k, at: r.t[k]};
+  return {k: "Fajr", at: r.tomorrow.Fajr};
+}
+function cityCard(c, r, isFav) {
+  const n = nextIn(r);
+  return `<div class="card citycard"><div class="row between"><div style="min-width:0"><b>📍 ${esc(c.name)} ${c.flag || ""}</b><div class="sub">🕒 ${tr("ci_local", {t: r.now})} · 🗓 ${r.hday} ${esc(T.hm[r.hmonth - 1])}</div></div>
+    <button class="chip ${isFav ? "" : "on"}" data-fav="${favKey(c)}" style="flex:none">${isFav ? tr("ci_rm") : tr("ci_add")}</button></div>
+    <div class="cgrid">${PRAYERS.map(k => `<div class="${k === n.k && !(n.k === "Fajr" && r.t.Fajr <= r.now) ? "nx" : ""}"><span>${ICONS[k]} ${esc(T.pn[k])}</span><b>${r.t[k]}</b></div>`).join("")}</div>
+    <div class="sub" style="margin-top:8px">⏳ ${tr("ci_next", {n: T.pn[n.k], t: n.at})} · 🕋 ${r.qibla}°</div></div>`;
+}
+let CI_FOUND = null;
+async function renderCities() {
+  $("ciTitle").textContent = tr("m_cities"); $("ciHint").textContent = tr("ci_hint");
+  $("ciQ").placeholder = tr("st_city_ph"); $("ciFind").textContent = tr("st_find"); $("ciFavL").textContent = tr("ci_favs");
+  await loadFavs(); drawFavs();
+}
+async function drawFavs() {
+  if (!FAVS.length) { $("ciFavs").innerHTML = `<div class="sub" style="padding:6px 2px">${tr("ci_empty")}</div>`; return; }
+  $("ciFavs").innerHTML = `<div class="sub" style="padding:6px 2px">${tr("loading")}</div>`;
+  const res = await Promise.all(FAVS.map(c => api(`/api/city_times?lat=${c.lat}&lon=${c.lon}&cc=${c.cc || ""}`).catch(() => null)));
+  $("ciFavs").innerHTML = FAVS.map((c, i) => res[i] && res[i].ok ? cityCard(c, res[i], true) : "").join("");
+}
+async function findOther() {
+  const q = $("ciQ").value.trim(); if (q.length < 2) return;
+  haptic(); $("ciRes").innerHTML = `<div class="sub" style="padding:6px 2px">${tr("loading")}</div>`;
+  try {
+    const g = await api("/api/geocode?q=" + encodeURIComponent(q));
+    if (!g.found) { $("ciRes").innerHTML = `<div class="sub" style="padding:6px 2px">${tr("st_nf")}</div>`; return; }
+    const r = await api(`/api/city_times?lat=${g.lat}&lon=${g.lon}&cc=${g.cc || ""}`);
+    CI_FOUND = {name: g.name, lat: g.lat, lon: g.lon, cc: g.cc, flag: g.flag};
+    $("ciRes").innerHTML = cityCard(CI_FOUND, r, FAVS.some(f => favKey(f) === favKey(CI_FOUND)));
+  } catch (e) { $("ciRes").innerHTML = `<div class="sub" style="padding:6px 2px">${tr("err")}</div>`; }
+}
+function toggleFav(key) {
+  const i = FAVS.findIndex(f => favKey(f) === key);
+  if (i >= 0) FAVS.splice(i, 1);
+  else if (CI_FOUND && favKey(CI_FOUND) === key) FAVS.unshift(CI_FOUND);
+  haptic(); saveFavs(); drawFavs();
+  if (CI_FOUND && favKey(CI_FOUND) === key) $("ciRes").querySelectorAll("[data-fav]").forEach(b => { const on = FAVS.some(f => favKey(f) === key); b.textContent = on ? tr("ci_rm") : tr("ci_add"); b.classList.toggle("on", !on); });
+}
+
+/* ───────── TRACKER: month, totals, achievements ───────── */
+let TRS = {total: null, best: 0}, TRM = null;
+async function loadTrackerDays(n) {
+  const today = todayISO(), days = Array.from({length: n}, (_, i) => addDays(today, -i)), out = {};
+  for (let i = 0; i < days.length; i += 30) Object.assign(out, await store.get(days.slice(i, i + 30).map(trKey)));
+  const st = (await store.get(["tr_stats"])).tr_stats; try { if (st) TRS = Object.assign(TRS, JSON.parse(st)); } catch (e) {}
+  TRK = {}; days.forEach(d => TRK[d] = (out[trKey(d)] || "00000").padEnd(5, "0").slice(0, 5));
+  if (TRS.total == null) TRS.total = days.reduce((s, d) => s + TRK[d].split("").filter(x => x === "1").length, 0);
+}
+const dayCount = iso => (TRK[iso] || "").split("").filter(x => x === "1").length;
+function currentStreak() { const t = todayISO(); let s = 0; for (let i = (dayCount(t) === 5 ? 0 : 1); i < 400; i++) { if (dayCount(addDays(t, -i)) === 5) s++; else break; } return s; }
+function drawTrackerStats() {
+  const streak = currentStreak(); TRS.best = Math.max(TRS.best || 0, streak);
+  $("trBest").textContent = TRS.best; $("trTotal").textContent = (TRS.total || 0).toLocaleString();
+  $("trBestL").textContent = tr("tr_best"); $("trTotalL").textContent = tr("tr_total"); $("trAchL").textContent = tr("tr_ach");
+  if (!TRM) { const [y, m] = todayISO().split("-").map(Number); TRM = {y, m}; }
+  const {y, m} = TRM, first = `${y}-${pad(m)}-01`, days = new Date(Date.UTC(y, m, 0)).getUTCDate(), today = todayISO();
+  const lead = (new Date(first + "T12:00:00Z").getUTCDay() + 6) % 7;
+  let done = 0, possible = 0, cells = T.wd.map(w => `<div class="hd">${esc(w)}</div>`).join("") + "<div></div>".repeat(lead);
+  for (let d = 1; d <= days; d++) {
+    const iso = `${y}-${pad(m)}-${pad(d)}`, n = iso in TRK ? dayCount(iso) : 0, future = iso > today;
+    if (!future) { done += n; possible += 5; }
+    cells += `<div class="dc ${future ? "fu" : ""} ${iso === today ? "td" : ""} ${n === 5 ? "full" : ""}" style="${n && n < 5 ? `background:rgba(212,175,55,${0.15 + n * 0.15})` : ""}">${d}</div>`;
+  }
+  $("trCal").innerHTML = cells;
+  $("trMonthT").textContent = `${T.gm[m - 1]} ${y}`;
+  $("trPct").textContent = possible ? tr("tr_pct", {p: Math.round(100 * done / possible)}) : "";
+  const ach = [["🌱", tr("a_day"), TRS.best >= 1], ["🔥", tr("a_streak", {n: 3}), TRS.best >= 3], ["⭐", tr("a_streak", {n: 7}), TRS.best >= 7], ["🏅", tr("a_streak", {n: 30}), TRS.best >= 30],
+    ["💯", tr("a_total", {n: 100}), TRS.total >= 100], ["🏆", tr("a_total", {n: 500}), TRS.total >= 500], ["👑", tr("a_total", {n: 1000}), TRS.total >= 1000]];
+  $("trAch").innerHTML = ach.map(([ic, t1, ok]) => `<div class="ach ${ok ? "ok" : ""}"><div class="i">${ic}</div><div>${esc(t1)}</div></div>`).join("");
+}
+function shiftTrMonth(n) {
+  let {y, m} = TRM; m += n; if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; }
+  const [ty, tm] = todayISO().split("-").map(Number);
+  if (y * 12 + m > ty * 12 + tm || (ty * 12 + tm) - (y * 12 + m) > 3) return;  // last 4 months
+  TRM = {y, m}; haptic(); drawTrackerStats();
+}
+
 /* ───────── boot ───────── */
 function applyLang() {
   T = LX[LANG] || LX.en;
@@ -1290,6 +1453,7 @@ function init() {
     const az = e.target.closest("#azSeg button"); if (az) { AZ_MODE = az.dataset.az; haptic(); renderAzkar(); return; }
     const qb = e.target.closest("#qdList .pm"); if (qb) { qdChange(qb.dataset.q, +qb.dataset.d); return; }
     const cv = e.target.closest("#cvSeg button"); if (cv) { haptic(); setCv(cv.dataset.cv); return; }
+    const fv = e.target.closest("[data-fav]"); if (fv) { toggleFav(fv.dataset.fav); return; }
   });
   $("bead").onclick = tapBead;
   $("tReset").onclick = () => { TS.c = 0; haptic("medium"); renderTasbih(); saveTasbih(); };
@@ -1300,6 +1464,9 @@ function init() {
   $("stCityQ").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); findCity(); } };
   $("azReset").onclick = () => { AZ = {}; store.set(azKey(), "{}"); haptic("medium"); drawAzkar(); };
   $("qdAdd").onclick = qdAddDays;
+  $("ciFind").onclick = findOther;
+  $("ciQ").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); findOther(); } };
+  $("trPrev").onclick = () => shiftTrMonth(-1); $("trNext").onclick = () => shiftTrMonth(1);
   ["cvDate", "cvHd", "cvHm", "cvHy"].forEach(id => $(id).addEventListener("input", convert));
   loadTasbih();
   load();

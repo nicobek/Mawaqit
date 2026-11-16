@@ -2656,6 +2656,7 @@ async def api_me(request):
         return web.json_response({"ok": False, "error": "timings"}, status=502)
     return web.json_response({
         "ok": True, "need_setup": False, "bot": BOT_USERNAME, "profile": profile_json(u, lang),
+        "share_url": share_url(u["user_id"], now.date().isoformat()),
         "today": {"date": now.date().isoformat(), "t": {k: today[k] for k in TIMING_KEYS},
                   "hday": today["hday"], "hmonth": today["hmonth"], "hyear": today["hyear"]},
         "tomorrow": {"t": {k: tomorrow[k] for k in TIMING_KEYS}},
@@ -2708,18 +2709,182 @@ async def page_health(request):
     return web.Response(text="ok")
 
 
-async def start_web():
+async def start_web(bot=None):
     global WEB_RUNNER
     app = web.Application()
+    app["bot"] = bot
     app.add_routes([web.get("/", page_index), web.get("/health", page_health),
                     web.get("/api/me", api_me), web.get("/api/month", api_month),
                     web.get("/api/ramadan", api_ramadan), web.post("/api/settings", api_settings),
-                    web.get("/api/geocode", api_geocode), web.post("/api/city", api_city)])
+                    web.get("/api/geocode", api_geocode), web.post("/api/city", api_city),
+                    web.get("/api/city_times", api_city_times), web.post("/api/share_send", api_share_send),
+                    web.get("/share/{uid}/{day}/{sig}.png", page_share)])
     WEB_RUNNER = web.AppRunner(app, access_log=None)
     await WEB_RUNNER.setup()
     port = int(os.getenv("PORT", "8080"))
     await web.TCPSite(WEB_RUNNER, "0.0.0.0", port).start()
     log.info("Mini app server on port %s (%s)", port, WEBAPP_URL or "no public domain yet")
+
+
+# ───────────────────────── mini app: other cities ─────────────────────────
+
+async def api_city_times(request):
+    """Prayer times for any place (the "other city" screen). Uses the user's madhab."""
+    _, u, lang = await api_auth(request)
+    try:
+        lat, lon = float(request.query["lat"]), float(request.query["lon"])
+        cc = (request.query.get("cc") or "")[:2].lower()
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            raise ValueError
+    except (KeyError, ValueError):
+        raise web.HTTPBadRequest(text="bad place")
+    place = {"lat": lat, "lon": lon, "country": cc, "madhab": (u or {}).get("madhab") or "std"}
+    try:
+        first = await get_timings(place, datetime.utcnow().date())
+        local = datetime.now(ZoneInfo(first["tz"]))
+        day = await get_timings(place, local.date())
+        tomorrow = await get_timings(place, local.date() + timedelta(days=1))
+    except Exception:  # noqa: BLE001
+        log.exception("city times failed")
+        return web.json_response({"ok": False}, status=502)
+    return web.json_response({
+        "ok": True, "tz": day["tz"], "date": local.date().isoformat(), "now": local.strftime("%H:%M"),
+        "t": {k: day[k] for k in TIMING_KEYS}, "tomorrow": {k: tomorrow[k] for k in TIMING_KEYS},
+        "hday": day["hday"], "hmonth": day["hmonth"], "hyear": day["hyear"],
+        "qibla": round(qibla_bearing(lat, lon)),
+    })
+
+
+# ───────────────────────── share: a picture of today's schedule ─────────────────────────
+# The picture has a public but signed address (Telegram downloads it for stories), valid for its day.
+
+FONT_DIR = Path(__file__).with_name("fonts")
+SHARE_CACHE = {}
+
+
+def share_sig(uid, day):
+    return hmac.new(BOT_TOKEN.encode(), f"share:{uid}:{day}".encode(), hashlib.sha256).hexdigest()[:20]
+
+
+def share_url(uid, day):
+    return f"{WEBAPP_URL}/share/{uid}/{day}/{share_sig(uid, day)}.png" if WEBAPP_URL else ""
+
+
+FONTS = {}
+
+
+def _font(size, bold=False):
+    """Bundled DejaVu Sans: Latin, Cyrillic (incl. Uzbek/Tajik letters) and Arabic."""
+    key = (size, bold)
+    if key not in FONTS:
+        from PIL import ImageFont, features
+        path = FONT_DIR / ("DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf")
+        try:
+            engine = ImageFont.Layout.RAQM if features.check("raqm") else ImageFont.Layout.BASIC
+            FONTS[key] = ImageFont.truetype(str(path), size, layout_engine=engine)
+        except Exception:  # noqa: BLE001
+            FONTS[key] = ImageFont.load_default(size=size)
+    return FONTS[key]
+
+
+def render_share(u, data, day_iso):
+    """A 1080×1920 story picture with the day's prayer times."""
+    from PIL import Image, ImageDraw
+    lang = u["lang"] or "en"
+    rtl = lang == "ar"
+    W, H = 1080, 1920
+    img = Image.new("RGB", (W, H), (12, 21, 38))
+    d = ImageDraw.Draw(img)
+    for y in range(H):  # soft vertical gradient
+        k = y / H
+        d.line([(0, y), (W, y)], fill=(int(12 + 14 * k), int(21 + 16 * k), int(38 + 26 * k)))
+    gold, white, hint, card = (212, 175, 55), (238, 242, 248), (150, 164, 186), (24, 38, 64)
+
+    def text(xy, s, font, fill, anchor="la"):
+        if rtl and anchor[0] == "l":
+            xy, anchor = (W - xy[0], xy[1]), "r" + anchor[1]
+        kw = {"direction": "rtl"} if rtl and any("؀" <= ch <= "ۿ" for ch in s) else {}
+        try:
+            d.text(xy, s, font=font, fill=fill, anchor=anchor, **kw)
+        except Exception:  # noqa: BLE001  (no RAQM: draw without direction)
+            d.text(xy, s, font=font, fill=fill, anchor=anchor)
+
+    # crescent
+    d.ellipse([W // 2 - 70, 150, W // 2 + 70, 290], fill=gold)
+    d.ellipse([W // 2 - 38, 132, W // 2 + 92, 262], fill=(13, 22, 40))
+    text((W // 2, 360), t(lang, "times_title").replace("🕌 ", "").replace("<b>", "").replace("</b>", ""),
+         _font(72, True), white, "mm")
+    text((W // 2, 450), u["city"] or "", _font(44), gold, "mm")
+    y0, m0, dd = (int(x) for x in day_iso.split("-"))
+    hij = f"{data['hday']} {HM[lang][data['hmonth'] - 1]} {data['hyear']}"
+    text((W // 2, 520), f"{dd:02d}.{m0:02d}.{y0} · {hij}", _font(36), hint, "mm")
+
+    names = PN[lang]
+    top = 620
+    for i, key in enumerate(("Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha")):
+        y = top + i * 170
+        d.rounded_rectangle([90, y, W - 90, y + 140], radius=36, fill=card)
+        if key != "Sunrise":
+            d.rounded_rectangle([90, y, 104, y + 140], radius=7, fill=gold)
+        text((150, y + 70), names[key.lower()], _font(52, True), white, "lm")
+        if rtl:
+            d.text((150, y + 70), data[key], font=_font(60, True), fill=gold, anchor="lm")
+        else:
+            d.text((W - 150, y + 70), data[key], font=_font(60, True), fill=gold, anchor="rm")
+    if BOT_USERNAME:
+        d.text((W // 2, H - 120), f"@{BOT_USERNAME}", font=_font(40, True), fill=hint, anchor="mm")
+    buf = io.BytesIO()
+    img.save(buf, "PNG", optimize=True)
+    return buf.getvalue()
+
+
+async def share_png_for(u, day_iso):
+    key = (u["user_id"], day_iso, u["lang"], u["city"], u["madhab"])
+    if key in SHARE_CACHE:
+        return SHARE_CACHE[key]
+    y, m, dd = (int(x) for x in day_iso.split("-"))
+    data = await get_timings(u, datetime(y, m, dd).date())
+    png = await asyncio.get_running_loop().run_in_executor(None, render_share, u, data, day_iso)
+    if len(SHARE_CACHE) > 200:
+        SHARE_CACHE.clear()
+    SHARE_CACHE[key] = png
+    return png
+
+
+async def page_share(request):
+    try:
+        uid = int(request.match_info["uid"])
+        day_iso = request.match_info["day"]
+        datetime.strptime(day_iso, "%Y-%m-%d")
+    except ValueError:
+        raise web.HTTPNotFound()
+    if not hmac.compare_digest(share_sig(uid, day_iso), request.match_info["sig"]):
+        raise web.HTTPNotFound()
+    u = await get_user(uid)
+    if not u or not u["city"] or not u["tz"]:
+        raise web.HTTPNotFound()
+    try:
+        png = await share_png_for(u, day_iso)
+    except Exception:  # noqa: BLE001
+        log.exception("share image failed")
+        raise web.HTTPServiceUnavailable()
+    return web.Response(body=png, content_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
+
+
+async def api_share_send(request):
+    """Send the picture to the user's chat with the bot, so they can keep or forward it."""
+    tg_user, u, lang = await api_auth(request)
+    if not u or not u["city"] or not u["tz"]:
+        raise web.HTTPBadRequest(text="no city")
+    day_iso = datetime.now(ZoneInfo(u["tz"])).date().isoformat()
+    try:
+        png = await share_png_for(u, day_iso)
+        await request.app["bot"].send_photo(u["user_id"], png, caption=f"🕌 {esc(u['city'])} · @{BOT_USERNAME}",
+                                            parse_mode=ParseMode.HTML)
+    except Exception:  # noqa: BLE001
+        log.exception("share send failed")
+        return web.json_response({"ok": False}, status=502)
+    return web.json_response({"ok": True})
 
 
 # ───────────────────────── compass picture (groups, desktop, no domain) ─────────────────────────
@@ -2864,7 +3029,7 @@ async def post_init(app: Application):
     BOT_USERNAME = app.bot.username
     asyncio.get_running_loop().create_task(setup_profile(app.bot))  # in background, never blocks startup
     try:
-        await start_web()
+        await start_web(app.bot)
     except Exception:  # noqa: BLE001
         log.exception("mini app server failed to start (the bot keeps working)")
     log.info("Bot is ready")
