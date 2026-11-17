@@ -2275,7 +2275,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return await q.answer(t((fu or {}).get("lang") or "en", "fr_tip"), show_alert=True)
         if len(parts) > 2 and parts[1] == "as" and parts[2] in ("photo", "video"):
             await q.answer()
-            return await share_cards_remember(uid, await send_share_card(ctx.bot, await get_user(uid), parts[2]))
+            return await share_card_send(ctx.bot, uid, parts[2])
         return await share_card_button(update, ctx)
     if act in ("pic", "ay") and chat.type == "private":
         return await pic_button(update, ctx, parts)
@@ -5088,40 +5088,52 @@ SHARE_CARD_DIR = Path(__file__).with_name("assets") / "share"
 SHARE_CARD_LANGS = ("en", "ru", "uz", "uzc", "tg", "ar")
 
 
-async def share_cards_forget(bot, uid):
-    """A new press of "Share": the cards sent before (photo and video) are removed from the chat."""
+SHARE_LOCKS = {}  # user_id -> lock, so quick repeated presses run one after another
+
+
+async def share_sent(uid):
     try:
-        old = json.loads(await kv_get(f"sharemsg:{uid}", "[]") or "[]")
+        return [x for x in json.loads(await kv_get(f"sharemsg:{uid}", "[]") or "[]") if isinstance(x, list)]
     except ValueError:
-        old = []
-    for mid in old:
+        return []
+
+
+async def share_cards_forget(bot, uid, kind=None):
+    """Removes the cards sent before: all of them (a new "Share"), or only those of one kind (no duplicates)."""
+    keep, gone = [], []
+    for mid, k in await share_sent(uid):
+        (gone if kind is None or k == kind else keep).append([mid, k])
+    for mid, _ in gone:
         try:
             await bot.delete_message(uid, mid)
         except Exception:  # noqa: BLE001
             pass
-    await kv_set(f"sharemsg:{uid}", "[]")
+    await kv_set(f"sharemsg:{uid}", json.dumps(keep))
 
 
-async def share_cards_remember(uid, msg):
-    if not msg:
-        return
-    try:
-        old = json.loads(await kv_get(f"sharemsg:{uid}", "[]") or "[]")
-    except ValueError:
-        old = []
-    await kv_set(f"sharemsg:{uid}", json.dumps((old + [msg.message_id])[-10:]))
+async def share_cards_remember(uid, msg, kind):
+    if msg:
+        await kv_set(f"sharemsg:{uid}", json.dumps((await share_sent(uid) + [[msg.message_id, kind]])[-10:]))
+
+
+async def share_card_send(bot, uid, kind=None, fresh=False):
+    """fresh: a new press of "Share" (everything old goes); otherwise only an older card of the same kind goes."""
+    lock = SHARE_LOCKS.setdefault(uid, asyncio.Lock())
+    async with lock:
+        u = await get_user(uid)
+        kind = kind or invite_cfg()["mode"]
+        await share_cards_forget(bot, uid, None if fresh else kind)
+        await share_cards_remember(uid, await send_share_card(bot, u, kind), kind)
 
 
 async def share_card_button(update, ctx):
     q = update.callback_query
     await q.answer()
-    u = await get_user(q.from_user.id)
-    await share_cards_forget(ctx.bot, q.from_user.id)
     try:
         await update.effective_chat.send_action("upload_photo" if invite_cfg()["mode"] == "photo" else "upload_video")
     except Exception:  # noqa: BLE001
         pass
-    await share_cards_remember(q.from_user.id, await send_share_card(ctx.bot, u))
+    await share_card_send(ctx.bot, q.from_user.id, fresh=True)
 
 
 async def page_share(request):
