@@ -2620,7 +2620,9 @@ async function openAdmUser(id) {
       <button class="btn" id="auSend">Отправить</button></div>` : ""}
     ${priv && !p.is_admin && canAd("bans") ? `<button class="btn ghost" id="auBan" style="margin-top:10px">${p.banned ? "✅ Разбанить" : "🚫 Забанить"}</button>` : ""}
     ${p.username ? `<button class="btn ghost" id="auOpen" style="margin-top:10px">💬 Открыть в Telegram</button>` : ""}
-    ${p.can_hide ? `<button class="btn ghost" id="auHide" style="margin-top:10px">${p.hidden ? "👁 Показать всем админам" : "🙈 Скрыть от других админов"}</button>` : ""}`;
+    ${p.can_hide ? `<button class="btn ghost" id="auHide" style="margin-top:10px">${p.hidden ? "👁 Показать всем админам" : "🙈 Скрыть от других админов"}</button>` : ""}
+    <div id="auTools"></div>`;
+  auTools(p.id);
   if ($("auHide")) $("auHide").onclick = async () => { haptic(); try { await apiAdmin("/api/admin/hide", {id: p.id}); openAdmUser(p.id); } catch (e) { toast("Ошибка"); } };
   if ($("auSend")) $("auSend").onclick = async () => {
     const text = $("auMsg").value.trim(); if (!text) return;
@@ -2634,6 +2636,34 @@ async function openAdmUser(id) {
   });
   if ($("auOpen")) $("auOpen").onclick = () => { try { tg.openTelegramLink("https://t.me/" + p.username); } catch (e) { openLink("https://t.me/" + p.username); } };
 }
+async function auTools(id, d) {
+  const box = $("auTools"); if (!box) return;
+  if (!d) { try { d = await apiAdmin(`/api/admin/person_tools?id=${id}`); } catch (e) { return; } }
+  if (d.deleted) { toast("Удалён ✓"); return back(); }
+  if (d.note) toast(d.note);
+  const PMI = {s: "🔔", q: "🔕", o: "❌"};
+  box.innerHTML = (d.can.bc ? `<button class="btn ghost" id="auPick" style="margin-top:10px">${d.picked ? "✅ В списке рассылки — убрать" : "📌 В рассылку (выбранным)"}</button>` : "")
+    + (d.can.users ? `<h2>⚙️ Настройки</h2><div class="card"><div class="lbl sub">📍 Город: <b>${esc(d.city || "—")}</b></div>
+        <div class="row" style="gap:8px;margin-top:6px"><input class="search" id="auCity" placeholder="Новый город" style="margin:0"><button class="chip" id="auCityGo">✓</button></div>
+        ${d.fields.map(f => `<div class="lbl sub" style="margin:10px 0 6px">${esc(f.label)}</div><div class="chips">${f.options.map(([v, l]) =>
+          `<button class="chip ${v === f.value ? "on" : ""}" data-uf="${f.key}" data-uv="${esc(v)}">${esc(l)}</button>`).join("")}</div>`).join("")}
+        <div class="lbl sub" style="margin:10px 0 6px">🔊 Звук намазов (нажмите, чтобы сменить)</div>
+        <div class="chips">${d.pm_names.map((n, i) => `<button class="chip on" data-upm="${i}">${PMI[d.pm[i]]} ${esc(n)}</button>`).join("")}</div>
+        <div class="sub" style="margin-top:8px">Изменения сразу применяются, человеку ничего не приходит.</div></div>
+      <h2>🗑 Сообщения бота</h2><div class="card">${d.msgs.map(m => `<div class="row between" style="margin:4px 0"><span class="sub">${fdate(m.at)} · ${esc(m.preview)}${m.fresh ? "" : " · ⌛ старше 48 ч"}</span>
+          ${m.fresh ? `<button class="chip" data-udel="${m.id}">🗑</button>` : ""}</div>`).join("") || `<div class="sub">Пока нет сообщений за неделю.</div>`}
+        ${d.msgs.some(m => m.fresh) ? `<button class="chip" id="auDelAll" style="margin-top:8px">🗑 Удалить все (до 48 ч)</button>` : ""}</div>` : "")
+    + (d.can.bans ? `<button class="btn ghost" id="auWipe" style="margin-top:10px">❌ Удалить пользователя</button><button class="btn ghost" id="auWipeBan" style="margin-top:10px">🗑🚫 Удалить и забанить</button>` : "");
+  const post = async body => { try { await auTools(id, await apiAdmin("/api/admin/person_tools", {id, ...body})); haptic(); } catch (e) { toast("Ошибка"); } };
+  if ($("auPick")) $("auPick").onclick = () => post({action: "pick"});
+  box.querySelectorAll("[data-uf]").forEach(b => b.onclick = () => post({action: "set", field: b.dataset.uf, value: b.dataset.uv}));
+  box.querySelectorAll("[data-upm]").forEach(b => b.onclick = () => post({action: "pm", i: +b.dataset.upm}));
+  if ($("auCityGo")) $("auCityGo").onclick = async () => { const c = $("auCity").value.trim(); if (!c) return; try { const r = await apiAdmin("/api/admin/person_tools", {id, action: "city", city: c}); if (r.ok === false) return toast("Город не найден"); auTools(id, r); } catch (e) { toast("Ошибка"); } };
+  box.querySelectorAll("[data-udel]").forEach(b => b.onclick = () => post({action: "delmsg", msg: +b.dataset.udel}));
+  if ($("auDelAll")) $("auDelAll").onclick = () => confirmBox("Удалить у него все сообщения бота за 48 часов?", () => post({action: "delmsg_all"}));
+  if ($("auWipe")) $("auWipe").onclick = () => confirmBox("Удалить пользователя? Сотрутся все его данные. Если он снова нажмёт /start — начнёт с нуля.", () => post({action: "delete", ban: false}));
+  if ($("auWipeBan")) $("auWipeBan").onclick = () => confirmBox("Удалить и забанить? Бот больше не будет ему отвечать.", () => post({action: "delete", ban: true}));
+}
 function confirmBox(text, ok) {
   try { if (ver("6.2")) return tg.showConfirm(text, yes => { if (yes) ok(); }); } catch (e) {}
   if (window.confirm(text)) ok();
@@ -2641,42 +2671,109 @@ function confirmBox(text, ok) {
 
 /* ── broadcast ── */
 let bcCountT = null;
+const BC_KINDS = [["all", "Всем"], ["everything", "Всем + группы"], ["chats", "Только группы и каналы"], ["lang", "По языку"], ["country", "По стране"],
+  ["city", "По городу"], ["active:7", "Активные 7 дн."], ["active:30", "Активные 30 дн."], ["inactive:30", "Неактивные 30+ дн."], ["new:7", "Новички 7 дн."],
+  ["remind", "С напоминаниями"], ["picked", "👤 Выбранные"]];
+const BC_ST = {done: "✅", stopped: "⏹", failed: "⚠️", deleted: "🗑", running: "⏳", scheduled: "🕓", queued: "⏳", cancelled: "✖️"};
+let BC_POLL = null;
+function bcAud() {
+  const b = AD.bc, [k, days] = (b.kind || "all").split(":");
+  return days ? {kind: k, value: +days} : {kind: k, value: k === "lang" ? b.lang || "ru" : k === "country" ? b.country || "" : k === "city" ? b.city || "" : null};
+}
 function adBc() {
-  const b = AD.bc;
-  adBody(`<div class="card"><b>📝 Текст</b><textarea class="search" id="bcText" rows="5" placeholder="Текст рассылки. **жирный**, __курсив__" style="margin-top:8px">${esc(b.text || "")}</textarea>
-      <label class="btn ghost" style="margin-top:4px">🖼 ${b.photo ? "Заменить фото" : "Добавить фото"}<input type="file" id="bcPhoto" accept="image/*" hidden></label>
-      ${b.photo ? `<button class="chip" id="bcPhotoRm" style="margin-top:8px">✕ Убрать фото</button>` : ""}</div>
-    <div class="card"><b>🔘 Кнопка-ссылка (необязательно)</b>
-      <input class="search" id="bcBtnT" placeholder="Текст кнопки" value="${esc(b.btnT || "")}" style="margin-top:8px"><input class="search" id="bcBtnU" placeholder="https://…" value="${esc(b.btnU || "")}" inputmode="url"></div>
-    <div class="card"><b>👥 Кому</b><div class="chips" id="bcKind" style="margin-top:8px">${[["all", "Всем пользователям"], ["lang", "По языку"], ["country", "По стране"], ["everything", "+ группы и каналы"]].map(([k, l]) => `<button class="chip ${k === b.kind ? "on" : ""}" data-k="${k}">${l}</button>`).join("")}</div>
-      ${b.kind === "lang" ? `<div class="chips" id="bcLang" style="margin-top:8px">${["en", "ru", "uz", "uzc", "tg", "ar"].map(l => `<button class="chip ${l === b.value ? "on" : ""}" data-l2="${l}">${LANG_LABEL[l]}</button>`).join("")}</div>` : ""}
-      ${b.kind === "country" ? `<input class="search" id="bcCountry" maxlength="2" placeholder="Код страны: uz, ru, tj…" value="${esc(b.kind === "country" ? (b.value.length === 2 ? b.value : "") : "")}" style="margin-top:8px">` : ""}
+  const b = AD.bc; b.buttons = b.buttons || []; b.kind = b.kind || "all";
+  const k = b.kind;
+  const sw = (id, label, on) => `<div class="sw ${on ? "on" : ""}" id="${id}"><span>${esc(label)}</span><span class="tg"></span></div>`;
+  adBody(`<div class="card"><b>👥 Кому</b><div class="chips" id="bcKind" style="margin-top:8px">${BC_KINDS.map(([v, l]) => `<button class="chip ${v === k ? "on" : ""}" data-k="${v}">${l}</button>`).join("")}</div>
+      ${k === "lang" ? `<div class="chips" id="bcLang" style="margin-top:8px">${["en", "ru", "uz", "uzc", "tg", "ar"].map(l => `<button class="chip ${l === (b.lang || "ru") ? "on" : ""}" data-l2="${l}">${LANG_LABEL[l]}</button>`).join("")}</div>` : ""}
+      ${k === "country" ? `<input class="search" id="bcCountry" maxlength="2" placeholder="Код страны: uz, ru, tj…" value="${esc(b.country || "")}" style="margin-top:8px">` : ""}
+      ${k === "city" ? `<input class="search" id="bcCity" placeholder="Город или его часть: Ташкент, Toshkent…" value="${esc(b.city || "")}" style="margin-top:8px">` : ""}
+      ${k === "picked" ? `<div id="bcPicks" class="sub" style="margin-top:8px">…</div><textarea class="search" id="bcPickIn" rows="2" placeholder="ID или @username через пробел" style="margin-top:6px"></textarea>
+        <div class="row" style="gap:8px"><button class="chip" id="bcPickAdd">➕ Добавить</button><button class="chip" id="bcPickClr">🧹 Очистить</button></div>
+        <div class="sub" style="margin-top:6px">Ещё можно отмечать людей кнопкой «📌 В рассылку» в их карточке.</div>` : ""}
       <div class="sub" id="bcCount" style="margin-top:8px">…</div></div>
+    <div class="card"><b>📝 Сообщение</b><textarea class="search" id="bcText" rows="5" placeholder="Текст. **жирный**, __курсив__. С фото или видео — до 1024 символов." style="margin-top:8px">${esc(b.text || "")}</textarea>
+      <label class="btn ghost" style="margin-top:4px">📎 ${b.photo || b.video ? "Заменить фото или видео" : "Добавить фото или видео"}<input type="file" id="bcFile" accept="image/*,video/*" hidden></label>
+      ${b.photo || b.video ? `<button class="chip" id="bcFileRm" style="margin-top:8px">✕ Убрать ${b.video ? "видео" : "фото"}</button>` : ""}</div>
+    <div class="card"><b>🔘 Кнопки</b>${b.buttons.map(([t, u], i) => `<div class="row between" style="margin-top:6px"><span class="sub">🔗 ${esc(t)} → ${esc(u)}</span><button class="chip" data-brm="${i}">✕</button></div>`).join("")}
+      <input class="search" id="bcBtnT" placeholder="Текст кнопки" style="margin-top:8px"><input class="search" id="bcBtnU" placeholder="https://…" inputmode="url"><button class="chip" id="bcBtnAdd">➕ Добавить кнопку-ссылку</button>
+      ${sw("bcApp", "📱 Кнопка «Открыть приложение»", b.app)}${sw("bcTimes", "🕌 Кнопка «Время намаза»", b.times)}</div>
+    <div class="card">${sw("bcSilent", "🔕 Без звука", b.silent)}${sw("bcPin", "📌 Закрепить у людей", b.pin)}</div>
     <div class="lbl">👁 Предпросмотр</div><div class="bubble" id="bcPrev"></div>
-    <button class="btn" id="bcSend" style="margin-top:12px">📣 Отправить рассылку</button>`);
-  const upd = () => { b.text = $("bcText").value; b.btnT = $("bcBtnT").value; b.btnU = $("bcBtnU").value; bcPreview(); };
-  ["bcText", "bcBtnT", "bcBtnU"].forEach(id => $(id).oninput = upd);
-  $("bcKind").querySelectorAll("[data-k]").forEach(x => x.onclick = () => { haptic(); b.kind = x.dataset.k; if (b.kind === "lang" && !["en", "ru", "uz", "tg", "ar"].includes(b.value)) b.value = "ru"; if (b.kind === "country") b.value = ""; adBc(); });
-  if ($("bcLang")) $("bcLang").querySelectorAll("[data-l2]").forEach(x => x.onclick = () => { haptic(); b.value = x.dataset.l2; adBc(); });
-  if ($("bcCountry")) $("bcCountry").oninput = e => { b.value = e.target.value.trim().toLowerCase(); bcCount(); };
-  $("bcPhoto").onchange = e => { const f = e.target.files[0]; if (f) shrinkPhoto(f).then(d => { b.photo = d; adBc(); }).catch(() => toast("Не удалось прочитать фото")); };
-  if ($("bcPhotoRm")) $("bcPhotoRm").onclick = () => { b.photo = null; adBc(); };
-  $("bcSend").onclick = bcSend;
-  bcPreview(); bcCount();
+    <button class="btn ghost" id="bcTest" style="margin-top:12px">👁 Превью себе в чат</button>
+    <button class="btn" id="bcSend" style="margin-top:10px">📣 Отправить сейчас</button>
+    <div class="card" style="margin-top:10px"><b>🕓 Запланировать</b><input class="search" type="datetime-local" id="bcWhen" style="margin-top:8px" value="${esc(b.when || "")}">
+      <button class="btn ghost" id="bcSched" style="background:var(--bg)">Запланировать</button><div class="sub" id="bcTz"></div></div>
+    <h2>📜 Рассылки</h2><div id="bcStat"><div class="muted">Загрузка…</div></div>`);
+  const upd = () => { b.text = $("bcText").value; bcPreview(); };
+  $("bcText").oninput = upd;
+  $("bcKind").querySelectorAll("[data-k]").forEach(x => x.onclick = () => { haptic(); b.kind = x.dataset.k; adBc(); });
+  if ($("bcLang")) $("bcLang").querySelectorAll("[data-l2]").forEach(x => x.onclick = () => { haptic(); b.lang = x.dataset.l2; adBc(); });
+  if ($("bcCountry")) $("bcCountry").oninput = e => { b.country = e.target.value.trim().toLowerCase(); bcCount(); };
+  if ($("bcCity")) $("bcCity").oninput = e => { b.city = e.target.value.trim(); bcCount(); };
+  if ($("bcPickAdd")) $("bcPickAdd").onclick = async () => { haptic(); try { bcStatus(await apiAdmin("/api/admin/bc2", {action: "picks_add", text: $("bcPickIn").value})); $("bcPickIn").value = ""; bcCount(); } catch (e) { toast("Ошибка"); } };
+  if ($("bcPickClr")) $("bcPickClr").onclick = async () => { haptic(); try { bcStatus(await apiAdmin("/api/admin/bc2", {action: "picks_clear"})); bcCount(); } catch (e) { toast("Ошибка"); } };
+  $("bcFile").onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    if (f.type.startsWith("video/")) {
+      if (f.size > 19 * 1024 * 1024) return toast("Видео больше 19 МБ — сожмите его или отправьте через бота");
+      const rd = new FileReader(); rd.onload = () => { b.video = rd.result; b.photo = null; b.videoUrl = URL.createObjectURL(f); adBc(); }; rd.readAsDataURL(f);
+    } else shrinkPhoto(f).then(d => { b.photo = d; b.video = null; adBc(); }).catch(() => toast("Не удалось прочитать фото"));
+  };
+  if ($("bcFileRm")) $("bcFileRm").onclick = () => { b.photo = b.video = null; adBc(); };
+  document.querySelectorAll("[data-brm]").forEach(x => x.onclick = () => { b.buttons.splice(+x.dataset.brm, 1); adBc(); });
+  $("bcBtnAdd").onclick = () => { const t = $("bcBtnT").value.trim(), u = $("bcBtnU").value.trim(); if (!t || !/^(https?:\/\/|tg:\/\/)\S+$/.test(u)) return toast("Нужен текст и ссылка https://…"); b.buttons.push([t, u]); adBc(); };
+  [["bcApp", "app"], ["bcTimes", "times"], ["bcSilent", "silent"], ["bcPin", "pin"]].forEach(([id, key]) => $(id).onclick = () => { haptic(); b[key] = !b[key]; adBc(); });
+  $("bcWhen").onchange = e => { b.when = e.target.value; };
+  $("bcTest").onclick = () => bcDo(null);
+  $("bcSend").onclick = () => confirmBox(`Отправить рассылку сейчас? Получателей: ${b.count ?? "?"}`, () => bcDo("go"));
+  $("bcSched").onclick = () => { if (!b.when) return toast("Выберите дату и время"); bcDo("schedule"); };
+  bcPreview(); bcCount(); bcLoadStatus();
+}
+async function bcDo(action) {
+  const b = AD.bc;
+  if (!(b.text || "").trim() && !b.photo && !b.video) return toast("Напишите текст или добавьте фото/видео");
+  const btns = ["bcTest", "bcSend", "bcSched"].map($).filter(Boolean); btns.forEach(x => x.disabled = true);
+  try {
+    const r = await apiAdmin("/api/admin/bc2", {action: "draft", text: b.text || "", photo: b.photo, video: b.video, buttons: b.buttons, app: !!b.app, times: !!b.times, silent: !!b.silent, pin: !!b.pin});
+    if (!r.ok) throw new Error(r.error);
+    if (!action) { toast("👁 Превью в чате с ботом"); return; }
+    const res = await apiAdmin("/api/admin/bc2", {action, when: b.when, ...bcAud()});
+    if (!res.ok) throw new Error(res.error);
+    toast(action === "go" ? `🚀 Рассылка #${res.id} запущена` : `🕓 Рассылка #${res.id} запланирована`);
+    Object.assign(b, {text: "", photo: null, video: null, buttons: [], when: ""}); adBc();
+  } catch (e) { toast(String(e.message).includes("409") ? "Сейчас идёт другая рассылка" : "Не получилось: " + e.message); }
+  finally { btns.forEach(x => x.disabled = false); }
+}
+async function bcLoadStatus() { try { bcStatus(await apiAdmin("/api/admin/bc2")); } catch (e) { if ($("bcStat")) $("bcStat").innerHTML = `<div class="muted">Не удалось загрузить</div>`; } }
+function bcStatus(d) {
+  if ($("bcTz")) $("bcTz").textContent = "Время по " + d.tz;
+  if ($("bcPicks")) $("bcPicks").innerHTML = d.picks.length ? "Отмечено: <b>" + d.picks.length + "</b> — " + d.picks.slice(0, 12).map(x => esc(x.name)).join(", ") + (d.picks.length > 12 ? "…" : "") : "Пока никого не отмечено.";
+  const el = $("bcStat"); if (!el) return;
+  el.innerHTML = d.items.map(r => `<div class="card"><div class="row between"><div style="min-width:0"><b>${BC_ST[r.status] || "•"} #${r.id}</b> · ${esc(r.label)}
+      <div class="sub">${fdate(r.status === "scheduled" ? r.run_at : r.when)} · 📬 ${r.sent} / ${r.total ?? "—"} · ❌ ${r.failed}</div></div>
+      <div>${r.status === "running" ? `<button class="chip" data-bstop="${r.id}">⏹ Стоп</button>` : ""}${r.status === "scheduled" ? `<button class="chip" data-bcancel="${r.id}">✖️ Отменить</button>` : ""}${r.can_delete ? `<button class="chip" data-bdel="${r.id}">🗑 У всех</button>` : ""}</div></div></div>`).join("") || `<div class="muted">Пока пусто</div>`;
+  const act = (attr, action, q) => el.querySelectorAll(`[${attr}]`).forEach(x => x.onclick = () => confirmBox(q, async () => { try { bcStatus(await apiAdmin("/api/admin/bc2", {action, id: +x.getAttribute(attr)})); toast("Готово ✓"); } catch (e) { toast("Ошибка"); } }));
+  act("data-bstop", "stop", "Остановить рассылку?"); act("data-bcancel", "cancel", "Отменить запланированную рассылку?");
+  act("data-bdel", "delete", "Удалить эту рассылку у всех получателей? (только сообщения не старше 48 часов)");
+  clearTimeout(BC_POLL);
+  if (d.items.some(r => ["running", "queued"].includes(r.status)) && AD_TAB === "bc") BC_POLL = setTimeout(bcLoadStatus, 3000);
 }
 const LANG_LABEL = {en: "🇬🇧 English", ru: "🇷🇺 Русский", uz: "🇺🇿 Oʻzbekcha", uzc: "🇺🇿 Ўзбекча", tg: "🇹🇯 Тоҷикӣ", ar: "🇸🇦 العربية"};
 function fmtRich(s) { return esc(s).replace(/\*\*(.+?)\*\*/gs, "<b>$1</b>").replace(/__(.+?)__/gs, "<i>$1</i>").replace(/\n/g, "<br>"); }
 function bcPreview() {
   const b = AD.bc;
-  $("bcPrev").innerHTML = (b.photo ? `<img src="${b.photo}">` : "") + `<div>${fmtRich(b.text || "") || '<span class="sub">Текст рассылки…</span>'}</div>` +
-    (b.btnT ? `<div class="bbtn">${esc(b.btnT)}</div>` : "");
+  $("bcPrev").innerHTML = (b.photo ? `<img src="${b.photo}">` : "") + (b.video ? `<video src="${b.videoUrl || ""}" muted playsinline controls style="width:100%;border-radius:12px"></video>` : "")
+    + `<div>${fmtRich(b.text || "") || '<span class="sub">Текст рассылки…</span>'}</div>`
+    + b.buttons.map(([t]) => `<div class="bbtn">${esc(t)}</div>`).join("") + (b.app ? `<div class="bbtn">📱 Открыть приложение</div>` : "") + (b.times ? `<div class="bbtn">🕌 Время намаза</div>` : "");
 }
 function bcCount() {
   clearTimeout(bcCountT);
   bcCountT = setTimeout(async () => {
-    const b = AD.bc;
-    if (b.kind === "country" && !/^[a-z]{2}$/.test(b.value || "")) { $("bcCount").textContent = "Введите двухбуквенный код страны"; b.count = null; return; }
-    try { const r = await apiAdmin(`/api/admin/bc_count?kind=${b.kind}&value=${encodeURIComponent(b.value || "")}`); b.count = r.count; $("bcCount").innerHTML = `👥 Получателей: <b>${r.count}</b> · ${esc(r.label)}`; }
+    const b = AD.bc, a = bcAud();
+    if (a.kind === "country" && !/^[a-z]{2}$/.test(a.value || "")) { $("bcCount").textContent = "Введите двухбуквенный код страны"; b.count = null; return; }
+    if (a.kind === "city" && !a.value) { $("bcCount").textContent = "Введите город"; b.count = null; return; }
+    try { const r = await apiAdmin(`/api/admin/bc2?count=1&kind=${a.kind}&value=${encodeURIComponent(a.value ?? "")}`); b.count = r.count; $("bcCount").innerHTML = `👥 Получателей: <b>${r.count}</b> · ${esc(r.label)}`; }
     catch (e) { $("bcCount").textContent = "Не удалось посчитать"; }
   }, 250);
 }

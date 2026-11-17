@@ -4502,7 +4502,7 @@ async def page_health(request):
 
 async def start_web(application=None):
     global WEB_RUNNER
-    app = web.Application(client_max_size=12 * 1024 * 1024)  # broadcast photos
+    app = web.Application(client_max_size=30 * 1024 * 1024)  # broadcast photos and videos (base64)
     app["ptb"] = application
     app["bot"] = application.bot if application else None
     app.add_routes([web.get("/", page_index), web.get("/health", page_health),
@@ -4530,7 +4530,9 @@ async def start_web(application=None):
                     web.post("/api/admin/hide", api_admin_hide),
                     web.get("/card/{name}", page_card), web.get("/api/invite", api_invite),
                     web.post("/api/invite_prepare", api_invite_prepare), web.post("/api/invite_send", api_invite_send),
-                    web.get("/api/admin/botcfg", api_admin_botcfg), web.post("/api/admin/botcfg", api_admin_botcfg)])
+                    web.get("/api/admin/botcfg", api_admin_botcfg), web.post("/api/admin/botcfg", api_admin_botcfg),
+                    web.get("/api/admin/bc2", api_admin_bc2), web.post("/api/admin/bc2", api_admin_bc2),
+                    web.get("/api/admin/person_tools", api_admin_person_tools), web.post("/api/admin/person_tools", api_admin_person_tools)])
     WEB_RUNNER = web.AppRunner(app, access_log=None)
     await WEB_RUNNER.setup()
     port = int(os.getenv("PORT", "8080"))
@@ -5518,8 +5520,9 @@ async def api_admin_message(request):
     u = await get_user(uid)
     lang = (u or {}).get("lang") or "en"
     try:
-        await request.app["bot"].send_message(uid, t(lang, "admin_msg_header") + "\n\n" + admin_markup_text(text),
-                                              parse_mode=ParseMode.HTML)
+        m = await request.app["bot"].send_message(uid, t(lang, "admin_msg_header") + "\n\n" + admin_markup_text(text),
+                                                  parse_mode=ParseMode.HTML)
+        await log_sent(uid, m.message_id, "admin", "от админа: " + text[:60])
     except Forbidden:
         await POOL.execute("UPDATE users SET blocked = TRUE WHERE user_id = $1", uid)
         return web.json_response({"ok": False, "error": "blocked"})
@@ -8751,6 +8754,223 @@ async def api_admin_botcfg(request):
         "invite": invite_cfg(),
         "sys": {"uptime": up, "db": await POOL.fetchval("SELECT pg_size_pretty(pg_database_size(current_database()))"),
                 "errors": [[e[0].strftime("%d.%m %H:%M"), e[1]] for e in list(ERRBUF)]}})
+
+
+# ── mini app: broadcast v2 (the draft is sent to the admin's own chat first, then copied to everyone) ──
+
+BC_DRAFTS = {}  # admin_id -> {"src": [chat, msg], "opts": {...}}
+
+
+async def bc_from_body2(body, admin):
+    kind = body.get("kind")
+    value = body.get("value")
+    if kind == "lang":
+        value = value if value in LANGS else "ru"
+    elif kind == "country":
+        value = str(value or "").strip().lower()[:2]
+        if len(value) != 2 or not value.isalpha():
+            raise web.HTTPBadRequest(text="bad country")
+    elif kind == "city":
+        value = str(value or "").strip()[:60]
+        if not value:
+            raise web.HTTPBadRequest(text="bad city")
+    elif kind in BC_DAYS:
+        try:
+            value = max(1, min(365, int(value)))
+        except (TypeError, ValueError):
+            value = 30
+    elif kind == "picked":
+        value = await bc_picks(admin)
+    elif kind not in ("all", "everything", "chats", "remind"):
+        kind, value = "all", None
+    return {"kind": kind, "value": value}
+
+
+def b64_file(raw, limit):
+    import base64
+    try:
+        data = base64.b64decode(str(raw).split(",", 1)[-1], validate=True)
+    except Exception:  # noqa: BLE001
+        raise web.HTTPBadRequest(text="bad file")
+    if len(data) > limit:
+        raise web.HTTPBadRequest(text="file too big")
+    return data
+
+
+async def bc2_status(admin):
+    hist = await POOL.fetch("SELECT * FROM broadcasts ORDER BY id DESC LIMIT 12")
+    fresh = datetime.now(ZoneInfo("UTC")) - timedelta(hours=48)
+    me = await get_user(admin)
+    tz = (me or {}).get("tz") or "Asia/Tashkent"
+    picks = await bc_picks(admin)
+    return {"tz": tz, "picks": [{"id": x, "name": await admin_name(x)} for x in picks[:50]],
+            "items": [{"id": r["id"], "status": r["status"], "label": r["label"], "total": r["total"], "sent": r["sent"] or 0,
+                       "failed": r["failed"] or 0, "blocked": r["blocked"] or 0,
+                       "when": (r["finished_at"] or r["run_at"] or r["created_at"]).isoformat(),
+                       "run_at": r["run_at"].isoformat() if r["run_at"] else None,
+                       "can_delete": r["status"] in ("done", "stopped") and bool(r["sent"]) and bool(r["finished_at"])
+                       and r["finished_at"] > fresh} for r in hist]}
+
+
+async def api_admin_bc2(request):
+    admin = await admin_auth(request, "bc")
+    bot = request.app["bot"]
+    ptb = request.app["ptb"]
+    if request.method == "GET":
+        if request.query.get("count"):
+            bc = await bc_from_body2(dict(request.query), admin)
+            return web.json_response({"ok": True, "count": await bc_count(bc), "label": bc_label(bc)})
+        return web.json_response({"ok": True, **await bc2_status(admin)})
+    b = await read_json(request)
+    act = b.get("action")
+    if act == "draft":  # make the message in the admin's chat: that's the preview and the source
+        text = admin_markup_text(str(b.get("text") or "").strip()[:4000])
+        opts = {"buttons": [], "app": bool(b.get("app")), "times": bool(b.get("times")), "silent": bool(b.get("silent")),
+                "pin": bool(b.get("pin"))}
+        for row in (b.get("buttons") or [])[:6]:
+            if isinstance(row, list) and len(row) == 2 and str(row[0]).strip() and re.match(r"^(https?://|tg://)\S+$", str(row[1]).strip()):
+                opts["buttons"].append([str(row[0]).strip()[:60], str(row[1]).strip()[:500]])
+        media = None
+        if b.get("photo"):
+            media = ("photo", b64_file(b["photo"], 9 * 1024 * 1024))
+        elif b.get("video"):
+            media = ("video", b64_file(b["video"], 19 * 1024 * 1024))
+        if not text and not media:
+            raise web.HTTPBadRequest(text="empty")
+        if media and len(text) > 1024:
+            raise web.HTTPBadRequest(text="caption too long")
+        markup = bc_markup(opts, "ru")
+        try:
+            await bot.send_message(admin, "👁 <b>Превью рассылки</b> — так увидят люди 👇", parse_mode=ParseMode.HTML)
+            if media and media[0] == "photo":
+                m = await bot.send_photo(admin, media[1], caption=text or None, parse_mode=ParseMode.HTML, reply_markup=markup)
+            elif media:
+                m = await bot.send_video(admin, media[1], caption=text or None, parse_mode=ParseMode.HTML, reply_markup=markup,
+                                         supports_streaming=True)
+            else:
+                m = await bot.send_message(admin, text, parse_mode=ParseMode.HTML, reply_markup=markup, disable_web_page_preview=False)
+        except BadRequest as e:
+            return web.json_response({"ok": False, "error": str(e)}, status=400)
+        BC_DRAFTS[admin] = {"src": [admin, m.message_id], "opts": opts}
+        return web.json_response({"ok": True})
+    if act in ("go", "schedule"):
+        d = BC_DRAFTS.get(admin)
+        if not d:
+            return web.json_response({"ok": False, "error": "no_draft"}, status=400)
+        bc = await bc_from_body2(b, admin)
+        bc.update(src=d["src"], opts=d["opts"])
+        if act == "go":
+            if ptb.bot_data.get("bc_running"):
+                return web.json_response({"ok": False, "error": "running"}, status=409)
+            bc_id = await bc_save(admin, bc, "queued")
+            bc_start(ptb, bc_id)
+        else:
+            me = await get_user(admin)
+            tz = (me or {}).get("tz") or "Asia/Tashkent"
+            try:
+                when = datetime.fromisoformat(str(b.get("when"))).replace(tzinfo=ZoneInfo(tz))
+            except ValueError:
+                raise web.HTTPBadRequest(text="bad time")
+            if when <= datetime.now(ZoneInfo(tz)):
+                return web.json_response({"ok": False, "error": "past"}, status=400)
+            bc_id = await bc_save(admin, bc, "scheduled", when)
+        BC_DRAFTS.pop(admin, None)
+        return web.json_response({"ok": True, "id": bc_id, **await bc2_status(admin)})
+    bc_id = int(b.get("id") or 0)
+    if act == "stop":
+        ptb.bot_data["bc_stop"] = bc_id
+    elif act == "cancel":
+        await POOL.execute("UPDATE broadcasts SET status = 'cancelled' WHERE id = $1 AND status = 'scheduled'", bc_id)
+    elif act == "delete":
+        task = asyncio.create_task(run_bc_delete(ptb, bc_id, admin))
+        ptb.bot_data.setdefault("tasks", set()).add(task)
+    elif act == "picks_add":
+        picks = await bc_picks(admin)
+        for tok in re.split(r"[\s,;]+", str(b.get("text") or "")):
+            who = await find_user_id(tok) if tok else None
+            if who and who not in picks and await get_user(who):
+                picks.append(who)
+        await kv_set(f"bcpick:{admin}", json.dumps(picks))
+    elif act == "picks_clear":
+        await kv_set(f"bcpick:{admin}", "[]")
+    elif act == "pick_toggle":
+        uid = int(b.get("uid") or 0)
+        picks = await bc_picks(admin)
+        picks = [x for x in picks if x != uid] if uid in picks else picks + [uid]
+        await kv_set(f"bcpick:{admin}", json.dumps(picks))
+    return web.json_response({"ok": True, **await bc2_status(admin)})
+
+
+# ── mini app: one person's settings, their messages from the bot, deleting them ──
+
+async def person_tools_json(uid, viewer):
+    u = await get_user(uid)
+    private = u["chat_type"] == "private"
+    fields = PRIVATE_FIELDS if private else CHAT_FIELDS
+    msgs = await POOL.fetch("SELECT * FROM sent_msgs WHERE user_id = $1 AND NOT deleted AND at > now() - interval '7 days' "
+                            "ORDER BY id DESC LIMIT 10", uid)
+    fresh = datetime.now(ZoneInfo("UTC")) - timedelta(hours=48)
+    return {"fields": [{"key": f, "label": USER_FIELDS[f][0], "value": enc(field_value(u, f)),
+                        "options": [[enc(o), USER_FIELDS[f][2](o)] for o in USER_FIELDS[f][1]]} for f in fields],
+            "pm": (u["prayer_modes"] or "sssss").ljust(5, "s"), "pm_names": [PN["ru"][k.lower()] for k in EVENTS],
+            "city": u["city"], "picked": uid in await bc_picks(viewer),
+            "msgs": [{"id": r["id"], "at": r["at"].isoformat(), "preview": r["preview"] or r["kind"], "fresh": r["at"] > fresh} for r in msgs],
+            "can": {"users": has_perm(viewer, "users"), "bc": has_perm(viewer, "bc"), "bans": has_perm(viewer, "bans") and not is_admin(uid)}}
+
+
+async def api_admin_person_tools(request):
+    viewer = await admin_auth(request)
+    bot = request.app["bot"]
+    if request.method == "GET":
+        uid = int(request.query.get("id") or 0)
+    else:
+        b = await read_json(request)
+        uid = int(b.get("id") or 0)
+    u = await get_user(uid) if uid else None
+    if not u or (u["hidden"] and not is_main(viewer)):
+        raise web.HTTPNotFound()
+    note = ""
+    if request.method == "POST":
+        act = b.get("action")
+        need = {"set": "users", "pm": "users", "city": "users", "delmsg": "users", "delmsg_all": "users", "pick": "bc",
+                "delete": "bans"}.get(act)
+        if not need or not has_perm(viewer, need):
+            raise web.HTTPForbidden(text="no right")
+        if act == "set" and b.get("field") in USER_FIELDS:
+            v, ok = dec(b["field"], str(b.get("value")))
+            if ok:
+                await set_user_field(bot, uid, b["field"], v)
+        elif act == "pm":
+            pm = list((u["prayer_modes"] or "sssss").ljust(5, "s"))
+            i = int(b.get("i") or 0) % 5
+            pm[i] = {"s": "q", "q": "o", "o": "s"}[pm[i]]
+            await save(uid, prayer_modes="".join(pm))
+        elif act == "city":
+            place = await geocode(str(b.get("city") or "").strip()[:80], u["lang"] or "ru")
+            if not place:
+                return web.json_response({"ok": False, "error": "not_found"})
+            name, lat, lon, cc = place
+            data = await get_timings(dict(u, lat=lat, lon=lon, country=cc, tz=None), datetime.utcnow().date())
+            await save(uid, city=name, lat=lat, lon=lon, country=cc, tz=data["tz"], awaiting_city=False)
+            note = f"Город: {name}"
+        elif act in ("delmsg", "delmsg_all"):
+            if act == "delmsg":
+                rows = await POOL.fetch("SELECT id, user_id, message_id FROM sent_msgs WHERE id = $1 AND user_id = $2", int(b.get("msg") or 0), uid)
+            else:
+                rows = await POOL.fetch("SELECT id, user_id, message_id FROM sent_msgs WHERE user_id = $1 AND NOT deleted "
+                                        "AND at > now() - interval '48 hours'", uid)
+            ok, gone = await delete_sent(bot, rows)
+            note = f"Удалено: {ok}" + (f", не удалось: {gone}" if gone else "")
+        elif act == "pick":
+            picks = await bc_picks(viewer)
+            picks = [x for x in picks if x != uid] if uid in picks else picks + [uid]
+            await kv_set(f"bcpick:{viewer}", json.dumps(picks))
+        elif act == "delete":
+            if is_admin(uid):
+                raise web.HTTPBadRequest(text="admin")
+            await wipe_user(bot, uid, bool(b.get("ban")))
+            return web.json_response({"ok": True, "deleted": True})
+    return web.json_response({"ok": True, "note": note, **await person_tools_json(uid, viewer)})
 
 
 # ───────────────────────── app ─────────────────────────
