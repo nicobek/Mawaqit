@@ -1067,11 +1067,16 @@ for _l, _d in EXTRA10.items():
     T[_l].update(_d)
 
 EXTRA12 = {
-    "en": {"fr_btn": "🤝 Share with friends", "fr_send": "📤 Send to a friend"},
-    "ru": {"fr_btn": "🤝 Поделиться с друзьями", "fr_send": "📤 Отправить другу"},
-    "uz": {"fr_btn": "🤝 Do‘stlarga ulashish", "fr_send": "📤 Do‘stga yuborish"},
-    "tg": {"fr_btn": "🤝 Ба дӯстон фиристодан", "fr_send": "📤 Ба дӯст фиристодан"},
-    "ar": {"fr_btn": "🤝 شارك مع الأصدقاء", "fr_send": "📤 أرسل إلى صديق"},
+    "en": {"fr_btn": "🤝 Share with friends", "fr_send": "📤 Send to a friend",
+           "fr_cap": "\"Whoever guides someone to goodness will have a reward like the one who does it\" (Muslim) 🤍\nNever miss a prayer with {bot}"},
+    "ru": {"fr_btn": "🤝 Поделиться с друзьями", "fr_send": "📤 Отправить другу",
+           "fr_cap": "«Кто укажет на благое, тому награда, как и совершившему его» (Муслим) 🤍\nНе пропускай намаз вместе с {bot}"},
+    "uz": {"fr_btn": "🤝 Do‘stlarga ulashish", "fr_send": "📤 Do‘stga yuborish",
+           "fr_cap": "«Kim yaxshilikka yo‘l ko‘rsatsa, unga uni qilgan kishining savobicha savob bor» (Muslim) 🤍\n{bot} bilan namozni qoldirmang"},
+    "tg": {"fr_btn": "🤝 Ба дӯстон фиристодан", "fr_send": "📤 Ба дӯст фиристодан",
+           "fr_cap": "«Ҳар кӣ ба некӣ роҳнамоӣ кунад, барояш мисли подоши иҷрокунандаи он аст» (Муслим) 🤍\nБо {bot} намозро аз даст надиҳед"},
+    "ar": {"fr_btn": "🤝 شارك مع الأصدقاء", "fr_send": "📤 أرسل إلى صديق",
+           "fr_cap": "«مَن دَلَّ على خيرٍ فله مثلُ أجرِ فاعلِه» (رواه مسلم) 🤍\nلا تفوّت صلاتك مع {bot}"},
 }
 for _l, _d in EXTRA12.items():
     T[_l].update(_d)
@@ -4436,12 +4441,12 @@ async def share_card_button(update, ctx):
         pass
     if fid:
         try:
-            return await chat.send_animation(fid, caption=f"@{BOT_USERNAME}", reply_markup=markup)
+            return await chat.send_animation(fid, caption=t(cl, "fr_cap", bot=f"@{BOT_USERNAME}"), reply_markup=markup)
         except BadRequest:
             log.warning("share card file id expired for %s", cl)
     path = SHARE_CARD_DIR / f"mawaqit_card_{cl}.mp4"
     with open(path, "rb") as f:
-        msg = await chat.send_animation(f, caption=f"@{BOT_USERNAME}", reply_markup=markup, width=1020, height=1770, duration=7,
+        msg = await chat.send_animation(f, caption=t(cl, "fr_cap", bot=f"@{BOT_USERNAME}"), reply_markup=markup, width=1020, height=1770, duration=7,
                                         filename=f"mawaqit_{cl}.mp4")
     if msg.animation:
         await kv_set("share_card_" + cl, msg.animation.file_id)
@@ -4993,7 +4998,8 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if q in ("card", "card " + lang) or q.startswith("card "):  # "Send to a friend" under the animated card
         cl = q.split()[1] if len(q.split()) > 1 and q.split()[1] in SHARE_CARD_LANGS else lang
         fid = await kv_get("share_card_" + cl)
-        res = [InlineQueryResultCachedMpeg4Gif(id="card_" + cl, mpeg4_file_id=fid, caption=f"@{BOT_USERNAME}")] if fid else []
+        res = [InlineQueryResultCachedMpeg4Gif(id="card2_" + cl, mpeg4_file_id=fid,
+                                               caption=t(cl, "fr_cap", bot=f"@{BOT_USERNAME}"))] if fid else []
         try:
             await iq.answer(res, cache_time=600, is_personal=False)
         except BadRequest as e:
