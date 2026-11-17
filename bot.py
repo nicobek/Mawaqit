@@ -1312,6 +1312,13 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS last_ayah DATE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS share_bg INT NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS share_font INT NOT NULL DEFAULT 0;
 CREATE TABLE IF NOT EXISTS ayah_cache (ref TEXT PRIMARY KEY, data JSONB NOT NULL);
+CREATE TABLE IF NOT EXISTS broadcasts (id SERIAL PRIMARY KEY, admin_id BIGINT, audience TEXT, label TEXT, src_chat BIGINT,
+    src_msg BIGINT, opts TEXT, status TEXT, run_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    started_at TIMESTAMPTZ, finished_at TIMESTAMPTZ, total INT, sent INT, failed INT, blocked INT);
+CREATE TABLE IF NOT EXISTS sent_msgs (id SERIAL PRIMARY KEY, bc_id INT, user_id BIGINT NOT NULL, message_id BIGINT NOT NULL,
+    kind TEXT, preview TEXT, deleted BOOLEAN NOT NULL DEFAULT FALSE, at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS sent_msgs_user ON sent_msgs (user_id, id);
+CREATE INDEX IF NOT EXISTS sent_msgs_bc ON sent_msgs (bc_id);
 CREATE TABLE IF NOT EXISTS share_pics (id TEXT PRIMARY KEY, file_id TEXT NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS ayah_pool (ref TEXT PRIMARY KEY, source TEXT NOT NULL DEFAULT 'base',
                                       removed BOOLEAN NOT NULL DEFAULT FALSE, added_at TIMESTAMPTZ NOT NULL DEFAULT now());
@@ -2601,6 +2608,10 @@ async def support_msg(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if is_admin(uid) and ctx.user_data.get("admin_state") == "azan" and not (update.message.text or "").startswith("/"):
         await admin_azan_upload(update, ctx)
         raise ApplicationHandlerStop
+    if is_admin(uid) and ctx.user_data.get("admin_state") == "bc_text" and ctx.user_data.get("bc") \
+            and not (update.message.text or "").startswith("/"):
+        await bc_got_message(update, ctx)
+        raise ApplicationHandlerStop
     if is_admin(uid) and ctx.user_data.get("reply_to"):
         await admin_reply(update, ctx)
         raise ApplicationHandlerStop
@@ -2669,11 +2680,16 @@ async def admin_reply(update: Update, ctx):
     mg = msg.media_group_id
     first = not mg or ctx.user_data.get("rep_last_mg") != mg
     ctx.user_data["rep_last_mg"] = mg
+    logged = []
     try:
         if first:
             head = "admin_msg_header" if ctx.user_data.get("reply_kind") == "w" else "support_reply_header"
-            await ctx.bot.send_message(target, t(tlang, head), parse_mode=ParseMode.HTML)
-        await msg.copy(target)
+            hm = await ctx.bot.send_message(target, t(tlang, head), parse_mode=ParseMode.HTML)
+            logged.append(await log_sent(target, hm.message_id, "admin", "заголовок сообщения от админа"))
+        cm = await msg.copy(target)
+        preview = (msg.text or msg.caption or "")[:60] or ("[фото]" if msg.photo else "[видео]" if msg.video else
+                                                              "[голосовое]" if msg.voice else "[файл]")
+        logged.append(await log_sent(target, cm.message_id, "admin", "от админа: " + preview))
     except Forbidden:
         await POOL.execute("UPDATE users SET blocked = TRUE WHERE user_id = $1", target)
         ctx.user_data.pop("reply_to", None)
@@ -2684,8 +2700,11 @@ async def admin_reply(update: Update, ctx):
         await msg.reply_text(f"⚠️ Не удалось отправить: {esc(e)}")
         return
     if first:
+        dl = ":".join(str(x) for x in logged if x)
         await msg.reply_text(f"✅ Доставлено пользователю <code>{target}</code>.\nМожно отправить ещё или завершить 👇",
-                             parse_mode=ParseMode.HTML, reply_markup=kb([btn("✅ Готово", "sup:rdone")]))
+                             parse_mode=ParseMode.HTML,
+                             reply_markup=kb([btn("✅ Готово", "sup:rdone"), btn("🗑 Удалить у него", f"a:umdelp:{target}:{dl}")]
+                                             if dl and len(dl) < 40 else [btn("✅ Готово", "sup:rdone")]))
 
 
 # ───────────────────────── reminders ─────────────────────────
@@ -3119,6 +3138,15 @@ async def user_card(uid, back=None, viewer=None):
             credits, unl = await ai_wallet(uid)
             text += f"\n🤖 ИИ: куплено {credits}" + (f", безлимит до {unl:%d.%m.%Y}" if unl and unl > datetime.now(ZoneInfo('UTC')) else "")
             rows.append([btn("🎁 Начислить вопросы", f"a:grant:{uid}"), btn("📜 Его вопросы", f"a:ai:log:0:{uid}")])
+        tools = []
+        if viewer is not None and has_perm(viewer, "bc"):
+            tools.append(btn("✅ В рассылке" if uid in await bc_picks(viewer) else "📌 В рассылку", f"a:bpick:{uid}:{back or ''}"))
+        if viewer is not None and has_perm(viewer, "users"):
+            tools.append(btn("🗑 Сообщения бота", f"a:umsg:{uid}:{back or ''}"))
+        if tools:
+            rows.append(tools)
+        if viewer is not None and has_perm(viewer, "bans") and not is_admin(uid):
+            rows.append([btn("❌ Удалить пользователя", f"a:udel:{uid}:{back or ''}")])
         if is_main(viewer):
             if not is_admin(uid):
                 rows.append([btn("👮 Сделать админом", f"a:adm:mk:{uid}")])
@@ -3138,6 +3166,8 @@ async def user_card(uid, back=None, viewer=None):
                 f"{'🧱 Бот удалён из чата' if u['blocked'] else '✅ Бот в чате'}")
         if u["owner_id"]:
             rows.append([btn("👤 Кто добавил", f"a:card:{u['owner_id']}:{back or ''}")])
+        if viewer is not None and has_perm(viewer, "bans"):
+            rows.append([btn("❌ Удалить и выйти из чата", f"a:udel:{uid}:{back or ''}")])
     rows.append([btn("⬅️ Назад", back_cb(back))])
     return text, kb(*rows)
 
@@ -3234,39 +3264,6 @@ async def screen_admin_health():
 
 # ── broadcast ──
 
-def bc_where(bc):
-    base = "lang IS NOT NULL AND NOT banned AND NOT blocked"
-    if bc["kind"] == "everything":
-        return base, []
-    base += " AND chat_type = 'private'"
-    if bc["kind"] == "lang":
-        return base + " AND lang = $1", [bc["value"]]
-    if bc["kind"] == "country":
-        return base + " AND lower(country) = $1", [bc["value"]]
-    return base, []
-
-
-def bc_label(bc):
-    if bc["kind"] == "lang":
-        return f"язык {LANG_BUTTONS.get(bc['value'], bc['value'])}"
-    if bc["kind"] == "country":
-        return f"страна {flag(bc['value'])} {bc['value'].upper()}"
-    if bc["kind"] == "everything":
-        return "пользователи + группы и каналы"
-    return "все пользователи"
-
-
-async def ask_bc_text(update, ctx):
-    bc = ctx.user_data["bc"]
-    where, args = bc_where(bc)
-    n = await POOL.fetchval(f"SELECT count(*) FROM users WHERE {where}", *args)
-    ctx.user_data["admin_state"] = "bc_text"
-    text = (f"✍️ <b>Текст рассылки</b>\n\n"
-            f"Кому: <b>{bc_label(bc)}</b> (получателей: <b>{n}</b>)\n\n"
-            f"Отправьте сообщение. Можно использовать форматирование Telegram: жирный, курсив, ссылки.")
-    await render(update, text, kb([btn("❌ Отмена", "a:home")]))
-
-
 async def send_one(bot, uid, text, photo=None, markup=None):
     for _ in range(2):
         try:
@@ -3330,12 +3327,643 @@ async def run_broadcast(app, chat_id, text, bc):
         app.bot_data["bc_running"] = False
 
 
+# ── broadcast v2: any message, audiences, buttons, schedule, progress/stop, history, delete everywhere ──
+
+BC_DAYS = {"active": "активные за {} дн.", "inactive": "неактивные {}+ дн.", "new": "новички за {} дн."}
+
+
+def bc_where(bc):
+    base = "lang IS NOT NULL AND NOT banned AND NOT blocked"
+    k, v = bc["kind"], bc.get("value")
+    if k == "everything":
+        return base, []
+    if k == "chats":
+        return base + " AND chat_type <> 'private'", []
+    base += " AND chat_type = 'private'"
+    if k == "lang":
+        return base + " AND lang = $1", [v]
+    if k == "country":
+        return base + " AND lower(country) = $1", [v]
+    if k == "city":
+        return base + " AND city ILIKE $1", [f"%{v}%"]
+    if k == "active":
+        return base + " AND last_seen > now() - make_interval(days => $1)", [int(v)]
+    if k == "inactive":
+        return base + " AND (last_seen IS NULL OR last_seen < now() - make_interval(days => $1))", [int(v)]
+    if k == "new":
+        return base + " AND created_at > now() - make_interval(days => $1)", [int(v)]
+    if k == "remind":
+        return base + " AND remind", []
+    if k == "picked":
+        return "user_id = ANY($1::bigint[]) AND NOT banned AND NOT blocked", [[int(x) for x in v]]
+    return base, []
+
+
+def bc_label(bc):
+    k, v = bc["kind"], bc.get("value")
+    if k == "lang":
+        return f"язык {LANG_BUTTONS.get(v, v)}"
+    if k == "country":
+        return f"страна {flag(v)} {v.upper()}"
+    if k == "city":
+        return f"город «{v}»"
+    if k in BC_DAYS:
+        return BC_DAYS[k].format(v)
+    return {"everything": "пользователи + группы и каналы", "chats": "только группы и каналы",
+            "remind": "с включёнными напоминаниями", "picked": f"выбранные люди ({len(v or [])})"}.get(k, "все пользователи")
+
+
+async def bc_count(bc):
+    where, args = bc_where(bc)
+    return await POOL.fetchval(f"SELECT count(*) FROM users WHERE {where}", *args)
+
+
+async def bc_picks(admin):
+    try:
+        return [int(x) for x in json.loads(await kv_get(f"bcpick:{admin}", "[]") or "[]")]
+    except ValueError:
+        return []
+
+
+async def screen_bc_menu(admin):
+    n = len(await bc_picks(admin))
+    sched = await POOL.fetchval("SELECT count(*) FROM broadcasts WHERE status = 'scheduled'")
+    return "📣 <b>Рассылка</b>\n\nКому отправить?", kb(
+        [btn("👥 Всем пользователям", "a:bc:all"), btn("👥📢 Всем + группы", "a:bc:everything")],
+        [btn("📢 Только группы и каналы", "a:bc:chats")],
+        [btn("🌐 По языку", "a:bc:lang"), btn("🌍 По стране", "a:bc:country"), btn("🏙 По городу", "a:bc:city")],
+        [btn("🟢 Активные 7 дн.", "a:bc:active:7"), btn("🟢 Активные 30 дн.", "a:bc:active:30")],
+        [btn("💤 Неактивные 30+ дн.", "a:bc:inactive:30"), btn("🆕 Новички 7 дн.", "a:bc:new:7")],
+        [btn("🔔 С напоминаниями", "a:bc:remind"), btn(f"👤 Выбранным ({n})", "a:bc:picked")],
+        [btn("📜 История", "a:bc:hist"), btn(f"🕓 Запланированные ({sched})", "a:bc:sched")],
+        ADMIN_BACK)
+
+
+async def ask_bc_text(update, ctx):
+    bc = ctx.user_data["bc"]
+    n = await bc_count(bc)
+    ctx.user_data["admin_state"] = "bc_text"
+    text = (f"✍️ <b>Сообщение для рассылки</b>\n\nКому: <b>{bc_label(bc)}</b> (получателей: <b>{n}</b>)\n\n"
+            "Отправьте сюда любое сообщение: текст с оформлением, фото, видео, GIF, голосовое, кружок, документ. "
+            "Оно уйдёт людям точно в таком виде.")
+    await render(update, text, kb([btn("❌ Отмена", "a:bc")]))
+
+
+def bc_markup(opts, lang):
+    rows = [[InlineKeyboardButton(b[0], url=b[1])] for b in opts.get("buttons", [])]
+    extra = []
+    if opts.get("app") and WEBAPP_URL:
+        extra.append(webapp_btn(t(lang, "btn_app"), "today"))
+    if opts.get("times"):
+        extra.append(btn(t(lang, "btn_times"), "m:times"))
+    if extra:
+        rows.append(extra)
+    return InlineKeyboardMarkup(rows) if rows else None
+
+
+async def screen_bc_builder(ctx):
+    bc = ctx.user_data["bc"]
+    o = bc.setdefault("opts", {})
+    n = await bc_count(bc)
+    btns = [f"🔗 {esc(b[0])}" for b in o.get("buttons", [])] + (["📱 Открыть приложение"] if o.get("app") else []) + \
+           (["🕌 Время намаза"] if o.get("times") else [])
+    text = (f"📣 <b>Рассылка готова</b>\n\n👥 Кому: <b>{bc_label(bc)}</b> — {n}\n"
+            f"🔘 Кнопки: {', '.join(btns) if btns else 'нет'}\n"
+            f"🔕 Без звука: {'да' if o.get('silent') else 'нет'} · 📌 Закрепить: {'да' if o.get('pin') else 'нет'}\n\n"
+            "Сначала можно отправить превью себе 👇")
+    rows = [[btn("🔗 + Кнопка-ссылка", "a:bcd:url"), btn(("✅ " if o.get("app") else "➕ ") + "Приложение", "a:bcd:app")],
+            [btn(("✅ " if o.get("times") else "➕ ") + "Время намаза", "a:bcd:times")]
+            + ([btn("🧹 Убрать кнопки", "a:bcd:clr")] if btns else []),
+            [btn(("🔕 Без звука ✅" if o.get("silent") else "🔔 Со звуком"), "a:bcd:silent"),
+             btn(("📌 Закрепить ✅" if o.get("pin") else "📌 Не закреплять"), "a:bcd:pin")],
+            [btn("👁 Превью себе", "a:bcd:test"), btn("✏️ Другое сообщение", "a:bcd:msg")],
+            [btn("🕓 Запланировать", "a:bcd:when"), btn(f"✅ Отправить ({n})", "a:bcd:go")],
+            [btn("❌ Отмена", "a:bc")]]
+    return text, kb(*rows)
+
+
+async def bc_got_message(update, ctx):
+    """The admin sent the message to broadcast (any type)."""
+    msg = update.message
+    if msg.media_group_id:
+        if ctx.user_data.get("bc_mg") == msg.media_group_id:
+            return
+        ctx.user_data["bc_mg"] = msg.media_group_id
+        await msg.reply_text("ℹ️ Альбомы рассылаются только первым файлом. Лучше отправьте одно фото или видео с подписью.")
+    ctx.user_data.pop("admin_state", None)
+    ctx.user_data["bc"]["src"] = [msg.chat_id, msg.message_id]
+    text, markup = await screen_bc_builder(ctx)
+    await msg.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
+
+
+def bc_parse_when(raw, tz):
+    """"18:30" (today, or tomorrow if passed) or "17.11 18:30" / "17.11.2026 18:30", in the admin's time."""
+    now = datetime.now(ZoneInfo(tz))
+    m = re.match(r"^\s*(?:(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?\s+)?(\d{1,2})[:.](\d{2})\s*$", raw)
+    if not m:
+        return None
+    d, mo, y, h, mi = m.groups()
+    try:
+        if d:
+            y = int(y) + (2000 if y and len(y) == 2 else 0) if y else now.year
+            when = datetime(y, int(mo), int(d), int(h), int(mi), tzinfo=ZoneInfo(tz))
+        else:
+            when = now.replace(hour=int(h), minute=int(mi), second=0, microsecond=0)
+            if when <= now:
+                when += timedelta(days=1)
+    except ValueError:
+        return None
+    return when if when > now else None
+
+
+async def bc_save(admin, bc, status, run_at=None):
+    return await POOL.fetchval(
+        "INSERT INTO broadcasts (admin_id, audience, label, src_chat, src_msg, opts, status, run_at) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
+        admin, json.dumps({"kind": bc["kind"], "value": bc.get("value")}), bc_label(bc), bc["src"][0], bc["src"][1],
+        json.dumps(bc.get("opts", {}), ensure_ascii=False), status, run_at)
+
+
+def bc_start(app, bc_id):
+    task = asyncio.create_task(run_bc(app, bc_id))
+    tasks = app.bot_data.setdefault("tasks", set())
+    tasks.add(task)
+    task.add_done_callback(tasks.discard)
+
+
+async def log_sent(user_id, message_id, kind, preview="", bc_id=None):
+    try:
+        return await POOL.fetchval("INSERT INTO sent_msgs (bc_id, user_id, message_id, kind, preview) VALUES ($1, $2, $3, $4, $5) "
+                                   "RETURNING id", bc_id, user_id, message_id, kind, preview[:80])
+    except Exception:  # noqa: BLE001
+        log.exception("log sent failed")
+
+
+async def run_bc(app, bc_id):
+    if app.bot_data.get("bc_running"):
+        return
+    app.bot_data["bc_running"] = bc_id
+    app.bot_data.pop("bc_stop", None)
+    row = await POOL.fetchrow("SELECT * FROM broadcasts WHERE id = $1", bc_id)
+    admin = row["admin_id"]
+    aud, opts = json.loads(row["audience"]), json.loads(row["opts"] or "{}")
+    sent = failed = blocked = 0
+    status = "done"
+    try:
+        where, args = bc_where(aud)
+        people = await POOL.fetch(f"SELECT user_id, lang FROM users WHERE {where}", *args)
+        total = len(people)
+        await POOL.execute("UPDATE broadcasts SET status = 'running', total = $2, started_at = now() WHERE id = $1", bc_id, total)
+        stop_kb = kb([btn("⏹ Остановить", f"a:bcx:stop:{bc_id}")])
+        progress = await app.bot.send_message(admin, f"📣 Рассылка #{bc_id}: 0 / {total}", reply_markup=stop_kb)
+        markups = {}
+        for i, p in enumerate(people, 1):
+            if app.bot_data.get("bc_stop") == bc_id:
+                status = "stopped"
+                break
+            lang = p["lang"] or "en"
+            if lang not in markups:
+                markups[lang] = bc_markup(opts, lang)
+            for attempt in range(2):
+                try:
+                    m = await app.bot.copy_message(p["user_id"], row["src_chat"], row["src_msg"], reply_markup=markups[lang],
+                                                   disable_notification=bool(opts.get("silent")))
+                    sent += 1
+                    await log_sent(p["user_id"], m.message_id, "bc", f"рассылка #{bc_id}", bc_id)
+                    if opts.get("pin"):
+                        try:
+                            await app.bot.pin_chat_message(p["user_id"], m.message_id, disable_notification=True)
+                        except Exception:  # noqa: BLE001
+                            pass
+                    break
+                except Forbidden:
+                    blocked += 1
+                    failed += 1
+                    await POOL.execute("UPDATE users SET blocked = TRUE WHERE user_id = $1", p["user_id"])
+                    break
+                except RetryAfter as e:
+                    await asyncio.sleep(e.retry_after + 1)
+                except BadRequest as e:
+                    if "not found" in str(e).lower() and "message" in str(e).lower() and sent == 0:
+                        raise RuntimeError("исходное сообщение удалено — рассылка невозможна") from e
+                    failed += 1
+                    break
+                except Exception:  # noqa: BLE001
+                    log.exception("broadcast copy failed for %s", p["user_id"])
+                    failed += 1
+                    break
+            await asyncio.sleep(0.045)
+            if i % 50 == 0:
+                await POOL.execute("UPDATE broadcasts SET sent = $2, failed = $3, blocked = $4 WHERE id = $1",
+                                   bc_id, sent, failed, blocked)
+                try:
+                    await progress.edit_text(f"📣 Рассылка #{bc_id}: {i} / {total}", reply_markup=stop_kb)
+                except Exception:  # noqa: BLE001
+                    pass
+        try:
+            await progress.delete()
+        except Exception:  # noqa: BLE001
+            pass
+        report = (f"{'⏹ Остановлена' if status == 'stopped' else '✅ Завершена'} <b>рассылка #{bc_id}</b>\n\n"
+                  f"Кому: {esc(row['label'])}\n📬 Доставлено: <b>{sent}</b>\n"
+                  f"❌ Не доставлено: <b>{failed}</b> (заблокировали бота: {blocked})")
+        await app.bot.send_message(admin, report, parse_mode=ParseMode.HTML,
+                                   reply_markup=kb([btn("🗑 Удалить у всех", f"a:bcx:del:{bc_id}"), btn("📜 История", "a:bc:hist")],
+                                                   ADMIN_BACK))
+    except Exception as e:  # noqa: BLE001
+        status = "failed"
+        log.exception("broadcast %s crashed", bc_id)
+        try:
+            await app.bot.send_message(admin, f"⚠️ Рассылка #{bc_id} прервана: {esc(e)}\nОтправлено: {sent}.", parse_mode=ParseMode.HTML)
+        except Exception:  # noqa: BLE001
+            pass
+    finally:
+        await POOL.execute("UPDATE broadcasts SET status = $2, sent = $3, failed = $4, blocked = $5, finished_at = now() "
+                           "WHERE id = $1", bc_id, status, sent, failed, blocked)
+        app.bot_data["bc_running"] = False
+
+
+async def delete_sent(bot, rows):
+    ok = gone = 0
+    for r in rows:
+        try:
+            await bot.delete_message(r["user_id"], r["message_id"])
+            ok += 1
+        except RetryAfter as e:
+            await asyncio.sleep(e.retry_after + 1)
+        except Exception:  # noqa: BLE001
+            gone += 1
+        await POOL.execute("UPDATE sent_msgs SET deleted = TRUE WHERE id = $1", r["id"])
+        await asyncio.sleep(0.04)
+    return ok, gone
+
+
+async def run_bc_delete(app, bc_id, admin):
+    rows = await POOL.fetch("SELECT id, user_id, message_id FROM sent_msgs WHERE bc_id = $1 AND NOT deleted "
+                            "AND at > now() - interval '48 hours'", bc_id)
+    note = await app.bot.send_message(admin, f"🗑 Удаляю рассылку #{bc_id} у {len(rows)} получателей…")
+    ok, gone = await delete_sent(app.bot, rows)
+    await POOL.execute("UPDATE broadcasts SET status = 'deleted' WHERE id = $1", bc_id)
+    try:
+        await note.edit_text(f"🗑 Рассылка #{bc_id} удалена у <b>{ok}</b> получателей." + (f" Не удалось: {gone}." if gone else ""),
+                             parse_mode=ParseMode.HTML, reply_markup=kb(ADMIN_BACK))
+    except Exception:  # noqa: BLE001
+        pass
+
+
+async def bc_scheduler(context):
+    """Starts scheduled broadcasts when their time comes."""
+    app = context.application
+    if app.bot_data.get("bc_running"):
+        return
+    bc_id = await POOL.fetchval("SELECT id FROM broadcasts WHERE status = 'scheduled' AND run_at <= now() ORDER BY run_at LIMIT 1")
+    if bc_id:
+        await POOL.execute("UPDATE broadcasts SET status = 'queued' WHERE id = $1", bc_id)
+        bc_start(app, bc_id)
+
+
+BC_ST = {"done": "✅", "stopped": "⏹", "failed": "⚠️", "deleted": "🗑", "running": "⏳", "scheduled": "🕓", "queued": "⏳",
+         "cancelled": "✖️"}
+
+
+async def admin_bc(update, ctx, parts):
+    """a:bc:… (audience and lists), a:bcd:… (draft), a:bcx:… (running/history actions)."""
+    admin = update.effective_user.id
+    sub = parts[1]
+    what = parts[2] if len(parts) > 2 else "menu"
+    app = ctx.application
+    if sub == "bc":
+        if what == "menu":
+            text, markup = await screen_bc_menu(admin)
+            return await render(update, text, markup)
+        if what in ("all", "everything", "chats", "remind"):
+            ctx.user_data["bc"] = {"kind": what, "value": None}
+            return await ask_bc_text(update, ctx)
+        if what in BC_DAYS and len(parts) > 3 and parts[3].isdigit():
+            ctx.user_data["bc"] = {"kind": what, "value": int(parts[3])}
+            return await ask_bc_text(update, ctx)
+        if what == "lang":
+            rows = [[btn(LANG_BUTTONS["en"], "a:bcl:en"), btn(LANG_BUTTONS["ru"], "a:bcl:ru")],
+                    [btn(LANG_BUTTONS["uz"], "a:bcl:uz"), btn(LANG_BUTTONS["uzc"], "a:bcl:uzc")],
+                    [btn(LANG_BUTTONS["tg"], "a:bcl:tg"), btn(LANG_BUTTONS["ar"], "a:bcl:ar")], [btn("⬅️ Назад", "a:bc")]]
+            return await render(update, "🌐 <b>Выберите язык получателей</b>", kb(*rows))
+        if what == "country":
+            ctx.user_data["admin_state"] = "bc_country"
+            return await render(update, "🌍 <b>Страна получателей</b>\n\nОтправьте двухбуквенный код страны, например: "
+                                        "<code>uz</code>, <code>ru</code>, <code>tj</code>, <code>sa</code>.", kb([btn("⬅️ Назад", "a:bc")]))
+        if what == "city":
+            ctx.user_data["admin_state"] = "bc_city"
+            return await render(update, "🏙 <b>Город получателей</b>\n\nОтправьте название города (или его часть), "
+                                        "например: <code>Ташкент</code> или <code>Toshkent</code>.", kb([btn("⬅️ Назад", "a:bc")]))
+        if what == "picked":
+            if len(parts) > 3 and parts[3] == "use":
+                picks = await bc_picks(admin)
+                if not picks:
+                    return await update.callback_query.answer("Список пуст", show_alert=True)
+                ctx.user_data["bc"] = {"kind": "picked", "value": picks}
+                return await ask_bc_text(update, ctx)
+            if len(parts) > 3 and parts[3] == "clr":
+                await kv_set(f"bcpick:{admin}", "[]")
+            picks = await bc_picks(admin)
+            ctx.user_data["admin_state"] = "bc_pick"
+            names = [esc(await admin_name(x)) for x in picks[:15]]
+            text = ("👤 <b>Рассылка выбранным людям</b>\n\n"
+                    "Отправьте список ID или @username — через пробел или каждый с новой строки.\n"
+                    "Или отмечайте людей кнопкой «📌 В рассылку» в их карточке (Пользователи → человек).\n\n"
+                    f"Сейчас отмечено: <b>{len(picks)}</b>" + (("\n" + "\n".join("• " + x for x in names)) if names else "")
+                    + ("\n…" if len(picks) > 15 else ""))
+            rows = ([[btn(f"✅ Отправить отмеченным ({len(picks)})", "a:bc:picked:use")], [btn("🧹 Очистить", "a:bc:picked:clr")]]
+                    if picks else []) + [[btn("⬅️ Назад", "a:bc")]]
+            return await render(update, text, kb(*rows))
+        if what == "hist":
+            rows = await POOL.fetch("SELECT * FROM broadcasts ORDER BY id DESC LIMIT 10")
+            lines = ["📜 <b>История рассылок</b>", ""]
+            kbrows = []
+            for r in rows:
+                when = r["finished_at"] or r["run_at"] or r["created_at"]
+                lines.append(f"{BC_ST.get(r['status'], '•')} <b>#{r['id']}</b> · {fdt(when)} UTC · {esc(r['label'])}\n"
+                             f"    📬 {r['sent'] or 0} / {r['total'] or '—'} · ❌ {r['failed'] or 0}")
+                if r["status"] in ("done", "stopped") and r["sent"] and r["finished_at"] and \
+                        r["finished_at"] > datetime.now(ZoneInfo("UTC")) - timedelta(hours=48):
+                    kbrows.append([btn(f"🗑 Удалить #{r['id']} у всех", f"a:bcx:del:{r['id']}")])
+            if not rows:
+                lines.append("Пока пусто.")
+            return await render(update, "\n".join(lines), kb(*kbrows, [btn("⬅️ Назад", "a:bc")]))
+        if what == "sched":
+            rows = await POOL.fetch("SELECT * FROM broadcasts WHERE status = 'scheduled' ORDER BY run_at")
+            me = await get_user(admin)
+            tz = (me or {}).get("tz") or "Asia/Tashkent"
+            lines = ["🕓 <b>Запланированные рассылки</b>", ""] + \
+                [f"• <b>#{r['id']}</b> · {r['run_at'].astimezone(ZoneInfo(tz)):%d.%m %H:%M} · {esc(r['label'])}" for r in rows]
+            if not rows:
+                lines.append("Нет запланированных.")
+            kbrows = [[btn(f"👁 #{r['id']}", f"a:bcx:show:{r['id']}"), btn(f"✖️ Отменить #{r['id']}", f"a:bcx:cancel:{r['id']}")]
+                      for r in rows]
+            return await render(update, "\n".join(lines), kb(*kbrows, [btn("⬅️ Назад", "a:bc")]))
+        text, markup = await screen_bc_menu(admin)
+        return await render(update, text, markup)
+
+    if sub == "bcd":
+        bc = ctx.user_data.get("bc")
+        if not bc or not bc.get("src"):
+            return await render(update, "⚠️ Черновик рассылки не найден. Начните заново.", kb([btn("📣 Рассылка", "a:bc")]))
+        o = bc.setdefault("opts", {})
+        if what in ("app", "times", "silent", "pin"):
+            o[what] = not o.get(what)
+        elif what == "clr":
+            o.update(buttons=[], app=False, times=False)
+        elif what == "url":
+            ctx.user_data["admin_state"] = "bc_btn"
+            return await render(update, "🔗 <b>Кнопки-ссылки</b>\n\nОтправьте кнопки, каждую с новой строки, в виде:\n"
+                                        "<code>Текст кнопки | https://ссылка</code>\n\nНапример:\n"
+                                        "<code>📖 Читать статью | https://example.com</code>", kb([btn("⬅️ Назад", "a:bcd:back")]))
+        elif what == "msg":
+            return await ask_bc_text(update, ctx)
+        elif what == "test":
+            try:
+                await ctx.bot.copy_message(admin, bc["src"][0], bc["src"][1], reply_markup=bc_markup(o, "ru"),
+                                           disable_notification=bool(o.get("silent")))
+            except Exception as e:  # noqa: BLE001
+                await update.effective_chat.send_message(f"⚠️ Не получилось: {esc(e)}", parse_mode=ParseMode.HTML)
+            text, markup = await screen_bc_builder(ctx)
+            return await update.effective_chat.send_message("👆 Так увидят люди.\n\n" + text, parse_mode=ParseMode.HTML,
+                                                            reply_markup=markup)
+        elif what == "when":
+            ctx.user_data["admin_state"] = "bc_when"
+            me = await get_user(admin)
+            tz = (me or {}).get("tz") or "Asia/Tashkent"
+            return await render(update, f"🕓 <b>Когда отправить?</b>\n\nВремя по {esc(tz)}. Отправьте:\n"
+                                        "<code>18:30</code> — сегодня (или завтра, если время прошло)\n"
+                                        "<code>20.11 09:00</code> — в конкретный день", kb([btn("⬅️ Назад", "a:bcd:back")]))
+        elif what == "go":
+            if app.bot_data.get("bc_running"):
+                return await update.callback_query.answer("⏳ Сейчас идёт другая рассылка. Подождите или остановите её.",
+                                                          show_alert=True)
+            bc_id = await bc_save(admin, bc, "queued")
+            ctx.user_data.pop("bc", None)
+            await render(update, f"🚀 Рассылка #{bc_id} запущена. Прогресс и кнопка «Остановить» — в следующем сообщении.",
+                         kb(ADMIN_BACK))
+            return bc_start(app, bc_id)
+        text, markup = await screen_bc_builder(ctx)
+        return await render(update, text, markup)
+
+    if sub == "bcx" and len(parts) > 3 and parts[3].isdigit():
+        bc_id = int(parts[3])
+        if what == "stop":
+            app.bot_data["bc_stop"] = bc_id
+            return await update.callback_query.answer("⏹ Останавливаю…")
+        if what == "cancel":
+            await POOL.execute("UPDATE broadcasts SET status = 'cancelled' WHERE id = $1 AND status = 'scheduled'", bc_id)
+            return await admin_bc(update, ctx, ["a", "bc", "sched"])
+        if what == "show":
+            r = await POOL.fetchrow("SELECT * FROM broadcasts WHERE id = $1", bc_id)
+            if r:
+                try:
+                    await ctx.bot.copy_message(admin, r["src_chat"], r["src_msg"], reply_markup=bc_markup(json.loads(r["opts"]), "ru"))
+                except Exception as e:  # noqa: BLE001
+                    await update.effective_chat.send_message(f"⚠️ {esc(e)}", parse_mode=ParseMode.HTML)
+            return
+        if what == "del":
+            n = await POOL.fetchval("SELECT count(*) FROM sent_msgs WHERE bc_id = $1 AND NOT deleted AND at > now() - interval '48 hours'",
+                                    bc_id)
+            return await render(update, f"🗑 Удалить рассылку #{bc_id} у всех получателей ({n})?\n\n"
+                                        "Telegram позволяет удалять сообщения не старше 48 часов.",
+                                kb([btn("🗑 Да, удалить", f"a:bcx:delok:{bc_id}"), btn("⬅️ Нет", "a:bc:hist")]))
+        if what == "delok":
+            task = asyncio.create_task(run_bc_delete(app, bc_id, admin))
+            app.bot_data.setdefault("tasks", set()).add(task)
+            return await render(update, f"🗑 Удаляю рассылку #{bc_id}…", kb(ADMIN_BACK))
+    text, markup = await screen_bc_menu(admin)
+    return await render(update, text, markup)
+
+
+async def admin_bc_text(update, ctx, state):
+    """Typed answers for the broadcast. Returns True if consumed."""
+    msg = update.message
+    raw = (msg.text or "").strip()
+    admin = update.effective_user.id
+    back = kb([btn("📣 Рассылка", "a:bc")])
+    if state == "bc_city":
+        ctx.user_data.pop("admin_state", None)
+        ctx.user_data["bc"] = {"kind": "city", "value": raw[:60]}
+        await ask_bc_text(update, ctx)
+        return True
+    if state == "bc_pick":
+        ids, missing = [], []
+        for tok in re.split(r"[\s,;]+", raw):
+            if not tok:
+                continue
+            who = await find_user_id(tok)
+            if who and await get_user(who):
+                ids.append(who)
+            else:
+                missing.append(tok)
+        ids = list(dict.fromkeys(ids))
+        if not ids:
+            await msg.reply_text("🤷 Никого не нашёл. Проверьте ID или @username.", reply_markup=back)
+            return True
+        ctx.user_data.pop("admin_state", None)
+        ctx.user_data["bc"] = {"kind": "picked", "value": ids}
+        if missing:
+            await msg.reply_text("⚠️ Не найдены: " + ", ".join(missing[:20]))
+        await ask_bc_text(update, ctx)
+        return True
+    if state == "bc_btn":
+        bc = ctx.user_data.get("bc")
+        if not bc:
+            return False
+        good = []
+        for line in raw.splitlines():
+            if "|" in line:
+                a, b = (x.strip() for x in line.split("|", 1))
+                if a and re.match(r"^(https?://|tg://)\S+$", b):
+                    good.append([a[:60], b[:500]])
+        if not good:
+            await msg.reply_text("❗ Не понял. Пример: <code>Открыть | https://example.com</code>", parse_mode=ParseMode.HTML)
+            return True
+        ctx.user_data.pop("admin_state", None)
+        bc.setdefault("opts", {}).setdefault("buttons", []).extend(good[:6])
+        text, markup = await screen_bc_builder(ctx)
+        await msg.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
+        return True
+    if state == "bc_when":
+        bc = ctx.user_data.get("bc")
+        if not bc:
+            return False
+        me = await get_user(admin)
+        tz = (me or {}).get("tz") or "Asia/Tashkent"
+        when = bc_parse_when(raw, tz)
+        if not when:
+            await msg.reply_text("❗ Не понял время. Пример: <code>18:30</code> или <code>20.11 09:00</code>", parse_mode=ParseMode.HTML)
+            return True
+        ctx.user_data.pop("admin_state", None)
+        bc_id = await bc_save(admin, bc, "scheduled", when)
+        ctx.user_data.pop("bc", None)
+        await msg.reply_text(f"🕓 Рассылка #{bc_id} запланирована на <b>{when:%d.%m.%Y %H:%M}</b> ({esc(tz)}).\n"
+                             "Отменить можно в «📣 Рассылка → 🕓 Запланированные».", parse_mode=ParseMode.HTML,
+                             reply_markup=kb([btn("🕓 Запланированные", "a:bc:sched")], ADMIN_BACK))
+        return True
+    return False
+
+
+# ── deleting a bot message for a person, deleting a person ──
+
+async def screen_user_msgs(uid, back):
+    rows = await POOL.fetch("SELECT * FROM sent_msgs WHERE user_id = $1 AND NOT deleted AND at > now() - interval '7 days' "
+                            "ORDER BY id DESC LIMIT 10", uid)
+    lines = [f"🗑 <b>Сообщения бота для</b> {esc(await admin_name(uid))}", "",
+             "Последние рассылки и сообщения от админов. Удалить можно сообщения не старше 48 часов.", ""]
+    kbrows, cur = [], []
+    fresh = datetime.now(ZoneInfo("UTC")) - timedelta(hours=48)
+    for k, r in enumerate(rows, 1):
+        ok = r["at"] > fresh
+        lines.append(f"{k}. {fdt(r['at'])} UTC · {esc(r['preview'] or r['kind'])}" + ("" if ok else " · ⌛ старше 48 ч"))
+        if ok:
+            cur.append(btn(f"🗑 {k}", f"a:umdel:{uid}:{r['id']}:{back or ''}"))
+            if len(cur) == 5:
+                kbrows.append(cur)
+                cur = []
+    if cur:
+        kbrows.append(cur)
+    if not rows:
+        lines.append("Пока нет сообщений.")
+    elif any(r["at"] > fresh for r in rows):
+        kbrows.append([btn("🗑 Удалить все (до 48 ч)", f"a:umdelall:{uid}:{back or ''}")])
+    kbrows.append([btn("⬅️ К карточке", f"a:card:{uid}:{back or ''}")])
+    return "\n".join(lines), kb(*kbrows)
+
+
+async def wipe_user(bot, uid, ban):
+    """Deletes everything the bot keeps about a person (sales stay in the sales log). With ban: keeps a banned stub."""
+    tables = await POOL.fetch("SELECT table_name FROM information_schema.columns WHERE column_name = 'user_id' "
+                              "AND table_schema = current_schema() AND table_name NOT IN ('users', 'payments', 'admins', 'sent_msgs')")
+    for r in tables:
+        try:
+            await POOL.execute(f'DELETE FROM "{r["table_name"]}" WHERE user_id = $1', uid)
+        except Exception:  # noqa: BLE001
+            log.exception("wipe %s failed", r["table_name"])
+    await POOL.execute("DELETE FROM sent_msgs WHERE user_id = $1", uid)
+    u = await get_user(uid)
+    if u and u["chat_type"] != "private":
+        try:
+            await bot.leave_chat(uid)
+        except Exception:  # noqa: BLE001
+            pass
+    if ban:
+        await POOL.execute("UPDATE users SET banned = TRUE, remind = FALSE, city = NULL, lat = NULL, lon = NULL, tz = NULL, "
+                           "country = NULL, onboarded = FALSE WHERE user_id = $1", uid)
+    else:
+        await POOL.execute("DELETE FROM users WHERE user_id = $1", uid)
+
+
+async def admin_people_tools(update, ctx, parts):
+    """a:bpick / a:umsg / a:umdel / a:umdelall / a:umdelp / a:udel / a:udelok."""
+    admin = update.effective_user.id
+    sub = parts[1]
+    uid = int(parts[2]) if len(parts) > 2 and parts[2].lstrip("-").isdigit() else 0
+    if not uid:
+        return
+    if sub == "bpick":
+        picks = await bc_picks(admin)
+        picks = [x for x in picks if x != uid] if uid in picks else picks + [uid]
+        await kv_set(f"bcpick:{admin}", json.dumps(picks))
+        await update.callback_query.answer(("📌 Добавлен в рассылку" if uid in picks else "Убран из рассылки") + f" ({len(picks)})")
+        card = await user_card(uid, parts[3] if len(parts) > 3 and parts[3] else None, viewer=admin)
+        if card:
+            return await render(update, card[0], card[1])
+        return
+    if sub == "umsg":
+        text, markup = await screen_user_msgs(uid, parts[3] if len(parts) > 3 else "")
+        return await render(update, text, markup)
+    if sub in ("umdel", "umdelall", "umdelp"):
+        if sub == "umdel" and len(parts) > 3 and parts[3].isdigit():
+            rows = await POOL.fetch("SELECT id, user_id, message_id FROM sent_msgs WHERE id = $1 AND user_id = $2", int(parts[3]), uid)
+            bk = parts[4] if len(parts) > 4 else ""
+        elif sub == "umdelp":  # right after an admin's message: both the header and the message
+            ids = [int(x) for x in parts[3:] if x.isdigit()]
+            rows = await POOL.fetch("SELECT id, user_id, message_id FROM sent_msgs WHERE id = ANY($1::int[]) AND user_id = $2", ids, uid)
+            bk = None
+        elif sub == "umdelall":
+            rows = await POOL.fetch("SELECT id, user_id, message_id FROM sent_msgs WHERE user_id = $1 AND NOT deleted "
+                                    "AND at > now() - interval '48 hours'", uid)
+            bk = parts[3] if len(parts) > 3 else ""
+        else:
+            text, markup = await screen_user_msgs(uid, "")
+            return await render(update, text, markup)
+        ok, gone = await delete_sent(ctx.bot, rows)
+        await update.callback_query.answer(f"🗑 Удалено: {ok}" + (f", не удалось: {gone}" if gone else ""), show_alert=bool(gone))
+        if bk is None:
+            try:
+                await update.callback_query.edit_message_reply_markup(None)
+            except Exception:  # noqa: BLE001
+                pass
+            return
+        text, markup = await screen_user_msgs(uid, bk)
+        return await render(update, text, markup)
+    if sub == "udel":
+        if is_admin(uid):
+            return await update.callback_query.answer("Админа удалить нельзя — сначала снимите права.", show_alert=True)
+        bk = parts[3] if len(parts) > 3 else ""
+        return await render(update, f"❌ <b>Удалить {esc(await admin_name(uid))}?</b>\n\n"
+                                    "Сотрутся все данные: настройки, город, трекер, история ИИ, купленные вопросы. "
+                                    "Журнал продаж останется.\n\n"
+                                    "• <b>Удалить</b> — если он снова нажмёт /start, начнёт с нуля.\n"
+                                    "• <b>Удалить и забанить</b> — бот больше не будет ему отвечать.",
+                            kb([btn("🗑 Удалить", f"a:udelok:{uid}:d")], [btn("🗑🚫 Удалить и забанить", f"a:udelok:{uid}:b")],
+                               [btn("⬅️ Отмена", f"a:card:{uid}:{bk}")]))
+    if sub == "udelok" and len(parts) > 3 and not is_admin(uid):
+        name = await admin_name(uid)
+        await wipe_user(ctx.bot, uid, parts[3] == "b")
+        return await render(update, f"✅ {esc(name)} удалён" + (" и забанен." if parts[3] == "b" else "."), kb(ADMIN_BACK))
+
+
 # ── router ──
 
 ADMIN_PERM_OF = {"stats": "stats", "geo": "stats", "health": "health", "test": "health", "bans": "bans", "ban": "bans",
                  "unban": "bans", "azan": "azan", "card": "users", "users": "users", "usearch": "users", "chats": "users",
                  "user": "users", "export": "export", "bc": "bc", "bcl": "bc", "adm": "main", "ai": "ai",
-                 "grant": "ai", "hide": "main", "hidden": "main", "ayrm": "main"}
+                 "grant": "ai", "hide": "main", "hidden": "main", "ayrm": "main", "bcd": "bc", "bcx": "bc", "bpick": "bc",
+                 "umsg": "users", "umdel": "users", "umdelall": "users", "umdelp": "users", "udel": "bans", "udelok": "bans"}
 
 
 async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
@@ -3447,41 +4075,10 @@ async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
                                                   caption=f"📤 Пользователей: {len(rows)}")
         return
 
-    if sub == "bc":
-        what = parts[2] if len(parts) > 2 else "menu"
-        if what == "menu":
-            return await render(update, "📣 <b>Рассылка</b>\n\nКому отправить?", kb(
-                [btn("👥 Всем пользователям", "a:bc:all")],
-                [btn("👥📢 Пользователям + группам и каналам", "a:bc:everything")],
-                [btn("🌐 По языку", "a:bc:lang")],
-                [btn("🌍 По стране", "a:bc:country")],
-                ADMIN_BACK))
-        if what in ("all", "everything"):
-            ctx.user_data["bc"] = {"kind": what, "value": None, "text": None}
-            return await ask_bc_text(update, ctx)
-        if what == "lang":
-            rows = [[btn(LANG_BUTTONS["en"], "a:bcl:en"), btn(LANG_BUTTONS["ru"], "a:bcl:ru")],
-                    [btn(LANG_BUTTONS["uz"], "a:bcl:uz"), btn(LANG_BUTTONS["uzc"], "a:bcl:uzc")],
-                    [btn(LANG_BUTTONS["tg"], "a:bcl:tg"), btn(LANG_BUTTONS["ar"], "a:bcl:ar")], [btn("⬅️ Назад", "a:bc")]]
-            return await render(update, "🌐 <b>Выберите язык получателей</b>", kb(*rows))
-        if what == "country":
-            ctx.user_data["admin_state"] = "bc_country"
-            return await render(update, "🌍 <b>Страна получателей</b>\n\nОтправьте двухбуквенный код страны, "
-                                        "например: <code>uz</code>, <code>ru</code>, <code>tj</code>, <code>sa</code>.",
-                                kb([btn("⬅️ Назад", "a:bc")]))
-        if what == "go":
-            bc = ctx.user_data.get("bc")
-            if not bc or not bc.get("text"):
-                return await render(update, "⚠️ Текст рассылки не найден. Начните заново.", kb(ADMIN_BACK))
-            if ctx.application.bot_data.get("bc_running"):
-                return await render(update, "⏳ Другая рассылка ещё идёт. Дождитесь её завершения.", kb(ADMIN_BACK))
-            ctx.user_data.pop("bc", None)
-            await render(update, "🚀 Рассылка запущена. Отчёт придёт, когда она завершится.", kb(ADMIN_BACK))
-            task = asyncio.create_task(run_broadcast(ctx.application, update.effective_chat.id, bc["text"], bc))
-            tasks = ctx.application.bot_data.setdefault("tasks", set())
-            tasks.add(task)
-            task.add_done_callback(tasks.discard)
-            return
+    if sub in ("bc", "bcd", "bcx"):
+        return await admin_bc(update, ctx, parts)
+    if sub in ("bpick", "umsg", "umdel", "umdelall", "umdelp", "udel", "udelok"):
+        return await admin_people_tools(update, ctx, parts)
 
     if sub == "bcl" and len(parts) > 2 and parts[2] in LANGS:
         ctx.user_data["bc"] = {"kind": "lang", "value": parts[2], "text": None}
@@ -3509,6 +4106,9 @@ async def admin_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         text, markup = await screen_people(0, "search", raw, viewer=update.effective_user.id)
         await msg.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
         return True
+
+    if state in ("bc_city", "bc_pick", "bc_btn", "bc_when"):
+        return await admin_bc_text(update, ctx, state)
 
     if state == "bc_country":
         code = msg.text.strip().lower()
@@ -7289,6 +7889,7 @@ async def post_init(app: Application):
     await load_admins()
     await load_ai()
     await load_ayah_pool()
+    await POOL.execute("UPDATE broadcasts SET status = 'failed', finished_at = now() WHERE status IN ('running', 'queued')")
     if AI["key"]:  # check the key and pick the models in the background
         asyncio.get_running_loop().create_task(ai_models())
     global BOT_USERNAME
@@ -7340,6 +7941,7 @@ def main():
     app.job_queue.run_repeating(menu_buttons_job, interval=120, first=120)
     app.job_queue.run_once(prefetch_ayahs, 60)
     app.job_queue.run_once(check_backup_ai, 30)
+    app.job_queue.run_repeating(bc_scheduler, interval=30, first=45)
     app.add_handler(InlineQueryHandler(on_inline), group=1)
     app.add_handler(PreCheckoutQueryHandler(on_precheckout), group=1)
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, on_paid), group=1)
