@@ -4433,7 +4433,7 @@ async def share_card_button(update, ctx):
     lang = (u or {}).get("lang") or "en"
     cl = lang if lang in SHARE_CARD_LANGS else "en"
     fid = await kv_get("share_card_" + cl)
-    markup = kb([InlineKeyboardButton(t(lang, "fr_send"), switch_inline_query=f"card {cl}")])
+    markup = None  # no buttons: people forward it with Telegram's own forward arrow (several chats at once)
     chat = update.effective_chat
     try:
         await chat.send_action("upload_video")
