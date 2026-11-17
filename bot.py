@@ -42,6 +42,7 @@ from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     InlineQueryResultArticle,
+    InlineQueryResultCachedMpeg4Gif,
     InlineQueryResultCachedPhoto,
     InlineQueryResultPhoto,
     InlineQueryResultsButton,
@@ -1065,6 +1066,16 @@ EXTRA10 = {
 for _l, _d in EXTRA10.items():
     T[_l].update(_d)
 
+EXTRA12 = {
+    "en": {"fr_btn": "🤝 Share with friends", "fr_send": "📤 Send to a friend"},
+    "ru": {"fr_btn": "🤝 Поделиться с друзьями", "fr_send": "📤 Отправить другу"},
+    "uz": {"fr_btn": "🤝 Do‘stlarga ulashish", "fr_send": "📤 Do‘stga yuborish"},
+    "tg": {"fr_btn": "🤝 Ба дӯстон фиристодан", "fr_send": "📤 Ба дӯст фиристодан"},
+    "ar": {"fr_btn": "🤝 شارك مع الأصدقاء", "fr_send": "📤 أرسل إلى صديق"},
+}
+for _l, _d in EXTRA12.items():
+    T[_l].update(_d)
+
 EXTRA11 = {
     "en": {"ayah_btn": "📖 Ayah of the day", "ayah_title": "Ayah of the day", "ayah_hdr": "AYAH OF THE DAY", "quran": "Qur'an",
            "pic_btn": "🖼 Share as a picture", "pic_bg": "🎨 Background {i}/{n}", "pic_done": "✅ Done",
@@ -1801,6 +1812,7 @@ def screen_menu(u):
             rows.append([InlineKeyboardButton(t(lang, "ai_btn"), callback_data="ai:start", style="primary")])
         if BOT_USERNAME:
             rows.append([add_group_btn(lang)])
+            rows.append([btn(t(lang, "fr_btn"), "fr:share")])
         if is_admin(u["user_id"]):
             rows.append([btn("🛠 Админка", "a:home")])
     return t(lang, "menu_title", city=esc(u["city"])), kb(*rows)
@@ -2237,6 +2249,8 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return await don_button(update, ctx, parts)
     if act == "buy" and chat.type == "private":
         return await buy_button(update, ctx, parts)
+    if act == "fr" and chat.type == "private":
+        return await share_card_button(update, ctx)
     if act in ("pic", "ay") and chat.type == "private":
         return await pic_button(update, ctx, parts)
     if chat.type == "private":
@@ -4401,6 +4415,39 @@ async def page_pic(request):
     return web.Response(body=jpg, content_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
 
 
+# ───────────────────────── "Share with friends": an animated card (assets/share/mawaqit_card_<lang>.mp4) ─────────────────────────
+
+SHARE_CARD_DIR = Path(__file__).with_name("assets") / "share"
+SHARE_CARD_LANGS = ("en", "ru", "uz", "uzc", "tg", "ar")
+
+
+async def share_card_button(update, ctx):
+    q = update.callback_query
+    await q.answer()
+    u = await get_user(q.from_user.id)
+    lang = (u or {}).get("lang") or "en"
+    cl = lang if lang in SHARE_CARD_LANGS else "en"
+    fid = await kv_get("share_card_" + cl)
+    markup = kb([InlineKeyboardButton(t(lang, "fr_send"), switch_inline_query=f"card {cl}")])
+    chat = update.effective_chat
+    try:
+        await chat.send_action("upload_video")
+    except Exception:  # noqa: BLE001
+        pass
+    if fid:
+        try:
+            return await chat.send_animation(fid, caption=f"@{BOT_USERNAME}", reply_markup=markup)
+        except BadRequest:
+            log.warning("share card file id expired for %s", cl)
+    path = SHARE_CARD_DIR / f"mawaqit_card_{cl}.mp4"
+    with open(path, "rb") as f:
+        msg = await chat.send_animation(f, caption=f"@{BOT_USERNAME}", reply_markup=markup, width=1020, height=1770, duration=7,
+                                        filename=f"mawaqit_{cl}.mp4")
+    if msg.animation:
+        await kv_set("share_card_" + cl, msg.animation.file_id)
+    await bump("share_card")
+
+
 async def page_share(request):
     try:
         uid = int(request.match_info["uid"])
@@ -4943,6 +4990,15 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     lang = (u or {}).get("lang") or str(iq.from_user.language_code or "en")[:2]
     lang = lang if lang in LANGS else "en"
     q = iq.query.strip()[:80]
+    if q in ("card", "card " + lang) or q.startswith("card "):  # "Send to a friend" under the animated card
+        cl = q.split()[1] if len(q.split()) > 1 and q.split()[1] in SHARE_CARD_LANGS else lang
+        fid = await kv_get("share_card_" + cl)
+        res = [InlineQueryResultCachedMpeg4Gif(id="card_" + cl, mpeg4_file_id=fid, caption=f"@{BOT_USERNAME}")] if fid else []
+        try:
+            await iq.answer(res, cache_time=600, is_personal=False)
+        except BadRequest as e:
+            log.info("inline answer skipped: %s", e)
+        return
     m = re.match(r"^pic ([0-9a-f]{12})$", q)
     if m:  # the "Share" button under a finished picture
         fid = await POOL.fetchval("SELECT file_id FROM share_pics WHERE id = $1", m.group(1))
