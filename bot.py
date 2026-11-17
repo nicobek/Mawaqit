@@ -1067,15 +1067,20 @@ for _l, _d in EXTRA10.items():
     T[_l].update(_d)
 
 EXTRA12 = {
-    "en": {"fr_btn": "🤝 Share with friends", "fr_send": "📤 Send to a friend",
+    "en": {"fr_btn": "🤝 Share with friends", "fr_send": "📤 Send to a friend", "fr_how": "↪️ How to forward",
+           "fr_tip": "Tap the ↪️ arrow next to the card (or hold the card → Forward). You can pick several chats at once 🤍",
            "fr_cap": "\"Whoever guides someone to goodness will have a reward like the one who does it\" (Muslim) 🤍\nNever miss a prayer with {bot}"},
-    "ru": {"fr_btn": "🤝 Поделиться с друзьями", "fr_send": "📤 Отправить другу",
+    "ru": {"fr_btn": "🤝 Поделиться с друзьями", "fr_send": "📤 Отправить другу", "fr_how": "↪️ Как переслать",
+           "fr_tip": "Нажмите стрелку ↪️ справа от карточки (или зажмите карточку → «Переслать»). Можно выбрать сразу несколько чатов 🤍",
            "fr_cap": "«Кто укажет на благое, тому награда, как и совершившему его» (Муслим) 🤍\nНе пропускай намаз вместе с {bot}"},
-    "uz": {"fr_btn": "🤝 Do‘stlarga ulashish", "fr_send": "📤 Do‘stga yuborish",
+    "uz": {"fr_btn": "🤝 Do‘stlarga ulashish", "fr_send": "📤 Do‘stga yuborish", "fr_how": "↪️ Qanday uzatiladi",
+           "fr_tip": "Kartochka yonidagi ↪️ strelkani bosing (yoki kartochkani bosib turing → «Uzatish»). Bir nechta chatni birdan tanlash mumkin 🤍",
            "fr_cap": "«Kim yaxshilikka yo‘l ko‘rsatsa, unga uni qilgan kishining savobicha savob bor» (Muslim) 🤍\n{bot} bilan namozni qoldirmang"},
-    "tg": {"fr_btn": "🤝 Ба дӯстон фиристодан", "fr_send": "📤 Ба дӯст фиристодан",
+    "tg": {"fr_btn": "🤝 Ба дӯстон фиристодан", "fr_send": "📤 Ба дӯст фиристодан", "fr_how": "↪️ Чӣ тавр фиристодан",
+           "fr_tip": "Тирчаи ↪️-ро дар паҳлӯи корт пахш кунед (ё кортро пахш карда нигоҳ доред → «Фиристодан»). Якбора якчанд чатро интихоб кардан мумкин 🤍",
            "fr_cap": "«Ҳар кӣ ба некӣ роҳнамоӣ кунад, барояш мисли подоши иҷрокунандаи он аст» (Муслим) 🤍\nБо {bot} намозро аз даст надиҳед"},
-    "ar": {"fr_btn": "🤝 شارك مع الأصدقاء", "fr_send": "📤 أرسل إلى صديق",
+    "ar": {"fr_btn": "🤝 شارك مع الأصدقاء", "fr_send": "📤 أرسل إلى صديق", "fr_how": "↪️ كيف أعيد التوجيه",
+           "fr_tip": "اضغط على السهم ↪️ بجانب البطاقة (أو اضغط مطولاً على البطاقة ← «إعادة توجيه»). يمكنك اختيار عدة محادثات معاً 🤍",
            "fr_cap": "«مَن دَلَّ على خيرٍ فله مثلُ أجرِ فاعلِه» (رواه مسلم) 🤍\nلا تفوّت صلاتك مع {bot}"},
 }
 for _l, _d in EXTRA12.items():
@@ -2255,6 +2260,9 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if act == "buy" and chat.type == "private":
         return await buy_button(update, ctx, parts)
     if act == "fr" and chat.type == "private":
+        if len(parts) > 1 and parts[1] == "how":
+            fu = await get_user(uid)
+            return await q.answer(t((fu or {}).get("lang") or "en", "fr_tip"), show_alert=True)
         return await share_card_button(update, ctx)
     if act in ("pic", "ay") and chat.type == "private":
         return await pic_button(update, ctx, parts)
@@ -4433,7 +4441,7 @@ async def share_card_button(update, ctx):
     lang = (u or {}).get("lang") or "en"
     cl = lang if lang in SHARE_CARD_LANGS else "en"
     fid = await kv_get("share_card_" + cl)
-    markup = None  # no buttons: people forward it with Telegram's own forward arrow (several chats at once)
+    markup = kb([btn(t(lang, "fr_how"), "fr:how")])  # Telegram doesn't let bots open the forward window: show how
     chat = update.effective_chat
     try:
         await chat.send_action("upload_video")
