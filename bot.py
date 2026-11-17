@@ -44,6 +44,8 @@ from telegram import (
     InlineQueryResultArticle,
     InlineQueryResultCachedMpeg4Gif,
     InlineQueryResultCachedPhoto,
+    InlineQueryResultCachedVideo,
+    InlineQueryResultMpeg4Gif,
     InlineQueryResultPhoto,
     InlineQueryResultsButton,
     InputMediaPhoto,
@@ -2613,6 +2615,19 @@ async def support_msg(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             and not (update.message.text or "").startswith("/"):
         await bc_got_message(update, ctx)
         raise ApplicationHandlerStop
+    if is_main(uid) and ctx.user_data.get("admin_state") == "inv_up":
+        m = update.message
+        got = ("photo", m.photo[-1].file_id) if m.photo else ("video", m.video.file_id) if m.video else \
+            ("animation", m.animation.file_id) if m.animation else None
+        if got:
+            ctx.user_data.pop("admin_state", None)
+            invite_cfg()["custom"]["all"] = {"type": got[0], "file_id": got[1]}
+            await save_bot_cfg()
+            await m.reply_text("✅ Своя карточка сохранена. Теперь по кнопке «Поделиться» уходит она.",
+                               reply_markup=kb([btn("🤝 Карточка приглашения", "a:bset:inv")]))
+        else:
+            await m.reply_text("❗ Нужно фото, видео или GIF.")
+        raise ApplicationHandlerStop
     if is_admin(uid) and ctx.user_data.get("reply_to"):
         await admin_reply(update, ctx)
         raise ApplicationHandlerStop
@@ -4512,7 +4527,10 @@ async def start_web(application=None):
                     web.get("/pic/{kind}/{uid}/{key}/{bg}/{fs}/{sig}.jpg", page_pic),
                     web.post("/api/invoice", api_invoice), web.post("/api/donate/sent", api_donate_sent),
                     web.get("/api/admin/ai", api_admin_ai), web.post("/api/admin/ai", api_admin_ai),
-                    web.post("/api/admin/hide", api_admin_hide)])
+                    web.post("/api/admin/hide", api_admin_hide),
+                    web.get("/card/{name}", page_card), web.get("/api/invite", api_invite),
+                    web.post("/api/invite_prepare", api_invite_prepare), web.post("/api/invite_send", api_invite_send),
+                    web.get("/api/admin/botcfg", api_admin_botcfg), web.post("/api/admin/botcfg", api_admin_botcfg)])
     WEB_RUNNER = web.AppRunner(app, access_log=None)
     await WEB_RUNNER.setup()
     port = int(os.getenv("PORT", "8080"))
@@ -5069,27 +5087,11 @@ async def share_card_button(update, ctx):
     q = update.callback_query
     await q.answer()
     u = await get_user(q.from_user.id)
-    lang = (u or {}).get("lang") or "en"
-    cl = lang if lang in SHARE_CARD_LANGS else "en"
-    fid = await kv_get("share_card_" + cl)
-    markup = kb([btn(t(lang, "fr_how"), "fr:how")])  # Telegram doesn't let bots open the forward window: show how
-    chat = update.effective_chat
     try:
-        await chat.send_action("upload_video")
+        await update.effective_chat.send_action("upload_photo" if invite_cfg()["mode"] == "photo" else "upload_video")
     except Exception:  # noqa: BLE001
         pass
-    if fid:
-        try:
-            return await chat.send_animation(fid, caption=t(cl, "fr_cap", bot=f"@{BOT_USERNAME}"), reply_markup=markup)
-        except BadRequest:
-            log.warning("share card file id expired for %s", cl)
-    path = SHARE_CARD_DIR / f"mawaqit_card_{cl}.mp4"
-    with open(path, "rb") as f:
-        msg = await chat.send_animation(f, caption=t(cl, "fr_cap", bot=f"@{BOT_USERNAME}"), reply_markup=markup, width=1020, height=1770, duration=7,
-                                        filename=f"mawaqit_{cl}.mp4")
-    if msg.animation:
-        await kv_set("share_card_" + cl, msg.animation.file_id)
-    await bump("share_card")
+    await send_share_card(ctx.bot, u)
 
 
 async def page_share(request):
@@ -7906,7 +7908,9 @@ def menu_button(u, key):
     if key == "groups":
         return add_group_btn(lang) if BOT_USERNAME and feat("groups") else None
     if key == "share":
-        return btn(t(lang, "fr_btn"), "fr:share") if feat("share") else None
+        if not feat("share"):
+            return None
+        return webapp_btn(t(lang, "fr_btn"), "more&sub=invite") if WEBAPP_URL else btn(t(lang, "fr_btn"), "fr:share")
     return None
 
 
@@ -8151,6 +8155,7 @@ def screen_bset_home():
         [btn("🧩 Функции", "a:bset:feat"), btn("🧭 Меню", "a:bset:menu")],
         [btn("✍️ Тексты", "a:bset:texts"), btn("📢 Подписка на канал", "a:bset:sub")],
         [btn("👥 По умолчанию для новичков", "a:bset:def")],
+        [btn("🤝 Карточка приглашения", "a:bset:inv")],
         [btn("🖥 Система", "a:bset:sys")],
         ADMIN_BACK)
 
@@ -8322,6 +8327,27 @@ async def admin_bset(update, ctx, parts):
             rows.append([btn("📣 Звук намазов — применить ко всем", "a:bset:def:all:pm")])
         rows.append([btn("⬅️ Назад", "a:bset")])
         return await render(update, "\n".join(lines), kb(*rows))
+    elif what == "inv":
+        inv = invite_cfg()
+        if arg in ("video", "photo"):
+            inv["mode"] = arg
+            await save_bot_cfg()
+        elif arg == "clr":
+            inv["custom"] = {}
+            await save_bot_cfg()
+        elif arg == "up":
+            ctx.user_data["admin_state"] = "inv_up"
+            return await render(update, "📤 Отправьте своё фото, видео или GIF — оно заменит наши карточки для всех языков.\n\n"
+                                        "Подпись с хадисом и @MawaqitTimeBot добавится сама.", kb([btn("⬅️ Назад", "a:bset:inv")]))
+        custom = inv["custom"].get("all")
+        return await render(update, "🤝 <b>Карточка приглашения</b>\n\n"
+                                    f"По умолчанию: <b>{'🎬 видео' if inv['mode'] == 'video' else '🖼 фото'}</b>\n"
+                                    f"Своя карточка: {('✅ загружено ' + custom['type']) if custom else 'нет — наши карточки на языке человека'}\n\n"
+                                    "В мини-приложении человек может сам переключить видео/фото.",
+                            kb([btn(("✅ " if inv["mode"] == "video" else "") + "🎬 Видео", "a:bset:inv:video"),
+                                btn(("✅ " if inv["mode"] == "photo" else "") + "🖼 Фото", "a:bset:inv:photo")],
+                               [btn("📤 Загрузить свою", "a:bset:inv:up")] + ([btn("🗑 Убрать свою", "a:bset:inv:clr")] if custom else []),
+                               [btn("⬅️ Назад", "a:bset")]))
     elif what == "sys":
         if arg == "restart":
             return await render(update, "♻️ Перезапустить бота? Он будет недоступен около минуты.",
@@ -8347,6 +8373,12 @@ async def admin_bset(update, ctx, parts):
 
 
 async def send_backup(update):
+    data, n = await build_backup()
+    await update.effective_chat.send_document(document=data, filename=f"mawaqit_backup_{datetime.utcnow():%Y%m%d_%H%M}.zip",
+                                              caption=f"💾 Резервная копия: {n} таблиц")
+
+
+async def build_backup():
     """All tables as CSV files in one zip."""
     import zipfile
     buf = io.BytesIO()
@@ -8360,8 +8392,7 @@ async def send_backup(update):
                 await conn.copy_from_query(f'SELECT * FROM "{tname}"', output=out, format="csv", header=True)
                 z.writestr(f"{tname}.csv", out.getvalue())
     buf.seek(0)
-    await update.effective_chat.send_document(document=buf, filename=f"mawaqit_backup_{datetime.utcnow():%Y%m%d_%H%M}.zip",
-                                              caption=f"💾 Резервная копия: {len(tables)} таблиц")
+    return buf, len(tables)
 
 
 async def admin_bset_text(update, ctx, state):
@@ -8486,6 +8517,240 @@ async def admin_user_city(update, ctx, state):
     text, markup = await screen_user_settings(uid, back)
     await msg.reply_text(f"✅ Город: {esc(name)}\n\n" + text, parse_mode=ParseMode.HTML, reply_markup=markup)
     return True
+
+
+# ── invite card: video or photo (the main admin picks the default, may upload their own) ──
+
+def invite_cfg():
+    inv = BOT_CFG.setdefault("invite", {})
+    inv.setdefault("mode", "video")
+    inv.setdefault("custom", {})  # "all" or a language -> {"type": "photo"|"video"|"animation", "file_id": ...}
+    return inv
+
+
+def invite_custom(lang):
+    c = invite_cfg()["custom"]
+    return c.get(lang) or c.get("all")
+
+
+def card_lang(lang):
+    return lang if lang in SHARE_CARD_LANGS else "en"
+
+
+def card_url(lang, kind):
+    return f"{WEBAPP_URL}/card/{card_lang(lang)}.{'mp4' if kind == 'video' else 'jpg'}"
+
+
+async def page_card(request):
+    name = request.match_info["name"]
+    m = re.match(r"^(en|ru|uz|uzc|tg|ar)\.(mp4|jpg)$", name)
+    if not m:
+        raise web.HTTPNotFound()
+    path = SHARE_CARD_DIR / f"mawaqit_card_{name}"
+    if not path.exists():
+        raise web.HTTPNotFound()
+    return web.FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
+
+
+async def api_invite(request):
+    tg_user, u, lang = await api_auth(request)
+    lang = (u or {}).get("lang") or lang
+    inv = invite_cfg()
+    custom = invite_custom(lang)
+    return web.json_response({"ok": feat("share"), "mode": inv["mode"], "custom": bool(custom),
+                              "custom_type": custom["type"] if custom else None,
+                              "video": card_url(lang, "video"), "photo": card_url(lang, "photo"),
+                              "caption": t(card_lang(lang), "fr_cap", bot=f"@{BOT_USERNAME}")})
+
+
+async def api_invite_prepare(request):
+    """A ready message for Telegram's share window: the card (video or photo) with the hadith caption."""
+    tg_user, u, lang = await api_auth(request)
+    if not feat("share"):
+        raise web.HTTPForbidden(text="off")
+    lang = card_lang((u or {}).get("lang") or lang)
+    body = await read_json(request)
+    kind = "photo" if body.get("kind") == "photo" else "video"
+    cap = t(lang, "fr_cap", bot=f"@{BOT_USERNAME}")
+    custom = invite_custom(lang)
+    rid = f"inv_{lang}_{kind}_{int(_time.time())}"
+    if custom:
+        typ, fid = custom["type"], custom["file_id"]
+        res = (InlineQueryResultCachedPhoto(id=rid, photo_file_id=fid, caption=cap) if typ == "photo" else
+               InlineQueryResultCachedVideo(id=rid, video_file_id=fid, title="Mawaqit", caption=cap) if typ == "video" else
+               InlineQueryResultCachedMpeg4Gif(id=rid, mpeg4_file_id=fid, caption=cap))
+    elif kind == "photo":
+        res = InlineQueryResultPhoto(id=rid, photo_url=card_url(lang, "photo"), thumbnail_url=card_url(lang, "photo"), caption=cap,
+                                     photo_width=1020, photo_height=1770)
+    else:
+        fid = await kv_get("share_card_" + lang)
+        res = InlineQueryResultCachedMpeg4Gif(id=rid, mpeg4_file_id=fid, caption=cap) if fid else \
+            InlineQueryResultMpeg4Gif(id=rid, mpeg4_url=card_url(lang, "video"), thumbnail_url=card_url(lang, "photo"),
+                                      caption=cap, mpeg4_width=1020, mpeg4_height=1770, mpeg4_duration=7, thumbnail_mime_type="image/jpeg")
+    try:
+        pm = await request.app["bot"].save_prepared_inline_message(u["user_id"], res, allow_user_chats=True, allow_bot_chats=True,
+                                                                   allow_group_chats=True, allow_channel_chats=True)
+    except Exception:  # noqa: BLE001
+        log.exception("invite prepare failed")
+        return web.json_response({"ok": False}, status=502)
+    await bump("share_card")
+    return web.json_response({"ok": True, "id": pm.id})
+
+
+async def api_invite_send(request):
+    """Old Telegram (no share window): the bot sends the card to the person's chat."""
+    tg_user, u, lang = await api_auth(request)
+    body = await read_json(request)
+    await send_share_card(request.app["bot"], u, "photo" if body.get("kind") == "photo" else "video")
+    return web.json_response({"ok": True})
+
+
+async def send_share_card(bot, u, kind=None):
+    lang = (u or {}).get("lang") or "en"
+    cl = card_lang(lang)
+    kind = kind or invite_cfg()["mode"]
+    cap = t(cl, "fr_cap", bot=f"@{BOT_USERNAME}")
+    markup = kb([btn(t(lang, "fr_how"), "fr:how")])
+    chat = u["user_id"]
+    custom = invite_custom(cl)
+    if custom:
+        send = {"photo": bot.send_photo, "video": bot.send_video}.get(custom["type"], bot.send_animation)
+        return await send(chat, custom["file_id"], caption=cap, reply_markup=markup)
+    key = ("share_card_" if kind == "video" else "share_photo_") + cl
+    fid = await kv_get(key)
+    send = bot.send_animation if kind == "video" else bot.send_photo
+    if fid:
+        try:
+            return await send(chat, fid, caption=cap, reply_markup=markup)
+        except BadRequest:
+            log.warning("share card file id expired for %s", key)
+    path = SHARE_CARD_DIR / f"mawaqit_card_{cl}.{'mp4' if kind == 'video' else 'jpg'}"
+    with open(path, "rb") as f:
+        if kind == "video":
+            msg = await bot.send_animation(chat, f, caption=cap, reply_markup=markup, width=1020, height=1770, duration=7,
+                                           filename=f"mawaqit_{cl}.mp4")
+            new = msg.animation.file_id if msg.animation else None
+        else:
+            msg = await bot.send_photo(chat, f, caption=cap, reply_markup=markup)
+            new = msg.photo[-1].file_id if msg.photo else None
+    if new:
+        await kv_set(key, new)
+    await bump("share_card")
+    return msg
+
+
+# ── the "⚙️ Bot" tab of the mini app admin (main admin only) ──
+
+def _opts_for(f):
+    label, opts, show = USER_FIELDS[f]
+    return {"label": label, "options": [[enc(o), show(o)] for o in opts]}
+
+
+async def api_admin_botcfg(request):
+    uid = await admin_auth(request)
+    if not is_main(uid):
+        raise web.HTTPForbidden(text="main admin only")
+    c = BOT_CFG
+    note = ""
+    if request.method == "POST":
+        b = await read_json(request)
+        for k in ("maint", "closed"):
+            if isinstance(b.get(k), bool):
+                c[k] = b[k]
+        if isinstance(b.get("feat"), dict):
+            for k, v in b["feat"].items():
+                if k in dict(FEATURES) and isinstance(v, bool):
+                    c["feat"][k] = v
+                    if k == "ai":
+                        await save_ai_cfg(enabled=v)
+        if isinstance(b.get("menu"), list):
+            rows = [[k for k in row if k in MENU_ITEMS] for row in b["menu"] if isinstance(row, list)]
+            rows = [r[:3] for r in rows if r]
+            if sorted(k for r in rows for k in r) == sorted(MENU_ITEMS):
+                c["menu"] = rows
+        if isinstance(b.get("hide"), list):
+            c["hide"] = sorted({k for k in b["hide"] if k in MENU_ITEMS and k != "settings"})
+        if b.get("menu_reset"):
+            c["menu"], c["hide"] = json.loads(json.dumps(MENU_DEFAULT)), []
+        if isinstance(b.get("texts"), dict):
+            for k, v in b["texts"].items():
+                if k in TEXT_KEYS and isinstance(v, str):
+                    if k == "sub_text":
+                        c.setdefault("sub", {})["text"] = v.strip()[:1000]
+                    else:
+                        c[k] = v.strip()[:3000]
+        if isinstance(b.get("profile"), dict):
+            for pl, d in b["profile"].items():
+                if pl in PROFILE_LANGS and isinstance(d, dict):
+                    p = c.setdefault("profile", {}).setdefault(pl, {})
+                    if isinstance(d.get("desc"), str):
+                        p["desc"] = d["desc"].strip()[:512]
+                    if isinstance(d.get("about"), str):
+                        p["about"] = d["about"].strip()[:120]
+                    await apply_profile_texts(request.app["bot"], only=pl)
+        if isinstance(b.get("sub"), dict):
+            sub = c.setdefault("sub", {"on": False, "channel": "", "text": ""})
+            if isinstance(b["sub"].get("channel"), str):
+                ch = b["sub"]["channel"].strip().split("/")[-1].lstrip("@")
+                sub["channel"] = ("@" + ch) if re.match(r"^[A-Za-z0-9_]{4,}$", ch) else ""
+                sub["on"] = False
+            if b["sub"].get("on") is True:
+                try:
+                    me = await request.app["bot"].get_chat_member(sub["channel"], request.app["bot"].id)
+                    if me.status in ("administrator", "creator"):
+                        sub["on"] = True
+                    else:
+                        note = "Сделайте бота админом канала — иначе он не видит подписчиков."
+                except Exception:  # noqa: BLE001
+                    note = "Бот не видит канал. Укажите канал и добавьте бота туда админом."
+            elif b["sub"].get("on") is False:
+                sub["on"] = False
+        if isinstance(b.get("defaults"), dict):
+            d = c.setdefault("defaults", {})
+            for f, raw in b["defaults"].items():
+                if f == "pm" and isinstance(raw, str) and re.match(r"^[sqo]{5}$", raw):
+                    d["pm"] = raw
+                elif f in DEFAULT_FIELDS:
+                    if raw is None:
+                        d.pop(f, None)
+                    else:
+                        v, ok = dec(f, str(raw))
+                        if ok:
+                            d[f] = v
+        if b.get("apply_all") in list(DEFAULT_FIELDS) + ["pm"] and b["apply_all"] in c.get("defaults", {}):
+            f, v = b["apply_all"], c["defaults"][b["apply_all"]]
+            if f == "quiet":
+                qa, qb = (None, None) if v == "off" else (int(x) for x in v.split("-"))
+                res = await POOL.execute("UPDATE users SET quiet_start = $1, quiet_end = $2 WHERE chat_type = 'private'", qa, qb)
+            else:
+                res = await POOL.execute(f"UPDATE users SET {'prayer_modes' if f == 'pm' else f} = $1 WHERE chat_type = 'private'", v)
+            note = f"Применено к {res.split()[-1]} пользователям."
+        if isinstance(b.get("invite"), dict):
+            inv = invite_cfg()
+            if b["invite"].get("mode") in ("video", "photo"):
+                inv["mode"] = b["invite"]["mode"]
+            if b["invite"].get("clear_custom"):
+                inv["custom"] = {}
+        if b.get("backup"):
+            async def _send_backup():
+                data, n = await build_backup()
+                await request.app["bot"].send_document(uid, document=data, filename=f"mawaqit_backup_{datetime.utcnow():%Y%m%d_%H%M}.zip",
+                                                       caption=f"💾 Резервная копия: {n} таблиц")
+            asyncio.get_running_loop().create_task(_send_backup())
+            note = "Резервная копия придёт в чат с ботом."
+        if b.get("restart"):
+            log.warning("restart requested from the mini app")
+            asyncio.get_running_loop().call_later(1.5, os._exit, 1)
+            note = "Перезапуск… Через минуту откройте приложение заново."
+        await save_bot_cfg()
+    up = int(_time.time() - START_TS)
+    return web.json_response({
+        "ok": True, "note": note, "cfg": c, "features": [[k, n] for k, n in FEATURES], "menu_items": MENU_ITEMS,
+        "texts": {k: v[0] for k, v in TEXT_KEYS.items()}, "profile_langs": PROFILE_LANGS,
+        "defaults": {f: _opts_for(f) for f in DEFAULT_FIELDS}, "pm_names": [PN["ru"][k.lower()] for k in EVENTS],
+        "invite": invite_cfg(),
+        "sys": {"uptime": up, "db": await POOL.fetchval("SELECT pg_size_pretty(pg_database_size(current_database()))"),
+                "errors": [[e[0].strftime("%d.%m %H:%M"), e[1]] for e in list(ERRBUF)]}})
 
 
 # ───────────────────────── app ─────────────────────────

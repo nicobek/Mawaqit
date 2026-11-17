@@ -392,6 +392,8 @@ html.lite #sky .b{animation:none;filter:blur(60px)}
 .pic .nav button{height:40px;border-radius:12px;border:0;font:inherit;color:inherit;background:rgba(127,127,127,.16)}
 .pic .nav span{text-align:center;font-weight:600}
 .pic .busy{opacity:.55;transition:opacity .2s}
+.ivprev{margin:12px 0;display:flex;justify-content:center}
+.ivprev video,.ivprev img{height:min(48vh,520px);width:auto;max-width:100%;aspect-ratio:1020/1770;border-radius:20px;object-fit:cover;background:rgba(127,127,127,.15);box-shadow:0 10px 30px rgba(0,0,0,.35)}
 .aichat{display:flex;flex-direction:column;gap:10px;margin:12px 0}
 .aimsg{max-width:88%;padding:11px 14px;border-radius:18px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word}
 .aimsg.me{align-self:flex-end;background:var(--gold);color:var(--on-gold);border-bottom-right-radius:6px}
@@ -503,9 +505,11 @@ html.lite #sky .b{animation:none;filter:blur(60px)}
   <section class="view" id="v-invite">
     <div class="backbar"><button data-back>‹ <span class="lbl-back"></span></button></div>
     <h1 id="invTitle"></h1>
-    <div class="card center inv"><div class="big" id="invCount">0</div><div class="sub" id="invCountL" style="font-weight:600"></div><div class="sub" id="invText" style="margin-top:6px"></div></div>
-    <button class="btn" id="invShare"></button>
-    <button class="btn ghost" id="invCopy" style="margin-top:10px"></button>
+    <div class="sub" id="invText" style="margin:-4px 2px 10px"></div>
+    <div class="seg" id="ivSeg"><button data-iv="video"></button><button data-iv="photo"></button></div>
+    <div class="ivprev"><video id="ivVid" autoplay loop muted playsinline></video><img id="ivImg" alt=""></div>
+    <div class="share"><button class="btn" id="invShare"></button><button class="btn ghost" id="invCopy"></button></div>
+    <div class="card sub" id="ivCap" style="white-space:pre-wrap;margin-top:12px"></div>
   </section>
 
   <section class="view" id="v-challenges">
@@ -635,7 +639,7 @@ html.lite #sky .b{animation:none;filter:blur(60px)}
 
   <section class="view" id="v-admin">
     <h1>🛠 Админка</h1>
-    <div class="seg adseg" id="adSeg"><button data-ad="dash">📊 Обзор</button><button data-ad="users">👥 Люди</button><button data-ad="chats">📢 Чаты</button><button data-ad="bc">📣 Рассылка</button><button data-ad="sys">🩺 Система</button><button data-ad="ai" hidden>🤖 ИИ</button><button data-ad="adm" hidden>👮 Админы</button></div>
+    <div class="seg adseg" id="adSeg"><button data-ad="dash">📊 Обзор</button><button data-ad="users">👥 Люди</button><button data-ad="chats">📢 Чаты</button><button data-ad="bc">📣 Рассылка</button><button data-ad="sys">🩺 Система</button><button data-ad="ai" hidden>🤖 ИИ</button><button data-ad="adm" hidden>👮 Админы</button><button data-ad="bot" hidden>⚙️ Бот</button></div>
     <div id="adBody" style="margin-top:10px"></div>
   </section>
 
@@ -1852,6 +1856,14 @@ function toCyr(x) {
   return x.split(CYR_KEEP).map((p, i) => i % 2 ? p : p.replace(CYR_WORD, cyrWord)).join("");
 }
 const cy = s => LANG === "uzc" ? toCyr(s) : s;
+const LX13 = {
+  en:{iv_title:"🤝 Invite friends",iv_text:"Send friends a card about the bot — whoever starts praying on time thanks to you is a sadaqah jariyah for you 🤍",iv_video:"🎬 Video",iv_photo:"🖼 Photo",iv_send:"📤 Send to a chat",iv_save:"💾 Save",iv_chat:"The card is in your chat with the bot — forward it to friends ↪️",iv_saved:"Saved ✓",iv_off:"Sharing is turned off for now",iv_err:"Couldn't open the share window"},
+  ru:{iv_title:"🤝 Пригласить друзей",iv_text:"Отправьте друзьям карточку о боте — каждый, кто благодаря вам начнёт молиться вовремя, станет для вас садака джария 🤍",iv_video:"🎬 Видео",iv_photo:"🖼 Фото",iv_send:"📤 Отправить в чат",iv_save:"💾 Сохранить",iv_chat:"Карточка в вашем чате с ботом — перешлите её друзьям ↪️",iv_saved:"Сохранено ✓",iv_off:"Отправка сейчас выключена",iv_err:"Не получилось открыть окно отправки"},
+  uz:{iv_title:"🤝 Do'stlarni taklif qilish",iv_text:"Do'stlaringizga bot haqida kartochka yuboring — siz sababli namozni vaqtida o'qiy boshlagan har bir kishi siz uchun sadaqai joriya bo'ladi 🤍",iv_video:"🎬 Video",iv_photo:"🖼 Rasm",iv_send:"📤 Chatga yuborish",iv_save:"💾 Saqlash",iv_chat:"Kartochka bot bilan chatingizda — uni do'stlarga uzating ↪️",iv_saved:"Saqlandi ✓",iv_off:"Yuborish hozircha o'chirilgan",iv_err:"Yuborish oynasini ochib bo'lmadi"},
+  tg:{iv_title:"🤝 Дӯстонро даъват кунед",iv_text:"Ба дӯстон корти ботро фиристед — ҳар кӣ ба шарофати шумо намозро сари вақт хонад, барои шумо садақаи ҷория мешавад 🤍",iv_video:"🎬 Видео",iv_photo:"🖼 Расм",iv_send:"📤 Ба чат фиристодан",iv_save:"💾 Нигоҳ доштан",iv_chat:"Корт дар чати шумо бо бот аст — онро ба дӯстон фиристед ↪️",iv_saved:"Нигоҳ дошта шуд ✓",iv_off:"Фиристодан ҳоло хомӯш аст",iv_err:"Равзанаи фиристодан кушода нашуд"},
+  ar:{iv_title:"🤝 ادعُ أصدقاءك",iv_text:"أرسل لأصدقائك بطاقة عن البوت — كل من يبدأ الصلاة في وقتها بسببك صدقة جارية لك 🤍",iv_video:"🎬 فيديو",iv_photo:"🖼 صورة",iv_send:"📤 إرسال إلى محادثة",iv_save:"💾 حفظ",iv_chat:"البطاقة في محادثتك مع البوت — أعد توجيهها لأصدقائك ↪️",iv_saved:"تم الحفظ ✓",iv_off:"المشاركة متوقفة حاليًا",iv_err:"تعذر فتح نافذة المشاركة"}
+};
+for (const l in LX13) Object.assign(LX[l], LX13[l]);
 const LX12 = {
   en:{ay_title:"📖 Ayah of the day",ay_share:"📤 Share",pic_open:"🖼 Picture",pic_bg:"Background {i}/{n}",pic_share:"📤 Share",pic_save:"💾 Save",pic_saved:"Saved ✓",pic_err:"Couldn't make the picture"},
   ru:{ay_title:"📖 Аят дня",ay_share:"📤 Поделиться",pic_open:"🖼 Картинка",pic_bg:"Фон {i}/{n}",pic_share:"📤 Поделиться",pic_save:"💾 Сохранить",pic_saved:"Сохранено ✓",pic_err:"Не получилось сделать картинку"},
@@ -2035,21 +2047,47 @@ function openPicSheet(kind) {
 
 /* developer and invitations */
 function openDev() { haptic(); const u = "https://t.me/" + (DATA && DATA.dev || "bdurrokhman"); try { tg.openTelegramLink(u); } catch (e) { openLink(u); } }
-function renderInvite() {
-  $("invTitle").textContent = tr("inv_title"); $("invCountL").textContent = ""; $("invText").textContent = tr("inv_text");
-  $("invCount").textContent = (DATA.ref && DATA.ref.count) || 0; $("invCountL").textContent = tr("inv_count");
-  $("invShare").textContent = tr("inv_btn"); $("invCopy").textContent = tr("inv_copy");
-  api("/api/me").then(d => { if (d.ref) { DATA.ref = d.ref; $("invCount").textContent = d.ref.count; } }).catch(() => {});
+let IV = null, IV_KIND = null;
+async function renderInvite() {
+  $("invTitle").textContent = tr("iv_title"); $("invText").textContent = tr("iv_text");
+  $("invShare").textContent = tr("iv_send"); $("invCopy").textContent = tr("iv_save");
+  const seg = [...document.querySelectorAll("#ivSeg button")];
+  seg[0].textContent = tr("iv_video"); seg[1].textContent = tr("iv_photo");
+  try { IV = await api("/api/invite"); } catch (e) { IV = null; }
+  if (!IV || !IV.ok) { $("ivCap").textContent = tr("iv_off"); $("invShare").disabled = true; return; }
+  $("invShare").disabled = false;
+  $("ivSeg").hidden = IV.custom;
+  IV_KIND = IV_KIND || IV.mode;
+  const show = () => {
+    if (IV.custom) { $("ivVid").hidden = $("ivImg").hidden = true; return; }
+    seg.forEach(b => b.classList.toggle("on", b.dataset.iv === IV_KIND));
+    const vid = IV_KIND === "video" && !IV.custom;
+    $("ivVid").hidden = !vid; $("ivImg").hidden = vid;
+    if (vid) { if ($("ivVid").src !== IV.video) { $("ivVid").src = IV.video; $("ivVid").poster = IV.photo; } $("ivVid").play().catch(() => {}); }
+    else { $("ivVid").pause(); $("ivImg").src = IV.photo; }
+  };
+  seg.forEach(b => b.onclick = () => { haptic(); IV_KIND = b.dataset.iv; show(); });
+  $("ivCap").textContent = IV.caption;
+  show();
 }
-function shareInvite() {
-  haptic(); const link = DATA.ref && DATA.ref.link; if (!link) return;
-  const u = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(tr("inv_msg"))}`;
-  try { tg.openTelegramLink(u); } catch (e) { openLink(u); }
+async function shareInvite() {
+  haptic(); if (!IV || !IV.ok) return;
+  $("invShare").disabled = true;
+  try {
+    if (ver("8.0") && tg.shareMessage) {
+      const r = await apiPost("/api/invite_prepare", {kind: IV_KIND});
+      tg.shareMessage(r.id, () => {});
+    } else { await apiPost("/api/invite_send", {kind: IV_KIND}); toast(tr("iv_chat")); }
+  } catch (e) {
+    try { await apiPost("/api/invite_send", {kind: IV_KIND}); toast(tr("iv_chat")); } catch (e2) { toast(tr("iv_err")); }
+  }
+  $("invShare").disabled = false;
 }
-async function copyInvite() {
-  haptic(); const link = DATA.ref && DATA.ref.link; if (!link) return;
-  try { await navigator.clipboard.writeText(link); toast(tr("inv_copied")); }
-  catch (e) { const i = document.createElement("textarea"); i.value = link; document.body.appendChild(i); i.select(); try { document.execCommand("copy"); toast(tr("inv_copied")); } catch (e2) {} i.remove(); }
+function copyInvite() {
+  haptic(); if (!IV) return;
+  const url = IV_KIND === "video" && !IV.custom ? IV.video : IV.photo;
+  if (ver("8.0") && tg.downloadFile) tg.downloadFile({url, file_name: "mawaqit." + (url.endsWith(".mp4") ? "mp4" : "jpg")}, ok => { if (ok) toast(tr("iv_saved")); });
+  else openLink(url);
 }
 
 let COMM_AT = 0;
@@ -2363,14 +2401,79 @@ const shortD = d => d.slice(8, 10) + "." + d.slice(5, 7);
 async function apiAdmin(path, body) {
   return body === undefined ? api(path) : apiPost(path, body);
 }
-const AD_NEED = {dash: "stats", users: "users", chats: "users", bc: "bc", sys: ["health", "export"], ai: "ai", adm: "main"};
+const AD_NEED = {dash: "stats", users: "users", chats: "users", bc: "bc", sys: ["health", "export"], ai: "ai", adm: "main", bot: "main"};
 const canAd = p => { const a = (DATA && DATA.admin) || {perms: [], main: false}; return [].concat(p).some(x => x === "main" ? a.main : a.perms.includes(x)); };
 function renderAdmin() {
   const tabs = [...document.querySelectorAll("#adSeg button")];
   tabs.forEach(b => b.hidden = !canAd(AD_NEED[b.dataset.ad]));
   if (!canAd(AD_NEED[AD_TAB])) { const first = tabs.find(b => !b.hidden); if (!first) return adBody(`<div class="muted" style="padding:24px 4px">🔒 Нет доступных разделов. Попросите главного админа включить права.</div>`); AD_TAB = first.dataset.ad; }
   tabs.forEach(b => b.classList.toggle("on", b.dataset.ad === AD_TAB));
-  ({dash: adDash, users: () => adPeople("users"), chats: () => adPeople("chats"), bc: adBc, sys: adSys, ai: adAi, adm: adAdmins})[AD_TAB]();
+  ({dash: adDash, users: () => adPeople("users"), chats: () => adPeople("chats"), bc: adBc, sys: adSys, ai: adAi, adm: adAdmins, bot: adBot})[AD_TAB]();
+}
+
+/* ── ⚙️ the bot itself (main admin only) ── */
+let BOT_PL = "ru";
+async function adBot(data) {
+  if (!data) { adLoading(); try { data = await apiAdmin("/api/admin/botcfg"); } catch (e) { return adBody(`<div class="muted">Не удалось загрузить</div>`); } }
+  if (data.note) toast(data.note);
+  const c = data.cfg, feat = k => c.feat[k] !== false, hide = new Set(c.hide || []), d = c.defaults || {}, sub = c.sub || {}, inv = data.invite;
+  const sw = (id, label, on) => `<div class="sw ${on ? "on" : ""}" id="${id}"><span>${esc(label)}</span><span class="tg"></span></div>`;
+  const chipsH = (attr, opts, cur) => `<div class="chips">${opts.map(([v, l]) => `<button class="chip ${String(v) === String(cur) ? "on" : ""}" ${attr}="${esc(v)}">${esc(l)}</button>`).join("")}</div>`;
+  const menuRows = c.menu.map((row, i) => `<div class="card" style="padding:10px 12px"><div class="row between"><div style="min-width:0">${row.map(k =>
+      `<button class="chip ${hide.has(k) ? "" : "on"}" data-mhide="${k}" ${k === "settings" ? "disabled" : ""}>${hide.has(k) ? "🙈 " : ""}${esc(data.menu_items[k])}</button>`).join(" ")}</div>
+      <div style="white-space:nowrap"><button class="chip" data-mup="${i}">🔼</button><button class="chip" data-mdn="${i}">🔽</button>${i && c.menu[i - 1].length + row.length <= 3 ? `<button class="chip" data-mjoin="${i}">⤴️</button>` : ""}${row.length > 1 ? `<button class="chip" data-msplit="${i}">↔️</button>` : ""}</div></div></div>`).join("");
+  const defs = Object.entries(data.defaults).map(([f, o]) => `<div class="lbl sub" style="margin:10px 0 6px">${esc(o.label)} ${f in d ? `<button class="chip" data-dall="${f}" style="float:right">📣 Всем</button>` : ""}</div>
+      ${chipsH(`data-def-${f}`, [["", "стандарт"]].concat(o.options), f in d ? (d[f] === true ? "1" : d[f] === false ? "0" : d[f]) : "")}`).join("");
+  const pm = (d.pm || "sssss").padEnd(5, "s"), PMI = {s: "🔔", q: "🔕", o: "❌"};
+  const prof = (c.profile || {})[BOT_PL] || {};
+  adBody(`<div class="card">${sw("bMaint", "🟢 Бот работает (выкл — режим техработ)", !c.maint)}${sw("bClosed", "✅ Регистрация новых людей открыта", !c.closed)}</div>
+    <h2>🧩 Функции</h2><div class="card">${data.features.map(([k, n]) => sw("bf_" + k, n, feat(k))).join("")}</div>
+    <h2>🧭 Меню бота <button class="chip" id="bMenuReset" style="float:right">♻️ Как было</button></h2>
+    <div class="sub" style="margin:-4px 2px 8px">Нажмите на кнопку, чтобы скрыть или показать. 🔼🔽 — порядок строк, ⤴️ — склеить со строкой выше, ↔️ — разделить.</div>${menuRows}
+    <h2>✍️ Тексты</h2><div class="card">${Object.entries(data.texts).map(([k, label]) => `<div class="lbl sub" style="margin:8px 0 4px">${esc(label)}</div>
+      <textarea class="search" data-txt="${k}" rows="2" style="background:var(--bg)" placeholder="Пусто — стандартный текст">${esc(k === "sub_text" ? (sub.text || "") : (c[k] || ""))}</textarea>`).join("")}
+      <button class="btn" id="bTxtSave">Сохранить тексты</button></div>
+    <h2>🪪 Профиль бота в Telegram</h2><div class="card">${chipsH("data-pl", data.profile_langs.map(l => [l, l.toUpperCase()]), BOT_PL)}
+      <div class="lbl sub" style="margin:10px 0 4px">📝 Описание на пустом экране (до 512)</div><textarea class="search" id="bDesc" rows="3" style="background:var(--bg)" placeholder="Пусто — стандартное">${esc(prof.desc || "")}</textarea>
+      <div class="lbl sub" style="margin:8px 0 4px">🏷 Короткое описание в профиле (до 120)</div><input class="search" id="bAbout" style="background:var(--bg)" placeholder="Пусто — стандартное" value="${esc(prof.about || "")}">
+      <button class="btn" id="bProfSave">Сохранить для ${BOT_PL.toUpperCase()}</button></div>
+    <h2>📢 Подписка на канал</h2><div class="card"><input class="search" id="bSubCh" style="background:var(--bg)" placeholder="@канал" value="${esc(sub.channel || "")}">
+      <button class="btn ghost" id="bSubSave" style="background:var(--bg)">Сохранить канал</button>${sw("bSubOn", "Обязательная подписка", !!sub.on)}
+      <div class="sub" style="margin-top:6px">Бот должен быть админом канала. Админов подписка не касается.</div></div>
+    <h2>👥 По умолчанию для новичков</h2><div class="card">${defs}
+      <div class="lbl sub" style="margin:10px 0 6px">🔊 Звук намазов ${d.pm ? `<button class="chip" data-dall="pm" style="float:right">📣 Всем</button>` : ""}</div>
+      <div class="chips">${data.pm_names.map((n, i) => `<button class="chip on" data-pm="${i}">${PMI[pm[i]]} ${esc(n)}</button>`).join("")}</div></div>
+    <h2>🤝 Карточка приглашения</h2><div class="card">${chipsH("data-inv", [["video", "🎬 Видео"], ["photo", "🖼 Фото"]], inv.mode)}
+      <div class="sub" style="margin-top:8px">${inv.custom && inv.custom.all ? `Загружена своя карточка (${esc(inv.custom.all.type)}). <button class="chip" id="bInvClr">🗑 Убрать</button>` : "Своя карточка не загружена — показываются наши, на языке человека. Загрузить свою: бот → 🛠 → ⚙️ Настройки бота → 🤝 Карточка приглашения."}</div></div>
+    <h2>🖥 Система</h2><div class="card"><div class="sub">⏱ Работает: ${Math.floor(data.sys.uptime / 86400)} д ${Math.floor(data.sys.uptime % 86400 / 3600)} ч · 🗄 База: ${esc(data.sys.db)}</div>
+      <div class="lbl sub" style="margin:10px 0 4px">Последние ошибки</div>${data.sys.errors.map(e => `<div class="sub">• ${esc(e[0])} ${esc(e[1])}</div>`).join("") || `<div class="sub">— ошибок нет 🎉</div>`}
+      <button class="btn ghost" id="bBackup" style="background:var(--bg)">💾 Резервная копия (придёт в чат)</button><button class="btn ghost" id="bRestart" style="background:var(--bg)">♻️ Перезапустить бота</button></div>`);
+  const post = async (patch, keepScroll = true) => { const y = window.scrollY; try { await adBot(await apiAdmin("/api/admin/botcfg", patch)); haptic(); if (keepScroll) window.scrollTo(0, y); } catch (e) { toast("Ошибка"); } };
+  $("bMaint").onclick = () => post({maint: !c.maint});
+  $("bClosed").onclick = () => post({closed: !c.closed});
+  data.features.forEach(([k]) => $("bf_" + k).onclick = () => post({feat: {[k]: !feat(k)}}));
+  const menu = c.menu.map(r => r.slice());
+  document.querySelectorAll("[data-mhide]").forEach(b => b.onclick = () => { const k = b.dataset.mhide; hide.has(k) ? hide.delete(k) : hide.add(k); post({hide: [...hide]}); });
+  document.querySelectorAll("[data-mup]").forEach(b => b.onclick = () => { const i = +b.dataset.mup; if (i > 0) { [menu[i - 1], menu[i]] = [menu[i], menu[i - 1]]; post({menu}); } });
+  document.querySelectorAll("[data-mdn]").forEach(b => b.onclick = () => { const i = +b.dataset.mdn; if (i < menu.length - 1) { [menu[i + 1], menu[i]] = [menu[i], menu[i + 1]]; post({menu}); } });
+  document.querySelectorAll("[data-mjoin]").forEach(b => b.onclick = () => { const i = +b.dataset.mjoin; menu[i - 1] = menu[i - 1].concat(menu[i]); menu.splice(i, 1); post({menu}); });
+  document.querySelectorAll("[data-msplit]").forEach(b => b.onclick = () => { const i = +b.dataset.msplit; menu.splice(i, 1, ...menu[i].map(k => [k])); post({menu}); });
+  $("bMenuReset").onclick = () => post({menu_reset: true});
+  $("bTxtSave").onclick = () => { const texts = {}; document.querySelectorAll("[data-txt]").forEach(t => texts[t.dataset.txt] = t.value); post({texts}); toast("Сохранено ✓"); };
+  document.querySelectorAll("[data-pl]").forEach(b => b.onclick = () => { BOT_PL = b.dataset.pl; adBot(data); });
+  $("bProfSave").onclick = () => { post({profile: {[BOT_PL]: {desc: $("bDesc").value, about: $("bAbout").value}}}); toast("Сохранено ✓"); };
+  $("bSubSave").onclick = () => post({sub: {channel: $("bSubCh").value}});
+  $("bSubOn").onclick = () => post({sub: {on: !sub.on}});
+  Object.keys(data.defaults).forEach(f => document.querySelectorAll(`[data-def-${f}]`).forEach(b => b.onclick = () => post({defaults: {[f]: b.getAttribute(`data-def-${f}`) === "" ? null : b.getAttribute(`data-def-${f}`)}})));
+  document.querySelectorAll("[data-pm]").forEach(b => b.onclick = () => { const a = pm.split(""), i = +b.dataset.pm; a[i] = {s: "q", q: "o", o: "s"}[a[i]]; post({defaults: {pm: a.join("")}}); });
+  document.querySelectorAll("[data-dall]").forEach(b => b.onclick = () => {
+    const f = b.dataset.dall, go = () => post({apply_all: f});
+    try { tg.showConfirm("Поставить это значение всем пользователям?", ok => { if (ok) go(); }); } catch (e) { if (confirm("Поставить это значение всем пользователям?")) go(); }
+  });
+  document.querySelectorAll("[data-inv]").forEach(b => b.onclick = () => post({invite: {mode: b.dataset.inv}}));
+  if ($("bInvClr")) $("bInvClr").onclick = () => post({invite: {clear_custom: true}});
+  $("bBackup").onclick = () => post({backup: true});
+  $("bRestart").onclick = () => { try { tg.showConfirm("Перезапустить бота? Он будет недоступен около минуты.", ok => { if (ok) post({restart: true}); }); } catch (e) { post({restart: true}); } };
 }
 
 /* ── AI helper settings ── */
