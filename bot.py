@@ -4531,7 +4531,7 @@ async def start_web(application=None):
                     web.post("/api/invoice", api_invoice), web.post("/api/donate/sent", api_donate_sent),
                     web.get("/api/admin/ai", api_admin_ai), web.post("/api/admin/ai", api_admin_ai),
                     web.post("/api/admin/hide", api_admin_hide),
-                    web.get("/card/{name}", page_card), web.get("/api/invite", api_invite),
+                    web.get("/card/{name}", page_card), web.get("/ig/{name}", page_ig), web.get("/api/invite", api_invite),
                     web.post("/api/invite_prepare", api_invite_prepare), web.post("/api/invite_send", api_invite_send),
                     web.get("/api/admin/botcfg", api_admin_botcfg), web.post("/api/admin/botcfg", api_admin_botcfg),
                     web.get("/api/admin/bc2", api_admin_bc2), web.post("/api/admin/bc2", api_admin_bc2),
@@ -8590,6 +8590,17 @@ async def page_card(request):
     if not m:
         raise web.HTTPNotFound()
     path = SHARE_CARD_DIR / f"mawaqit_card_{name}"
+    if not path.exists():
+        raise web.HTTPNotFound()
+    return web.FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
+
+
+async def page_ig(request):
+    """Public media for the Instagram posts (the scheduler fetches them by URL)."""
+    name = request.match_info["name"]
+    if not re.match(r"^[a-z0-9_]+\.(mp4|jpg)$", name):
+        raise web.HTTPNotFound()
+    path = Path(__file__).with_name("assets") / "ig" / name
     if not path.exists():
         raise web.HTTPNotFound()
     return web.FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
