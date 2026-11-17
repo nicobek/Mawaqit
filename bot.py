@@ -1786,8 +1786,8 @@ def screen_menu(u):
         [qibla_btn(u), btn(t(lang, "btn_rem_s_on" if u["remind"] else "btn_rem_s_off"), "m:toggle")],
         [btn(t(lang, "btn_settings"), "m:settings")],
     ]
-    if is_private(u) and WEBAPP_URL:  # quick ways into the app: adhkar, tracker, qibla
-        rows[1:2] = [[webapp_btn(t(lang, "mb_azkar"), "more&sub=azkar"), btn(t(lang, "ayah_btn"), "ay:show"), qibla_btn(u)],
+    if is_private(u) and WEBAPP_URL:  # quick ways into the app: ayah, qibla
+        rows[1:2] = [[btn(t(lang, "ayah_btn"), "ay:show"), qibla_btn(u)],
                      [btn(t(lang, "btn_rem_s_on" if u["remind"] else "btn_rem_s_off"), "m:toggle"),
                       btn(t(lang, "btn_settings"), "m:settings")]]
         rows = rows[:3]
