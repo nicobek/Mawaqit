@@ -7916,7 +7916,7 @@ def menu_button(u, key):
     if key == "share":
         if not feat("share"):
             return None
-        return webapp_btn(t(lang, "fr_btn"), "more&sub=invite") if WEBAPP_URL else btn(t(lang, "fr_btn"), "fr:share")
+        return btn(t(lang, "fr_btn"), "fr:share")  # the bot sends the card right here (the mini app has its own screen)
     return None
 
 
