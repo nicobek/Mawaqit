@@ -1823,13 +1823,7 @@ def screen_menu(u):
         rows.append([btn(t(lang, "btn_my_channels"), "ch:list"), btn(t(lang, "btn_my_menu"), "ch:exit")])
         return t(lang, "channel_menu_title", title=esc(u["title"] or "—"), city=esc(u["city"] or "—")), kb(*rows)
     if is_private(u):
-        if WEBAPP_URL:
-            rows.insert(1, [webapp_btn(t(lang, "btn_app"), "today")])
-        if ai_allowed_now(u["user_id"]):
-            rows.append([InlineKeyboardButton(t(lang, "ai_btn"), callback_data="ai:start", style="primary")])
-        if BOT_USERNAME:
-            rows.append([add_group_btn(lang)])
-            rows.append([btn(t(lang, "fr_btn"), "fr:share")])
+        rows = private_menu_rows(u)  # the main admin arranges it in the bot settings
         if is_admin(u["user_id"]):
             rows.append([btn("🛠 Админка", "a:home")])
     return t(lang, "menu_title", city=esc(u["city"])), kb(*rows)
@@ -1870,9 +1864,11 @@ def screen_settings(u):
             lines.append(t(lang, "st_azan", v=esc(azan_label(lang, u))))
             rows.append([btn(t(lang, "sb_azan", v=azan_label(lang, u)), "s:azan")])
         rows.append([btn(t(lang, "btn_fast"), "s:fast"), btn(t(lang, "btn_snd"), "s:snd")])
-        rows.append([btn(t(lang, "btn_groups"), "s:groups")])
-        rows.append([btn(t(lang, "don_btn"), "don:menu")])
-        if ADMINS:
+        if feat("groups"):
+            rows.append([btn(t(lang, "btn_groups"), "s:groups")])
+        if feat("donate"):
+            rows.append([btn(t(lang, "don_btn"), "don:menu")])
+        if ADMINS and feat("support"):
             rows.append([btn(t(lang, "btn_support"), "s:support")])
     rows.append([btn(t(lang, "btn_back"), "m:home")])
     return "\n".join(lines), kb(*rows)
@@ -2044,6 +2040,8 @@ async def send_times_card(update, ctx, u):
 
 
 async def refresh_cards(context: ContextTypes.DEFAULT_TYPE):
+    if bot_off() or not feat("auto"):
+        return
     try:
         rows = await POOL.fetch(
             "SELECT c.chat_id AS card_chat, c.msg_id AS card_msg, u.* FROM times_cards c "
@@ -2262,6 +2260,9 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return await support_button(update, ctx, parts)
     if act == "ai" and chat.type == "private":
         return await ai_button(update, ctx, parts)
+    if (act == "don" and not feat("donate")) or (act == "fr" and not feat("share")) \
+            or (act == "ay" and not feat("ayah")):
+        return await q.answer()
     if act == "don" and chat.type == "private":
         return await don_button(update, ctx, parts)
     if act == "buy" and chat.type == "private":
@@ -2615,7 +2616,7 @@ async def support_msg(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if is_admin(uid) and ctx.user_data.get("reply_to"):
         await admin_reply(update, ctx)
         raise ApplicationHandlerStop
-    if ctx.user_data.get("support_mode") and ADMINS:
+    if ctx.user_data.get("support_mode") and ADMINS and feat("support"):
         await user_support(update, ctx)
         raise ApplicationHandlerStop
 
@@ -2670,6 +2671,8 @@ async def user_support(update: Update, ctx):
     if first:
         await bump("support_msgs")
         await msg.reply_text(t(lang, "support_sent"), reply_markup=kb([btn(t(lang, "btn_menu"), "m:home")]))
+        if BOT_CFG.get("sup_auto"):
+            await msg.reply_text(BOT_CFG["sup_auto"], disable_web_page_preview=True)
 
 
 async def admin_reply(update: Update, ctx):
@@ -2855,6 +2858,8 @@ async def fasting_reminders(bot, u, data, now, d, tz, ramadan, modes):
 
 
 async def tick(context: ContextTypes.DEFAULT_TYPE):
+    if bot_off() or not feat("remind"):
+        return
     try:
         rows = await POOL.fetch(
             "SELECT * FROM users WHERE (remind OR daily <> 'off' OR suhoor_rem >= 0 OR iftar_rem >= 0) "
@@ -2939,14 +2944,14 @@ async def gate(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             row = await POOL.fetchrow(
                 "INSERT INTO users (user_id, last_seen, full_name, username) VALUES ($1, now(), $2, $3) "
                 "ON CONFLICT (user_id) DO UPDATE SET last_seen = now(), blocked = FALSE, "
-                "full_name = EXCLUDED.full_name, username = EXCLUDED.username RETURNING banned",
+                "full_name = EXCLUDED.full_name, username = EXCLUDED.username RETURNING banned, lang, (xmax = 0) AS inserted",
                 user.id, user.full_name, user.username)
             await POOL.execute("INSERT INTO daily_active (day, user_id) VALUES (CURRENT_DATE, $1) ON CONFLICT DO NOTHING",
                                user.id)
         else:
             row = await POOL.fetchrow(
-                "UPDATE users SET last_seen = now(), full_name = $2, username = $3 WHERE user_id = $1 RETURNING banned",
-                user.id, user.full_name, user.username)
+                "UPDATE users SET last_seen = now(), full_name = $2, username = $3 WHERE user_id = $1 "
+                "RETURNING banned, lang, FALSE AS inserted", user.id, user.full_name, user.username)
     except Exception:  # noqa: BLE001
         log.exception("gate failed")
         return
@@ -2957,6 +2962,16 @@ async def gate(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             except Exception:  # noqa: BLE001
                 pass
         raise ApplicationHandlerStop
+    inserted = bool(row and row["inserted"])
+    code = (row["lang"] if row and row["lang"] else str(user.language_code or "en")[:2])
+    await gate_rules(update, ctx, user, code if code in LANGS else "en", inserted)
+    if inserted and chat and chat.type == "private":
+        try:
+            await apply_defaults(user.id)
+        except Exception:  # noqa: BLE001
+            log.exception("defaults failed")
+        if BOT_CFG.get("welcome"):
+            asyncio.get_running_loop().create_task(send_welcome(ctx.bot, user.id))
 
 
 # ── screens ──
@@ -2980,6 +2995,7 @@ async def screen_admin_home(uid=None):
     rows = [shown[i:i + 2] for i in range(0, len(shown), 2)]
     if uid is not None and is_main(uid):
         rows.append([btn("👮 Админы", "a:adm"), btn("🙈 Скрытые", "a:hidden")])
+        rows.append([btn("⚙️ Настройки бота", "a:bset")])
     rows.append([btn("🏠 В меню бота", "m:home")])
     return text, kb(*rows)
 
@@ -3139,6 +3155,8 @@ async def user_card(uid, back=None, viewer=None):
             text += f"\n🤖 ИИ: куплено {credits}" + (f", безлимит до {unl:%d.%m.%Y}" if unl and unl > datetime.now(ZoneInfo('UTC')) else "")
             rows.append([btn("🎁 Начислить вопросы", f"a:grant:{uid}"), btn("📜 Его вопросы", f"a:ai:log:0:{uid}")])
         tools = []
+        if viewer is not None and has_perm(viewer, "users"):
+            rows.append([btn("⚙️ Его настройки", f"a:us:{uid}:{back or ''}")])
         if viewer is not None and has_perm(viewer, "bc"):
             tools.append(btn("✅ В рассылке" if uid in await bc_picks(viewer) else "📌 В рассылку", f"a:bpick:{uid}:{back or ''}"))
         if viewer is not None and has_perm(viewer, "users"):
@@ -3166,6 +3184,8 @@ async def user_card(uid, back=None, viewer=None):
                 f"{'🧱 Бот удалён из чата' if u['blocked'] else '✅ Бот в чате'}")
         if u["owner_id"]:
             rows.append([btn("👤 Кто добавил", f"a:card:{u['owner_id']}:{back or ''}")])
+        if viewer is not None and has_perm(viewer, "users"):
+            rows.append([btn("⚙️ Настройки чата", f"a:us:{uid}:{back or ''}")])
         if viewer is not None and has_perm(viewer, "bans"):
             rows.append([btn("❌ Удалить и выйти из чата", f"a:udel:{uid}:{back or ''}")])
     rows.append([btn("⬅️ Назад", back_cb(back))])
@@ -3963,7 +3983,8 @@ ADMIN_PERM_OF = {"stats": "stats", "geo": "stats", "health": "health", "test": "
                  "unban": "bans", "azan": "azan", "card": "users", "users": "users", "usearch": "users", "chats": "users",
                  "user": "users", "export": "export", "bc": "bc", "bcl": "bc", "adm": "main", "ai": "ai",
                  "grant": "ai", "hide": "main", "hidden": "main", "ayrm": "main", "bcd": "bc", "bcx": "bc", "bpick": "bc",
-                 "umsg": "users", "umdel": "users", "umdelall": "users", "umdelp": "users", "udel": "bans", "udelok": "bans"}
+                 "umsg": "users", "umdel": "users", "umdelall": "users", "umdelp": "users", "udel": "bans", "udelok": "bans",
+                 "bset": "main", "us": "users", "uso": "users", "usset": "users", "uspm": "users", "usc": "users"}
 
 
 async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
@@ -4079,6 +4100,10 @@ async def admin_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE, parts):
         return await admin_bc(update, ctx, parts)
     if sub in ("bpick", "umsg", "umdel", "umdelall", "umdelp", "udel", "udelok"):
         return await admin_people_tools(update, ctx, parts)
+    if sub == "bset":
+        return await admin_bset(update, ctx, parts)
+    if sub in ("us", "uso", "usset", "uspm", "usc"):
+        return await admin_user_settings(update, ctx, parts)
 
     if sub == "bcl" and len(parts) > 2 and parts[2] in LANGS:
         ctx.user_data["bc"] = {"kind": "lang", "value": parts[2], "text": None}
@@ -4109,6 +4134,10 @@ async def admin_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if state in ("bc_city", "bc_pick", "bc_btn", "bc_when"):
         return await admin_bc_text(update, ctx, state)
+    if state.startswith("bs_text:") and is_main(update.effective_user.id):
+        return await admin_bset_text(update, ctx, state)
+    if state.startswith("us_city:") and has_perm(update.effective_user.id, "users"):
+        return await admin_user_city(update, ctx, state)
 
     if state == "bc_country":
         code = msg.text.strip().lower()
@@ -4960,6 +4989,8 @@ async def pic_key(u, kind):
 
 async def api_ayah(request):
     tg_user, u, lang = await api_auth(request)
+    if not feat("ayah"):
+        raise web.HTTPNotFound()
     if not u or not u["tz"]:
         raise web.HTTPBadRequest(text="no city")
     ref_id = await pic_key(u, "a")
@@ -5854,6 +5885,8 @@ async def admin_summary_text():
 async def periodic(context: ContextTypes.DEFAULT_TYPE):
     """Every 10 minutes: Monday 09:00 weekly reports (user's own time), 09:00 summary for admins."""
     bot = context.bot
+    if bot_off():
+        return
     try:
         rows = await POOL.fetch(
             "SELECT u.* FROM users u WHERE chat_type = 'private' AND weekly AND NOT banned AND NOT blocked "
@@ -5862,7 +5895,7 @@ async def periodic(context: ContextTypes.DEFAULT_TYPE):
         for r in rows:
             u = dict(r)
             now = datetime.now(ZoneInfo(u["tz"]))
-            if now.weekday() == 0 and now.hour == 9 and u["last_weekly"] != now.date():
+            if now.weekday() == 0 and now.hour == 9 and u["last_weekly"] != now.date() and feat("weekly"):
                 await POOL.execute("UPDATE users SET last_weekly = $2 WHERE user_id = $1", u["user_id"], now.date())
                 await send_weekly(bot, u, now.date())
                 await asyncio.sleep(0.05)
@@ -5874,7 +5907,7 @@ async def periodic(context: ContextTypes.DEFAULT_TYPE):
         for r in rows:
             u = dict(r)
             now = datetime.now(ZoneInfo(u["tz"]))
-            if now.hour == 9 and u["last_ayah"] != now.date():
+            if now.hour == 9 and u["last_ayah"] != now.date() and feat("ayah"):
                 await POOL.execute("UPDATE users SET last_ayah = $2 WHERE user_id = $1", u["user_id"], now.date())
                 try:
                     text, markup = await screen_ayah(u, now.date())
@@ -6141,7 +6174,7 @@ TOUR_FILE_IDS = {}
 
 async def send_tour(bot, u):
     """Once, right after the setup: what else is in the mini app, with buttons straight into each part."""
-    if not WEBAPP_URL or not is_private(u) or u["tour_sent"]:
+    if not WEBAPP_URL or not is_private(u) or u["tour_sent"] or not feat("tour"):
         return
     lang = u["lang"]
     await save(u["user_id"], tour_sent=True)
@@ -7809,6 +7842,652 @@ async def api_admin_ai(request):
                  "at": r["at"].isoformat(), "q": r["question"][:500], "a": r["answer"][:1500], "model": r["model"]} for r in logs]})
 
 
+# ───────────────────────── bot settings (main admin), defaults for newcomers, one person's settings ─────────────────────────
+
+FEATURES = [("remind", "🔔 Напоминания о намазе"), ("ayah", "📖 Аят дня"), ("ai", "🤖 ИИ-помощник"), ("app", "📱 Мини-приложение"),
+            ("share", "🤝 Поделиться с друзьями"), ("groups", "➕ Добавление в группы"), ("donate", "💝 Пожертвования"),
+            ("weekly", "📊 Недельные отчёты"), ("auto", "🔄 Автообновление карточки"), ("tour", "🎬 Приветственный тур"),
+            ("support", "💬 Поддержка")]
+MENU_ITEMS = {"times": "🕌 Время намаза", "app": "📱 Приложение", "ayah": "📖 Аят дня", "qibla": "🧭 Кибла",
+              "remind": "🔔 Напоминания", "settings": "⚙️ Настройки", "ai": "🤖 Вопрос об исламе", "groups": "➕ В группу",
+              "share": "🤝 Поделиться"}
+MENU_DEFAULT = [["times"], ["app"], ["ayah", "qibla"], ["remind", "settings"], ["ai"], ["groups"], ["share"]]
+BOT_CFG_DEFAULT = {"maint": False, "maint_text": "", "closed": False, "closed_text": "", "feat": {},
+                   "menu": MENU_DEFAULT, "hide": [], "sub": {"on": False, "channel": "", "text": ""},
+                   "defaults": {}, "welcome": "", "sup_auto": "", "profile": {}}
+BOT_CFG = json.loads(json.dumps(BOT_CFG_DEFAULT))
+SUB_OK = {}      # user_id -> time until which the subscription check is trusted
+GATE_NOTE = {}   # user_id -> last time we told them the bot is off/closed
+
+
+async def load_bot_cfg():
+    try:
+        cfg = json.loads(await kv_get("bot_cfg", "{}") or "{}")
+    except ValueError:
+        cfg = {}
+    BOT_CFG.clear()
+    BOT_CFG.update(json.loads(json.dumps(BOT_CFG_DEFAULT)))
+    BOT_CFG.update(cfg)
+    known = {k for row in BOT_CFG["menu"] for k in row}
+    BOT_CFG["menu"] += [[k] for row in MENU_DEFAULT for k in row if k not in known]  # buttons added later
+
+
+async def save_bot_cfg():
+    await kv_set("bot_cfg", json.dumps(BOT_CFG, ensure_ascii=False))
+
+
+def feat(name):
+    return BOT_CFG["feat"].get(name, True)
+
+
+def bot_off():
+    return BOT_CFG.get("maint", False)
+
+
+# ── what people see ──
+
+def menu_button(u, key):
+    lang = u["lang"]
+    if key == "times":
+        return InlineKeyboardButton(t(lang, "btn_times"), callback_data="m:times", style="success")
+    if key == "app":
+        return webapp_btn(t(lang, "btn_app"), "today") if WEBAPP_URL and feat("app") else None
+    if key == "ayah":
+        return btn(t(lang, "ayah_btn"), "ay:show") if feat("ayah") else None
+    if key == "qibla":
+        return qibla_btn(u)
+    if key == "remind":
+        return btn(t(lang, "btn_rem_s_on" if u["remind"] else "btn_rem_s_off"), "m:toggle")
+    if key == "settings":
+        return btn(t(lang, "btn_settings"), "m:settings")
+    if key == "ai":
+        return InlineKeyboardButton(t(lang, "ai_btn"), callback_data="ai:start", style="primary") \
+            if ai_allowed_now(u["user_id"]) else None
+    if key == "groups":
+        return add_group_btn(lang) if BOT_USERNAME and feat("groups") else None
+    if key == "share":
+        return btn(t(lang, "fr_btn"), "fr:share") if feat("share") else None
+    return None
+
+
+def private_menu_rows(u):
+    hide = set(BOT_CFG.get("hide", []))
+    rows = []
+    for row in BOT_CFG["menu"]:
+        bs = [b for b in (menu_button(u, k) for k in row if k not in hide or k == "settings") if b]
+        if bs:
+            rows.append(bs)
+    return rows
+
+
+GATE_T = {
+    "en": {"g_maint": "🛠 The bot is under maintenance. We'll be back soon 🤍", "g_closed": "🚪 New sign-ups are closed for now. Please try again later 🤍",
+           "g_sub": "📢 To use the bot, please subscribe to our channel first, then tap «✅ I've subscribed».",
+           "g_sub_btn": "📢 Subscribe", "g_sub_chk": "✅ I've subscribed", "g_sub_no": "You haven't subscribed yet 🙏", "g_sub_ok": "✅ Thank you! Press /start"},
+    "ru": {"g_maint": "🛠 Бот на техническом обслуживании. Скоро вернёмся 🤍", "g_closed": "🚪 Регистрация новых пользователей пока закрыта. Загляните позже 🤍",
+           "g_sub": "📢 Чтобы пользоваться ботом, подпишитесь на наш канал и нажмите «✅ Я подписался».",
+           "g_sub_btn": "📢 Подписаться", "g_sub_chk": "✅ Я подписался", "g_sub_no": "Вы ещё не подписались 🙏", "g_sub_ok": "✅ Спасибо! Нажмите /start"},
+    "uz": {"g_maint": "🛠 Botda texnik ishlar olib borilmoqda. Tez orada qaytamiz 🤍", "g_closed": "🚪 Yangi foydalanuvchilar uchun ro'yxatdan o'tish hozircha yopiq. Keyinroq urinib ko'ring 🤍",
+           "g_sub": "📢 Botdan foydalanish uchun kanalimizga obuna bo'ling va «✅ Obuna bo'ldim» tugmasini bosing.",
+           "g_sub_btn": "📢 Obuna bo'lish", "g_sub_chk": "✅ Obuna bo'ldim", "g_sub_no": "Hali obuna bo'lmadingiz 🙏", "g_sub_ok": "✅ Rahmat! /start ni bosing"},
+    "tg": {"g_maint": "🛠 Бот дар таъмир аст. Ба зудӣ бармегардем 🤍", "g_closed": "🚪 Сабти номи корбарони нав ҳоло баста аст. Баъдтар биёед 🤍",
+           "g_sub": "📢 Барои истифодаи бот ба канали мо обуна шавед ва «✅ Обуна шудам»-ро пахш кунед.",
+           "g_sub_btn": "📢 Обуна шудан", "g_sub_chk": "✅ Обуна шудам", "g_sub_no": "Шумо ҳанӯз обуна нашудаед 🙏", "g_sub_ok": "✅ Ташаккур! /start-ро пахш кунед"},
+    "ar": {"g_maint": "🛠 البوت قيد الصيانة. سنعود قريبًا 🤍", "g_closed": "🚪 التسجيل للمستخدمين الجدد مغلق حاليًا. حاول لاحقًا 🤍",
+           "g_sub": "📢 لاستخدام البوت اشترك في قناتنا أولاً ثم اضغط «✅ اشتركت».",
+           "g_sub_btn": "📢 اشترك", "g_sub_chk": "✅ اشتركت", "g_sub_no": "لم تشترك بعد 🙏", "g_sub_ok": "✅ شكرًا! اضغط /start"},
+}
+for _l, _d in GATE_T.items():
+    T[_l].update(_d)
+T["uzc"].update(to_cyr(GATE_T["uz"]))
+
+
+async def gate_note(update, text, markup=None):
+    """Tells the person why the bot doesn't answer (at most once a minute for messages)."""
+    uid = update.effective_user.id
+    if update.callback_query:
+        try:
+            await update.callback_query.answer(text[:190], show_alert=True)
+        except Exception:  # noqa: BLE001
+            pass
+        return
+    if GATE_NOTE.get(uid, 0) > _time.time() - 60 and markup is None:
+        return
+    GATE_NOTE[uid] = _time.time()
+    try:
+        await update.effective_chat.send_message(text, reply_markup=markup, disable_web_page_preview=True)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+async def sub_ok(bot, uid, fresh=False):
+    ch = BOT_CFG["sub"].get("channel")
+    if not ch:
+        return True
+    if not fresh and SUB_OK.get(uid, 0) > _time.time():
+        return True
+    try:
+        m = await bot.get_chat_member(ch, uid)
+        ok = m.status in ("member", "administrator", "creator", "restricted")
+    except Exception:  # noqa: BLE001
+        log.warning("subscription check failed for %s", ch)
+        ok = True  # the bot isn't an admin of the channel: don't lock people out
+    if ok:
+        SUB_OK[uid] = _time.time() + 600
+    return ok
+
+
+async def gate_rules(update, ctx, user, lang, inserted):
+    """Maintenance, closed sign-ups, required channel. Raises ApplicationHandlerStop when the person must wait."""
+    if is_admin(user.id):
+        return
+    chat = update.effective_chat
+    private = chat is not None and chat.type == "private"
+    if bot_off():
+        if private or update.callback_query:
+            await gate_note(update, BOT_CFG.get("maint_text") or t(lang, "g_maint"))
+        raise ApplicationHandlerStop
+    if not private:
+        return
+    if inserted and BOT_CFG.get("closed"):
+        await POOL.execute("DELETE FROM users WHERE user_id = $1 AND NOT onboarded", user.id)
+        await gate_note(update, BOT_CFG.get("closed_text") or t(lang, "g_closed"))
+        raise ApplicationHandlerStop
+    sub = BOT_CFG.get("sub") or {}
+    if sub.get("on") and sub.get("channel"):
+        q = update.callback_query
+        if q and q.data == "subchk":
+            if await sub_ok(ctx.bot, user.id, fresh=True):
+                await q.answer(t(lang, "g_sub_ok"), show_alert=True)
+                try:
+                    await q.message.delete()
+                except Exception:  # noqa: BLE001
+                    pass
+            else:
+                await q.answer(t(lang, "g_sub_no"), show_alert=True)
+            raise ApplicationHandlerStop
+        if not await sub_ok(ctx.bot, user.id):
+            ch = sub["channel"].lstrip("@")
+            markup = kb([InlineKeyboardButton(t(lang, "g_sub_btn"), url=f"https://t.me/{ch}")], [btn(t(lang, "g_sub_chk"), "subchk")])
+            if update.callback_query:
+                await gate_note(update, t(lang, "g_sub_no"))
+            await gate_note(update, sub.get("text") or t(lang, "g_sub"), markup)
+            raise ApplicationHandlerStop
+
+
+async def apply_defaults(uid):
+    d = BOT_CFG.get("defaults") or {}
+    fields = {}
+    for k, v in d.items():
+        if k == "quiet":
+            fields.update(quiet_start=None, quiet_end=None) if v == "off" else \
+                fields.update(quiet_start=int(v.split("-")[0]), quiet_end=int(v.split("-")[1]))
+        elif k == "pm":
+            fields["prayer_modes"] = v
+        elif k in USER_FIELDS:
+            fields[k] = v
+    if fields:
+        await save(uid, **fields)
+
+
+async def send_welcome(bot, uid):
+    await asyncio.sleep(2)
+    try:
+        await bot.send_message(uid, BOT_CFG["welcome"], disable_web_page_preview=True)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+# ── the settings a person has (used for one person and for the defaults) ──
+
+def _yn(v):
+    return "да ✅" if v else "нет ❌"
+
+
+def _quiet_label(v):
+    return "выкл" if v in (None, "off") else f"{int(v.split('-')[0]):02d}:00–{int(v.split('-')[1]):02d}:00"
+
+
+USER_FIELDS = {
+    "lang": ("🌐 Язык", list(LANGS), lambda v: LANG_BUTTONS.get(v, v or "—")),
+    "madhab": ("🕌 Мазхаб", ["hanafi", "std"], lambda v: MADHAB_RU.get(v, "—")),
+    "remind": ("🔔 Напоминания", [True, False], _yn),
+    "lead_min": ("⏰ Напоминать за", LEAD_OPTIONS, lambda v: f"{v} мин" if v else "без заранее"),
+    "at_time": ("🕌 В момент азана", [True, False], _yn),
+    "quiet": ("🔕 Тихие часы", ["off"] + [f"{a}-{b}" for a, b in QUIET_PRESETS], _quiet_label),
+    "auto_mode": ("🔄 Автообновление", AUTO_OPTIONS, lambda v: auto_label("ru", v)),
+    "ramadan": ("🌙 Рамадан в карточке", [True, False], _yn),
+    "suhoor_rem": ("🥣 Сухур", SUH_OPTS, lambda v: "выкл" if v < 0 else f"за {v} мин"),
+    "iftar_rem": ("🍽 Ифтар", IFT_OPTS, lambda v: "выкл" if v < 0 else ("в момент Магриба" if v == 0 else f"за {v} мин")),
+    "ayah_rem": ("📖 Аят дня в 9:00", [True, False], _yn),
+    "weekly": ("📊 Недельный отчёт", [True, False], _yn),
+    "daily": ("📅 Расписание в чат", ["off", "fajr", "sunrise"], lambda v: {"off": "выкл", "fajr": "в Фаджр", "sunrise": "на восходе"}.get(v, v)),
+}
+PRIVATE_FIELDS = ["lang", "madhab", "remind", "lead_min", "at_time", "quiet", "auto_mode", "ramadan", "suhoor_rem", "iftar_rem",
+                  "ayah_rem", "weekly"]
+CHAT_FIELDS = ["lang", "madhab", "remind", "lead_min", "at_time", "quiet", "auto_mode", "ramadan", "daily"]
+DEFAULT_FIELDS = ["lead_min", "at_time", "quiet", "auto_mode", "ramadan", "suhoor_rem", "iftar_rem", "ayah_rem", "weekly"]
+MODE_RU = {"s": "🔔", "q": "🔕", "o": "❌"}
+
+
+def field_value(u, f):
+    if f == "quiet":
+        return "off" if u["quiet_start"] is None else f"{u['quiet_start']}-{u['quiet_end']}"
+    return u[f]
+
+
+def enc(v):
+    return "1" if v is True else "0" if v is False else str(v)
+
+
+def dec(f, raw):
+    opts = USER_FIELDS[f][1]
+    for o in opts:
+        if enc(o) == raw:
+            return o, True
+    return None, False
+
+
+async def screen_user_settings(uid, back):
+    u = await get_user(uid)
+    if not u:
+        return "🤷 Нет такого пользователя.", kb(ADMIN_BACK)
+    private = u["chat_type"] == "private"
+    fields = PRIVATE_FIELDS if private else CHAT_FIELDS
+    who = esc(await admin_name(uid))
+    lines = [f"⚙️ <b>Настройки: {who}</b>", "", f"📍 Город: {esc(u['city'] or '—')}"]
+    rows, cur = [[btn("📍 Изменить город", f"a:usc:{uid}:{back}")]], []
+    for f in fields:
+        label, _, show = USER_FIELDS[f]
+        val = field_value(u, f)
+        lines.append(f"{label}: <b>{esc(show(val))}</b>")
+        cur.append(btn(label, f"a:uso:{uid}:{f}:{back}"))
+        if len(cur) == 2:
+            rows.append(cur)
+            cur = []
+    if cur:
+        rows.append(cur)
+    modes = (u["prayer_modes"] or "sssss").ljust(5, "s")
+    lines.append("🔊 Звук намазов: " + " ".join(f"{PN['ru'][k.lower()]} {MODE_RU[modes[i]]}" for i, k in enumerate(EVENTS)))
+    rows.append([btn(f"{MODE_RU[modes[i]]} {PN['ru'][k.lower()]}", f"a:uspm:{uid}:{i}:{back}") for i, k in enumerate(EVENTS)])
+    lines += ["", "Нажмите на настройку, чтобы изменить. Человеку ничего не придёт."]
+    rows.append([btn("⬅️ К карточке", f"a:card:{uid}:{back}")])
+    return "\n".join(lines), kb(*rows)
+
+
+async def set_user_field(bot, uid, f, val):
+    u = await get_user(uid)
+    if f == "quiet":
+        if val == "off":
+            await save(uid, quiet_start=None, quiet_end=None)
+        else:
+            a, b = (int(x) for x in val.split("-"))
+            await save(uid, quiet_start=a, quiet_end=b)
+        return
+    await save(uid, **{f: val})
+    if f == "lang" and u and u["lang"] != val:
+        await relocalize_city(uid, val)
+        if u["chat_type"] == "private" and u["onboarded"]:
+            try:
+                await sync_menu_button(bot, await get_user(uid))
+            except Exception:  # noqa: BLE001
+                pass
+
+
+# ── admin screens ──
+
+def screen_bset_home():
+    c = BOT_CFG
+    off = [n for k, n in FEATURES if not feat(k)]
+    sub = c.get("sub") or {}
+    text = ("⚙️ <b>Настройки бота</b>\n\n"
+            f"Бот: {'🔴 выключен (техработы)' if c['maint'] else '🟢 работает'}\n"
+            f"Регистрация: {'🚪 закрыта' if c['closed'] else '✅ открыта'}\n"
+            f"Подписка на канал: {('✅ ' + esc(sub.get('channel', ''))) if sub.get('on') else 'выкл'}\n"
+            f"Выключенные функции: {', '.join(off) if off else 'нет'}")
+    return text, kb(
+        [btn("🟢 Включить бота" if c["maint"] else "🔴 Выключить бота", "a:bset:maint")],
+        [btn("✅ Открыть регистрацию" if c["closed"] else "🚪 Закрыть регистрацию", "a:bset:closed")],
+        [btn("🧩 Функции", "a:bset:feat"), btn("🧭 Меню", "a:bset:menu")],
+        [btn("✍️ Тексты", "a:bset:texts"), btn("📢 Подписка на канал", "a:bset:sub")],
+        [btn("👥 По умолчанию для новичков", "a:bset:def")],
+        [btn("🖥 Система", "a:bset:sys")],
+        ADMIN_BACK)
+
+
+TEXT_KEYS = {"maint_text": ("🛠 Текст техработ", "Что увидят люди, когда бот выключен."),
+             "closed_text": ("🚪 Текст закрытой регистрации", "Что увидят новые люди, когда регистрация закрыта."),
+             "welcome": ("👋 Приветствие новичкам", "Отдельное сообщение каждому новому человеку после первого /start."),
+             "sup_auto": ("💬 Автоответ поддержки", "Приходит человеку после его сообщения в поддержку."),
+             "sub_text": ("📢 Текст про подписку", "Что увидит человек, пока не подписан на канал.")}
+PROFILE_LANGS = ["en", "ru", "uz", "tg", "ar"]
+
+
+async def admin_bset(update, ctx, parts):
+    """a:bset:… — the main admin's bot settings."""
+    what = parts[2] if len(parts) > 2 else "home"
+    arg = parts[3] if len(parts) > 3 else ""
+    c = BOT_CFG
+    if what in ("maint", "closed"):
+        c[what] = not c[what]
+        await save_bot_cfg()
+    elif what == "feat":
+        if arg:
+            c["feat"][arg] = not feat(arg)
+            if arg == "ai":
+                await save_ai_cfg(enabled=c["feat"][arg])
+            await save_bot_cfg()
+        rows = [[btn(("✅ " if feat(k) else "⛔ ") + n, f"a:bset:feat:{k}")] for k, n in FEATURES]
+        return await render(update, "🧩 <b>Функции бота</b>\n\nНажмите, чтобы включить или выключить для всех.\n"
+                                    "Выключенная функция пропадает из меню и перестаёт работать.", kb(*rows, [btn("⬅️ Назад", "a:bset")]))
+    elif what == "menu":
+        menu, hide = c["menu"], set(c.get("hide", []))
+        if arg == "up" and len(parts) > 4 and parts[4].isdigit():
+            i = int(parts[4])
+            if 0 < i < len(menu):
+                menu[i - 1], menu[i] = menu[i], menu[i - 1]
+        elif arg == "down" and len(parts) > 4 and parts[4].isdigit():
+            i = int(parts[4])
+            if 0 <= i < len(menu) - 1:
+                menu[i + 1], menu[i] = menu[i], menu[i + 1]
+        elif arg == "hide" and len(parts) > 4 and parts[4] in MENU_ITEMS and parts[4] != "settings":
+            hide ^= {parts[4]}
+            c["hide"] = sorted(hide)
+        elif arg == "join" and len(parts) > 4 and parts[4].isdigit():  # put this row next to the one above
+            i = int(parts[4])
+            if 0 < i < len(menu) and len(menu[i - 1]) + len(menu[i]) <= 3:
+                menu[i - 1] = menu[i - 1] + menu.pop(i)
+        elif arg == "split" and len(parts) > 4 and parts[4].isdigit():
+            i = int(parts[4])
+            if i < len(menu) and len(menu[i]) > 1:
+                menu[i:i + 1] = [[k] for k in menu[i]]
+        elif arg == "reset":
+            c["menu"], c["hide"] = json.loads(json.dumps(MENU_DEFAULT)), []
+        if arg:
+            await save_bot_cfg()
+        menu, hide = c["menu"], set(c.get("hide", []))
+        lines = ["🧭 <b>Меню бота</b>", "", "Порядок строк сверху вниз. 🙈 — скрыто. «Админка» всегда внизу у админов.", ""]
+        rows = []
+        for i, row in enumerate(menu):
+            lines.append(f"{i + 1}. " + " | ".join(("🙈 " if k in hide else "") + MENU_ITEMS[k] for k in row))
+            rows.append([btn("🔼", f"a:bset:menu:up:{i}"), btn("🔽", f"a:bset:menu:down:{i}")] +
+                        ([btn("⤴️ Склеить", f"a:bset:menu:join:{i}")] if i and len(menu[i - 1]) + len(row) <= 3 else []) +
+                        ([btn("↔️ Разделить", f"a:bset:menu:split:{i}")] if len(row) > 1 else []))
+            rows.append([btn(("👁 " if k in hide else "🙈 ") + MENU_ITEMS[k], f"a:bset:menu:hide:{k}") for k in row if k != "settings"]
+                        or [btn("⚙️ Настройки — всегда видны", "a:bset:menu")])
+        rows += [[btn("♻️ Как было", "a:bset:menu:reset")], [btn("⬅️ Назад", "a:bset")]]
+        return await render(update, "\n".join(lines), kb(*rows))
+    elif what == "texts":
+        if arg in TEXT_KEYS or arg.startswith("pd_") or arg.startswith("pa_"):
+            ctx.user_data["admin_state"] = "bs_text:" + arg
+            if arg in TEXT_KEYS:
+                title, hint = TEXT_KEYS[arg]
+                cur = (c.get("sub") or {}).get("text", "") if arg == "sub_text" else c.get(arg, "")
+            else:
+                pl = arg[3:]
+                title = ("📝 Описание бота" if arg.startswith("pd_") else "🏷 Короткое описание") + f" ({pl.upper()})"
+                hint = ("Текст на пустом экране бота до /start (до 512 символов)." if arg.startswith("pd_")
+                        else "Текст в профиле бота (до 120 символов).")
+                cur = (c.get("profile", {}).get(pl) or {}).get("desc" if arg.startswith("pd_") else "about", "")
+            return await render(update, f"{title}\n\n{hint}\n\nСейчас: <i>{esc(cur) if cur else 'стандартный'}</i>\n\n"
+                                        "Отправьте новый текст или «-», чтобы вернуть стандартный.", kb([btn("⬅️ Назад", "a:bset:texts")]))
+        rows = [[btn(v[0], f"a:bset:texts:{k}")] for k, v in TEXT_KEYS.items()]
+        rows.append([btn(f"📝 {pl.upper()}", f"a:bset:texts:pd_{pl}") for pl in PROFILE_LANGS])
+        rows.append([btn(f"🏷 {pl.upper()}", f"a:bset:texts:pa_{pl}") for pl in PROFILE_LANGS])
+        rows.append([btn("⬅️ Назад", "a:bset")])
+        return await render(update, "✍️ <b>Тексты</b>\n\nСвои тексты показываются всем на одном языке — так, как вы их напишете.\n"
+                                    "📝 — описание бота на пустом экране, 🏷 — короткое описание в профиле (по языкам).", kb(*rows))
+    elif what == "sub":
+        sub = c.setdefault("sub", {"on": False, "channel": "", "text": ""})
+        if arg == "on":
+            if not sub.get("channel"):
+                return await update.callback_query.answer("Сначала укажите канал", show_alert=True)
+            try:
+                me = await ctx.bot.get_chat_member(sub["channel"], ctx.bot.id)
+                if me.status not in ("administrator", "creator"):
+                    return await update.callback_query.answer("Сделайте бота админом канала, иначе он не видит подписчиков.",
+                                                              show_alert=True)
+            except Exception:  # noqa: BLE001
+                return await update.callback_query.answer("Бот не видит канал. Добавьте бота в канал админом.", show_alert=True)
+            sub["on"] = True
+            await save_bot_cfg()
+        elif arg == "off":
+            sub["on"] = False
+            await save_bot_cfg()
+        elif arg == "ch":
+            ctx.user_data["admin_state"] = "bs_text:sub_ch"
+            return await render(update, "📢 Отправьте @username канала (например, <code>@MawaqitNews</code>).\n\n"
+                                        "Бота нужно добавить в этот канал администратором.", kb([btn("⬅️ Назад", "a:bset:sub")]))
+        return await render(update, "📢 <b>Обязательная подписка на канал</b>\n\n"
+                                    f"Статус: {'✅ включена' if sub.get('on') else '⛔ выключена'}\n"
+                                    f"Канал: {esc(sub.get('channel') or '— не указан')}\n\n"
+                                    "Пока человек не подписан, бот показывает ему кнопку «Подписаться». Админов это не касается.",
+                            kb([btn("✏️ Указать канал", "a:bset:sub:ch")],
+                               [btn("⛔ Выключить", "a:bset:sub:off") if sub.get("on") else btn("✅ Включить", "a:bset:sub:on")],
+                               [btn("✍️ Свой текст", "a:bset:texts:sub_text")], [btn("⬅️ Назад", "a:bset")]))
+    elif what == "def":
+        d = c.setdefault("defaults", {})
+        if arg == "set" and len(parts) > 5:
+            f, raw = parts[4], parts[5]
+            if f == "pm" and re.match(r"^[sqo]{5}$", raw):
+                d["pm"] = raw
+            elif f in DEFAULT_FIELDS:
+                v, ok = dec(f, raw)
+                if ok:
+                    d[f] = v
+            await save_bot_cfg()
+        elif arg == "opt" and len(parts) > 4 and parts[4] in DEFAULT_FIELDS:
+            f = parts[4]
+            label, opts, show = USER_FIELDS[f]
+            rows = [[btn(("✅ " if enc(d.get(f)) == enc(o) else "") + show(o), f"a:bset:def:set:{f}:{enc(o)}")] for o in opts]
+            rows.append([btn("📣 Применить текущее ко всем", f"a:bset:def:all:{f}")] if f in d else [])
+            rows.append([btn("⬅️ Назад", "a:bset:def")])
+            return await render(update, f"{label} — <b>по умолчанию для новичков</b>", kb(*rows))
+        elif arg == "all" and len(parts) > 4 and (parts[4] in d):
+            f = parts[4]
+            return await render(update, f"📣 Поставить «{esc(USER_FIELDS[f][0] if f != 'pm' else '🔊 Звук намазов')}» = "
+                                        f"<b>{esc(USER_FIELDS[f][2](d[f]) if f != 'pm' else d[f])}</b> всем пользователям?\n\n"
+                                        "Это изменит настройку у всех, кто уже пользуется ботом.",
+                                kb([btn("✅ Да, всем", f"a:bset:def:allok:{f}"), btn("⬅️ Нет", "a:bset:def")]))
+        elif arg == "allok" and len(parts) > 4 and parts[4] in d:
+            f, v = parts[4], d[parts[4]]
+            if f == "quiet":
+                a, b = (None, None) if v == "off" else (int(x) for x in v.split("-"))
+                n = await POOL.execute("UPDATE users SET quiet_start = $1, quiet_end = $2 WHERE chat_type = 'private'", a, b)
+            else:
+                col = "prayer_modes" if f == "pm" else f
+                n = await POOL.execute(f"UPDATE users SET {col} = $1 WHERE chat_type = 'private'", v)
+            await update.effective_chat.send_message(f"✅ Готово: {n.split()[-1]} пользователей.")
+        elif arg == "pm" and len(parts) > 4 and parts[4].isdigit():
+            pm = list((d.get("pm") or "sssss").ljust(5, "s"))
+            i = int(parts[4]) % 5
+            pm[i] = {"s": "q", "q": "o", "o": "s"}[pm[i]]
+            d["pm"] = "".join(pm)
+            await save_bot_cfg()
+        lines = ["👥 <b>По умолчанию для новичков</b>", "", "Так будет у каждого нового человека. Не задано — стандартное значение.", ""]
+        rows, cur = [], []
+        for f in DEFAULT_FIELDS:
+            label, _, show = USER_FIELDS[f]
+            lines.append(f"{label}: <b>{esc(show(d[f])) if f in d else 'стандарт'}</b>")
+            cur.append(btn(label, f"a:bset:def:opt:{f}"))
+            if len(cur) == 2:
+                rows.append(cur)
+                cur = []
+        if cur:
+            rows.append(cur)
+        pm = (d.get("pm") or "sssss").ljust(5, "s")
+        lines.append("🔊 Звук намазов: " + " ".join(f"{PN['ru'][k.lower()]} {MODE_RU[pm[i]]}" for i, k in enumerate(EVENTS)))
+        rows.append([btn(f"{MODE_RU[pm[i]]} {PN['ru'][k.lower()]}", f"a:bset:def:pm:{i}") for i, k in enumerate(EVENTS)])
+        if "pm" in d:
+            rows.append([btn("📣 Звук намазов — применить ко всем", "a:bset:def:all:pm")])
+        rows.append([btn("⬅️ Назад", "a:bset")])
+        return await render(update, "\n".join(lines), kb(*rows))
+    elif what == "sys":
+        if arg == "restart":
+            return await render(update, "♻️ Перезапустить бота? Он будет недоступен около минуты.",
+                                kb([btn("♻️ Да, перезапустить", "a:bset:sys:restartok"), btn("⬅️ Нет", "a:bset:sys")]))
+        if arg == "restartok":
+            await render(update, "♻️ Перезапускаю… Через минуту нажмите /start.", kb(ADMIN_BACK))
+            log.warning("restart requested by the main admin")
+            asyncio.get_running_loop().call_later(1.5, os._exit, 1)
+            return
+        if arg == "backup":
+            await update.callback_query.answer("Собираю копию…")
+            return await send_backup(update)
+        errs = "\n".join(f"• <code>{e[0]:%d.%m %H:%M}</code> {esc(e[1])}" for e in list(ERRBUF)) or "— ошибок нет 🎉"
+        up = int(_time.time() - START_TS)
+        size = await POOL.fetchval("SELECT pg_size_pretty(pg_database_size(current_database()))")
+        return await render(update, f"🖥 <b>Система</b>\n\n⏱ Работает: {up // 86400} д {up % 86400 // 3600} ч {up % 3600 // 60} мин\n"
+                                    f"🗄 Размер базы: {size}\n\n<b>Последние ошибки</b>\n{errs}",
+                            kb([btn("💾 Резервная копия базы", "a:bset:sys:backup")],
+                               [btn("♻️ Перезапустить бота", "a:bset:sys:restart")], [btn("🔄 Обновить", "a:bset:sys")],
+                               [btn("⬅️ Назад", "a:bset")]))
+    text, markup = screen_bset_home()
+    return await render(update, text, markup)
+
+
+async def send_backup(update):
+    """All tables as CSV files in one zip."""
+    import zipfile
+    buf = io.BytesIO()
+    tables = [r["table_name"] for r in await POOL.fetch(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' "
+        "ORDER BY table_name")]
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        async with POOL.acquire() as conn:
+            for tname in tables:
+                out = io.BytesIO()
+                await conn.copy_from_query(f'SELECT * FROM "{tname}"', output=out, format="csv", header=True)
+                z.writestr(f"{tname}.csv", out.getvalue())
+    buf.seek(0)
+    await update.effective_chat.send_document(document=buf, filename=f"mawaqit_backup_{datetime.utcnow():%Y%m%d_%H%M}.zip",
+                                              caption=f"💾 Резервная копия: {len(tables)} таблиц")
+
+
+async def admin_bset_text(update, ctx, state):
+    """Typed answers for the bot settings. Returns True if consumed."""
+    msg = update.message
+    plain = (msg.text or "").strip()
+    key = state.split(":", 1)[1]
+    ctx.user_data.pop("admin_state", None)
+    c = BOT_CFG
+    back = kb([btn("⬅️ К настройкам", "a:bset")])
+    if key == "sub_ch":
+        ch = plain.split("/")[-1].lstrip("@")
+        if not re.match(r"^[A-Za-z0-9_]{4,}$", ch):
+            await msg.reply_text("❗ Нужен @username канала, например @MawaqitNews", reply_markup=back)
+            return True
+        c.setdefault("sub", {})["channel"] = "@" + ch
+        c["sub"]["on"] = False
+        await save_bot_cfg()
+        await msg.reply_text(f"✅ Канал: @{esc(ch)}. Подписка пока выключена — включите её в «📢 Подписка на канал», "
+                             "когда добавите бота в канал админом.", parse_mode=ParseMode.HTML,
+                             reply_markup=kb([btn("📢 Подписка на канал", "a:bset:sub")]))
+        return True
+    if key in TEXT_KEYS:
+        if key == "sub_text":
+            c.setdefault("sub", {})["text"] = "" if plain == "-" else plain[:1000]
+        else:
+            c[key] = "" if plain == "-" else plain[:3000]
+        await save_bot_cfg()
+        await msg.reply_text("✅ Сохранено.", reply_markup=kb([btn("⬅️ К текстам", "a:bset:texts")]))
+        return True
+    if key[:3] in ("pd_", "pa_") and key[3:] in PROFILE_LANGS:
+        pl, field = key[3:], ("desc" if key.startswith("pd_") else "about")
+        limit = 512 if field == "desc" else 120
+        text = plain if plain != "-" else ""
+        if len(text) > limit:
+            await msg.reply_text(f"❗ Слишком длинно: {len(text)} символов, можно до {limit}.")
+            return True
+        c.setdefault("profile", {}).setdefault(pl, {})[field] = text
+        await save_bot_cfg()
+        ok = await apply_profile_texts(ctx.bot, only=pl)
+        await msg.reply_text("✅ Сохранено" + (" и обновлено в профиле бота." if ok else ", но Telegram пока не принял — попробую при перезапуске."),
+                             reply_markup=kb([btn("⬅️ К текстам", "a:bset:texts")]))
+        return True
+    return False
+
+
+async def apply_profile_texts(bot, only=None):
+    ok = True
+    for pl in PROFILE_LANGS:
+        if only and pl != only:
+            continue
+        custom = BOT_CFG.get("profile", {}).get(pl) or {}
+        about = custom.get("about") or (BOT_ABOUT["en"] if pl == "en" else "")
+        desc = custom.get("desc") or (BOT_DESCRIPTION["en"] if pl == "en" else "")
+        for code in ([None, pl] if pl == "en" else [pl]):
+            try:
+                await bot.set_my_short_description(about, language_code=code)
+                await bot.set_my_description(desc, language_code=code)
+            except Exception:  # noqa: BLE001
+                log.exception("could not set profile texts for %s", code or "default")
+                ok = False
+    return ok
+
+
+async def admin_user_settings(update, ctx, parts):
+    """a:us / a:uso / a:usset / a:uspm / a:usc — one person's (or chat's) settings."""
+    sub = parts[1]
+    uid = int(parts[2]) if len(parts) > 2 and parts[2].lstrip("-").isdigit() else 0
+    u = await get_user(uid) if uid else None
+    if not u:
+        return await render(update, "🤷 Нет такого пользователя.", kb(ADMIN_BACK))
+    if sub == "uso" and len(parts) > 3 and parts[3] in USER_FIELDS:
+        f, back = parts[3], (parts[4] if len(parts) > 4 else "")
+        label, opts, show = USER_FIELDS[f]
+        cur = field_value(u, f)
+        rows = [[btn(("✅ " if enc(cur) == enc(o) else "") + show(o), f"a:usset:{uid}:{f}:{enc(o)}:{back}")] for o in opts]
+        rows.append([btn("⬅️ Назад", f"a:us:{uid}:{back}")])
+        return await render(update, f"{label} — {esc(await admin_name(uid))}", kb(*rows))
+    if sub == "usset" and len(parts) > 4 and parts[3] in USER_FIELDS:
+        v, ok = dec(parts[3], parts[4])
+        if ok:
+            await set_user_field(ctx.bot, uid, parts[3], v)
+            await update.callback_query.answer("✅ Изменено")
+        back = parts[5] if len(parts) > 5 else ""
+    elif sub == "uspm" and len(parts) > 3 and parts[3].isdigit():
+        pm = list((u["prayer_modes"] or "sssss").ljust(5, "s"))
+        i = int(parts[3]) % 5
+        pm[i] = {"s": "q", "q": "o", "o": "s"}[pm[i]]
+        await save(uid, prayer_modes="".join(pm))
+        back = parts[4] if len(parts) > 4 else ""
+    elif sub == "usc":
+        back = parts[3] if len(parts) > 3 else ""
+        ctx.user_data["admin_state"] = f"us_city:{uid}:{back}"
+        return await render(update, f"📍 Отправьте город для {esc(await admin_name(uid))}, например <code>Самарканд</code>.",
+                            kb([btn("⬅️ Назад", f"a:us:{uid}:{back}")]))
+    else:
+        back = parts[3] if len(parts) > 3 else ""
+    text, markup = await screen_user_settings(uid, back)
+    return await render(update, text, markup)
+
+
+async def admin_user_city(update, ctx, state):
+    msg = update.message
+    _, uid, back = (state.split(":") + [""])[:3]
+    uid = int(uid)
+    ctx.user_data.pop("admin_state", None)
+    u = await get_user(uid)
+    if not u:
+        return True
+    place = await geocode((msg.text or "").strip()[:80], u["lang"] or "ru")
+    if not place:
+        await msg.reply_text("🤷 Город не найден. Попробуйте написать иначе.", reply_markup=kb([btn("📍 Ещё раз", f"a:usc:{uid}:{back}")]))
+        return True
+    name, lat, lon, cc = place
+    pu = dict(u, lat=lat, lon=lon, country=cc, tz=None)
+    try:
+        data = await get_timings(pu, datetime.utcnow().date())
+    except Exception:  # noqa: BLE001
+        await msg.reply_text("⚠️ Не получилось получить время для этого места. Попробуйте позже.")
+        return True
+    await save(uid, city=name, lat=lat, lon=lon, country=cc, tz=data["tz"], awaiting_city=False)
+    text, markup = await screen_user_settings(uid, back)
+    await msg.reply_text(f"✅ Город: {esc(name)}\n\n" + text, parse_mode=ParseMode.HTML, reply_markup=markup)
+    return True
+
+
 # ───────────────────────── app ─────────────────────────
 
 
@@ -7869,8 +8548,11 @@ async def setup_profile(bot):
             try:
                 # The bot's profile description is English for everyone: other languages get an empty one,
                 # so Telegram shows the default (English) text.
-                await bot.set_my_short_description(BOT_ABOUT["en"] if lang == "en" else "", language_code=code)
-                await bot.set_my_description(BOT_DESCRIPTION["en"] if lang == "en" else "", language_code=code)
+                custom = BOT_CFG.get("profile", {}).get(lang) or {}
+                await bot.set_my_short_description(custom.get("about") or (BOT_ABOUT["en"] if lang == "en" else ""),
+                                                   language_code=code)
+                await bot.set_my_description(custom.get("desc") or (BOT_DESCRIPTION["en"] if lang == "en" else ""),
+                                             language_code=code)
                 await bot.set_my_commands([BotCommand("start", BOT_COMMAND[lang])], language_code=code)
             except RetryAfter as e:
                 log.warning("profile texts rate-limited, retry in %ss", e.retry_after)
@@ -7888,6 +8570,7 @@ async def post_init(app: Application):
     await load_azans()
     await load_admins()
     await load_ai()
+    await load_bot_cfg()
     await load_ayah_pool()
     await POOL.execute("UPDATE broadcasts SET status = 'failed', finished_at = now() WHERE status IN ('running', 'queued')")
     if AI["key"]:  # check the key and pick the models in the background
